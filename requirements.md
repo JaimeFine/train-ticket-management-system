@@ -1,3 +1,11 @@
+# Requirements
+
+## Functionalities
+
+Train schedule management, real-time ticket availability inquiry, ticket sales / refunds, order saving; historical order statistics, dynamic pricing calculation; Dijkstra/Floyd shortest path transfer recommendation, graph structure storage for routes.
+
+## Basic Structures
+
 Here is the structure of the Train Ticket Management System:
 
 - **Train Ticket Management System**

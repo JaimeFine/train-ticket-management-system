@@ -3,16 +3,55 @@
 ## Structure
 
 ```txt
-root
-├── src
-│   ├── modules
-│   │   ├── auth        # Login, registration, role permission
-│   │   ├── admin       # Station management, train schedules
-│   │   ├── booking     # Ticket sales, refunds, changes
-│   │   ├── inventory   # Core seat‑availability engine
-│   │   └── public      # Guest inquiry portal
-│   ├── shared          # Database connection, common error handlers
-│   └── test            # Shared test files
-├── package.json
-└── .env                # Keep your secrets here!
+TrainTicketSystem/
+│
+├── src/
+│   ├── login/
+│   ├── ticket/
+│   ├── train/
+│   ├── statistics/
+│   ├── database/
+│   └── ui/
+├── include/
+├── resources/
+├── docs/
+├── tests/
+├── database/
+├── CMakeLists.txt
+└── README.md
 ```
+
+## **VERY IMPORTANT: DataBase Schema**
+
+### **User**
+- id  
+- username  
+- password  
+- role  
+- enabled  
+
+### **Train**
+- train_id  
+- train_no  
+- departure_station  
+- arrival_station  
+- departure_time  
+- arrival_time  
+
+### **Station**
+- station_id  
+- name  
+
+### **Ticket**
+- ticket_id  
+- train_id  
+- seat_type  
+- remaining  
+- price  
+
+### **Order**
+- order_id  
+- user_id  
+- ticket_id  
+- status  
+- purchase_time  
