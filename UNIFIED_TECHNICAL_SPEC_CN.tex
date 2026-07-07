@@ -1,0 +1,231 @@
+\documentclass[10pt,twocolumn]{ctexart}
+
+\usepackage[a4paper,margin=0.7in]{geometry}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{xcolor}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue,
+  pdftitle={火车票务管理系统 - 统一技术规范},
+  pdfauthor={项目团队}
+}
+
+\setlist[itemize]{leftmargin=*,itemsep=2pt,topsep=2pt}
+\setlist[enumerate]{leftmargin=*,itemsep=2pt,topsep=2pt}
+\setlength{\columnsep}{0.22in}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+
+\title{\textbf{火车票务管理系统}\\统一技术规范}
+\author{}
+\date{版本 1.0}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+\section{项目概述}
+火车票务管理系统是一个基于 Qt Widgets 和 C++ 开发的桌面应用程序。项目采用分层架构，以分离界面展示逻辑、业务逻辑和数据库访问逻辑。
+
+本文档是团队范围内的技术基线，用于定义统一的软件架构、模块职责、数据库设计、接口约定、集成规则和开发约束。
+
+所有成员都应按照本规范完成各自模块的实现。若需要修改本文档或共享架构，应在实施前与项目负责人沟通并达成一致。
+
+\section{技术栈}
+本项目使用 \textbf{C++17} 作为编程语言，采用 \textbf{Qt Widgets} 作为桌面界面框架，使用 \textbf{CMake} 进行构建，数据库统一选用 \textbf{SQLite}。版本控制工具为 \textbf{Git + GitHub}，日常开发以 \textit{develop} 为主分支，稳定发布以 \textit{main} 为目标分支。
+
+\section{项目结构}
+仓库应保持当前的高层目录结构：
+
+\begin{verbatim}
+TrainTicketSystem/
+src/
+  login/
+  train/
+  ticket/
+  statistics/
+  database/
+  ui/
+include/
+database/
+docs/
+tests/
+\end{verbatim}
+
+当前约定的核心类命名也属于共享结构的一部分：
+\textit{LoginManager}、\textit{TrainManager}、\textit{TicketManager}、
+\textit{StatisticsManager}、\textit{DatabaseManager}。
+
+\section{软件架构}
+项目采用如下分层架构：
+
+\begin{verbatim}
+Qt UI
+  |
+  v
+LoginManager
+TrainManager
+TicketManager
+StatisticsManager
+  |
+  v
+DatabaseManager
+  |
+  v
+SQLite
+\end{verbatim}
+
+\subsection*{架构规则}
+
+UI 类不得直接执行 SQL，所有数据库访问必须统一通过 \textit{DatabaseManager} 完成。各个 Manager 类通过公共接口向 UI 提供服务，并负责各自模块内部的业务逻辑处理。不同模块之间不应直接操作彼此的内部数据；若需要调整共享结构、重命名核心类或改变分层方式，必须先经过讨论再实施。
+
+\section{模块职责}
+\subsection*{项目负责人}
+项目负责人主要负责数据库设计与实现、GitHub 仓库管理、系统集成、代码审查以及 Pull Request 审查，同时承担团队协作过程中的接口协调和整体推进工作。
+
+\subsection*{程序员 A}
+模块：\textit{login/}
+
+程序员 A 负责登录窗口、身份验证逻辑、管理员相关功能以及权限管理实现。
+
+\subsection*{程序员 B}
+模块：\textit{train/}
+
+程序员 B 负责站点 CRUD、车次 CRUD、车次查询以及席位库存管理等与列车信息相关的功能。
+
+\subsection*{程序员 C}
+模块：\textit{ticket/}、\textit{statistics/}
+
+程序员 C 负责订票、退票、改签、订单历史以及统计分析等票务与报表相关功能。
+
+\subsection*{测试人员}
+测试人员负责功能测试、文档编写、用户手册整理以及 Bug 报告提交。
+
+\section{数据库规范}
+\subsection*{数据库引擎}：SQLite
+
+\textbf{版本 1 表}
+
+版本 1 的正式表包括 \textit{User}、\textit{Station}、\textit{Train} 和 \textit{Order}。
+
+\textbf{后续版本可扩展表}
+
+若后续需求扩大，可进一步引入 \textit{Ticket}、\textit{Payment}、\textit{Seat} 和 \textit{OperationLog} 等扩展表。
+
+\textbf{版本 1 设计决策}
+
+在首个集成版本中，不单独设置 \textit{Ticket} 表。当前约定为：\textit{Order} 表中的一条记录代表一条购票记录。这样可以简化数据库结构，降低多人协作时的集成风险。若后续需求强制要求座位级建模，可在版本 2 中扩展设计。
+
+\subsection*{User}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.22\columnwidth} >{\raggedright\arraybackslash}p{0.18\columnwidth} >{\raggedright\arraybackslash}p{0.48\columnwidth}}
+\toprule
+字段 & 类型 & 说明 \\
+\midrule
+\textit{userId} & INTEGER & 主键，自增 \\
+\textit{username} & TEXT & 唯一，非空 \\
+\textit{password} & TEXT & 非空 \\
+\textit{role} & INTEGER & 0 游客，1 售票员，2 管理员 \\
+\textit{enabled} & INTEGER & 默认值为 1 \\
+\bottomrule
+\end{tabular}
+
+\subsection*{Station}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.24\columnwidth} >{\raggedright\arraybackslash}p{0.20\columnwidth} >{\raggedright\arraybackslash}p{0.44\columnwidth}}
+\toprule
+字段 & 类型 & 说明 \\
+\midrule
+\textit{stationId} & INTEGER & 主键，自增 \\
+\textit{stationName} & TEXT & 唯一，非空 \\
+\bottomrule
+\end{tabular}
+
+\subsection*{Train}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.30\columnwidth} >{\raggedright\arraybackslash}p{0.18\columnwidth} >{\raggedright\arraybackslash}p{0.34\columnwidth}}
+\toprule
+字段 & 类型 & 说明 \\
+\midrule
+\textit{trainId} & INTEGER & 主键 \\
+\textit{trainNumber} & TEXT & 唯一，非空 \\
+\textit{departureStationId} & INTEGER & 外键，指向 Station \\
+\textit{arrivalStationId} & INTEGER & 外键，指向 Station \\
+\textit{departureTime} & TEXT & 非空 \\
+\textit{arrivalTime} & TEXT & 非空 \\
+\textit{totalSeats} & INTEGER & 非空 \\
+\textit{remainingSeats} & INTEGER & 非空 \\
+\textit{enabled} & INTEGER & 默认值为 1 \\
+\bottomrule
+\end{tabular}
+
+必要约束：
+\begin{itemize}
+  \item \textit{remainingSeats >= 0}
+  \item \textit{totalSeats >= 0}
+  \item \textit{remainingSeats <= totalSeats}
+\end{itemize}
+
+\subsection*{Order}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.25\columnwidth} >{\raggedright\arraybackslash}p{0.18\columnwidth} >{\raggedright\arraybackslash}p{0.41\columnwidth}}
+\toprule
+字段 & 类型 & 说明 \\
+\midrule
+\textit{orderId} & INTEGER & 主键 \\
+\textit{userId} & INTEGER & 外键，指向 User \\
+\textit{trainId} & INTEGER & 外键，指向 Train \\
+\textit{passengerName} & TEXT & 非空 \\
+\textit{purchaseTime} & TEXT & 非空 \\
+\textit{status} & INTEGER & 0 已预订，1 已退票，2 已改签 \\
+\bottomrule
+\end{tabular}
+
+\subsection*{关系定义}
+\textit{Order.userId} 关联 \textit{User.userId}，\textit{Order.trainId} 关联 \textit{Train.trainId}。同时，\textit{Train.departureStationId} 和 \textit{Train.arrivalStationId} 分别关联 \textit{Station.stationId}，用于表示车次的出发站和到达站。
+
+\section{接口约定}
+当前共享的核心 Manager 类如下：
+
+\textit{LoginManager}、\textit{TrainManager}、\textit{TicketManager}、\textit{StatisticsManager} 以及 \textit{DatabaseManager}。
+
+各 Manager 通过公共接口向 UI 提供服务。\textit{DatabaseManager} 是唯一允许执行 SQL 的组件。
+
+\subsection*{预期职责}
+
+\textit{LoginManager} 负责登录验证、角色校验和密码修改；\textit{TrainManager} 负责车次与站点的增删改查、车次搜索以及库存更新；\textit{TicketManager} 负责订票、退票、改签和历史查询；\textit{StatisticsManager} 负责报表与统计汇总；\textit{DatabaseManager} 则负责连接管理、数据库模式初始化以及共享查询执行。
+
+\section{开发规则}
+每个功能都应在独立的功能分支中开发，所有合并必须通过 Pull Request 完成，禁止直接向 \textit{main} 分支推送。日常开发的主要目标分支为 \textit{develop}。同时，Commit 信息必须清晰描述本次实现内容，便于审查与追踪。
+
+\textbf{良好示例}：\textit{Implement login validation}、\textit{Add train search}、\textit{Fix refund bug}。
+
+\textbf{避免使用}：\textit{update}、\textit{fix}、\textit{123}。
+
+\subsection*{AI 使用规则}
+
+如果团队成员使用 AI 生成代码，则该 AI 的输出也必须遵循本规范，保持既有结构一致，不得擅自发明新的整体架构，也不得绕开既定模块边界。
+
+\section{集成规则}
+默认情况下，每位程序员只修改自己负责的模块。若需要跨模块修改，应提前沟通并说明原因。数据库结构变更必须经过项目负责人批准，公共接口变更也应在实施前同步说明。无论模块如何扩展，UI 代码都必须保持不直接包含 SQL 逻辑。
+
+\section{当前项目状态}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.48\columnwidth} >{\raggedright\arraybackslash}p{0.38\columnwidth}}
+\toprule
+项目项 & 状态 \\
+\midrule
+架构设计 & 已确定 \\
+目录结构 & 已确定 \\
+模块职责 & 已确定 \\
+数据库设计 & 版本 1 已冻结 \\
+数据库实现 & 进行中 \\
+SQL 初始化 & 尚未实现 \\
+Qt UI & 进行中 \\
+测试 & 尚未开始 \\
+\bottomrule
+\end{tabular}
+
+\end{document}
