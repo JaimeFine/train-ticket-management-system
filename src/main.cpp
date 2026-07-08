@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QFont>
+#include <QMessageBox>
 
 #include "database_manager.h"
 #include "login_dialog.h"
@@ -14,7 +15,12 @@ int main(int argc, char *argv[])
 
     // 先准备数据库对象，再交给登录管理类使用。
     DatabaseManager databaseManager;
-    databaseManager.initialize();
+    if (!databaseManager.initialize()) {
+        QMessageBox::critical(nullptr,
+                              QStringLiteral("数据库初始化失败"),
+                              QStringLiteral("无法打开或初始化数据库：\n%1").arg(databaseManager.lastError()));
+        return 1;
+    }
 
     LoginManager loginManager(&databaseManager);
     LoginDialog loginDialog(loginManager);

@@ -45,6 +45,13 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
                 QStringLiteral("登录服务尚未连接。")};
     }
 
+    if (!m_databaseManager->isOpen()) {
+        return {false,
+                UserRole::Guest,
+                trimmedUsername,
+                QStringLiteral("登录服务不可用，请检查数据库。")};
+    }
+
     // 账号密码认证只通过 DatabaseManager 接口，保持 UI -> LoginManager -> DatabaseManager 的分层。
     const auto userAccount = m_databaseManager->findUserByCredentials(trimmedUsername, password);
 
