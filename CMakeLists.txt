@@ -16,6 +16,7 @@ message(STATUS "Using Qt ${QT_VERSION_MAJOR}.${QT_VERSION_MINOR}")
 # ── Source files grouped by module ────────────────────────────────────────────
 set(SOURCES
     src/main.cpp
+    src/login/login_dialog.cpp
     src/login/login_manager.cpp
     src/ticket/ticket_manager.cpp
     src/train/train_manager.cpp
@@ -25,6 +26,7 @@ set(SOURCES
 )
 
 set(HEADERS
+    include/login_dialog.h
     include/login_manager.h
     include/ticket_manager.h
     include/train_manager.h
