@@ -67,3 +67,11 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# latex headers
+*.aux
+*.log
+*.out
+
+# temp folders
+temp/*
