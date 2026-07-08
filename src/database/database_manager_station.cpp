@@ -26,6 +26,7 @@ bool DatabaseManager::addStation(const StationRecord &station) {
 std::optional<StationRecord> DatabaseManager::findStationById(
     int stationId
 ) const {
+    m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     query.prepare(QStringLiteral(
@@ -55,6 +56,7 @@ std::optional<StationRecord> DatabaseManager::findStationById(
 std::optional<StationRecord> DatabaseManager::findStationByName(
     const QString &stationName
 ) const {
+    m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     query.prepare(QStringLiteral(

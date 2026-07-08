@@ -1,15 +1,5 @@
 #pragma once
 
-
-// Current functionality
-// 1. open a SQLite database,
-// 2. create it automatically if it does not exist,
-// 3. create the four Version 1 tables,
-// 4. report success or failure.
-//
-// We are intentionally NOT adding booking, search, CRUD, login logic, or
-// business rules here. This keeps DatabaseManager focused on initialization
-
 #include <QString>
 #include <optional>
 #include <QList>
