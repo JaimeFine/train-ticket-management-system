@@ -37,6 +37,7 @@ bool DatabaseManager::addTrain(const TrainRecord &train) {
 }
 
 std::optional<TrainRecord> DatabaseManager::findTrainById(int trainId) const {
+    m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     query.prepare(QStringLiteral(
@@ -74,6 +75,7 @@ std::optional<TrainRecord> DatabaseManager::findTrainById(int trainId) const {
 std::optional<TrainRecord> DatabaseManager::findTrainByNumber(
     const QString &trainNumber
 ) const {
+    m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     query.prepare(QStringLiteral(
@@ -109,6 +111,7 @@ std::optional<TrainRecord> DatabaseManager::findTrainByNumber(
 }
 
 bool DatabaseManager::updateTrain(const TrainRecord &train) {
+    m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     query.prepare(QStringLiteral(

@@ -27,6 +27,7 @@ bool DatabaseManager::addUser(const UserRecord &user) {
 }
 
 std::optional<UserRecord> DatabaseManager::findUserById(int userId) const {
+    m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     query.prepare(QStringLiteral(
@@ -59,6 +60,7 @@ std::optional<UserRecord> DatabaseManager::findUserById(int userId) const {
 std::optional<UserRecord> DatabaseManager::findUserByUsername(
     const QString &username
 ) const {
+    m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     query.prepare(QStringLiteral(
@@ -89,6 +91,7 @@ std::optional<UserRecord> DatabaseManager::findUserByUsername(
 }
 
 bool DatabaseManager::updateUser(const UserRecord &user) {
+    m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     query.prepare(QStringLiteral(
