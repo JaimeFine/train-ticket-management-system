@@ -25,7 +25,9 @@ set(SOURCES
     src/database/database_manager_station.cpp
     src/database/database_manager_train.cpp
     src/database/database_manager_order.cpp
+    src/database/database_manager_ticket.cpp
     src/ui/main_window.cpp
+    src/ui/ticket_window.cpp
 )
 
 set(HEADERS
@@ -35,6 +37,7 @@ set(HEADERS
     include/statistics_manager.h
     include/database_manager.h
     include/main_window.h
+    include/ticket_window.h
 )
 
 # ── Resources ────────────────────────────────────────────────────────────────

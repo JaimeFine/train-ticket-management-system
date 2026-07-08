@@ -75,3 +75,11 @@ Testing/
 
 # temp folders
 temp/*
+
+# SQLite database files (generated at runtime)
+*.db
+*.db-journal
+*.db-wal
+
+# Temporary Python scripts (AI-generated one-offs)
+gen_*.py

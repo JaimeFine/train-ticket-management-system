@@ -56,6 +56,42 @@ public:
     QList<OrderRecord> findOrdersByUser(int userId) const;
     bool updateOrderStatus(int orderId, int status);
 
+    // ── Issue 9: Ticket-system extensions ──────────────────────
+    // Order search
+    std::optional<OrderRecord> findOrderById(int orderId) const;
+    QList<OrderRecord> findOrdersByPassenger(const QString &name) const;
+
+    // Order display: JOIN Train + Station for UI
+    struct OrderWithDetails {
+        int orderId = 0, userId = 0, trainId = 0, status = 0;
+        QString trainNumber, passengerName, purchaseTime;
+        QString departureStationName, arrivalStationName;
+    };
+    QList<OrderWithDetails> findAllOrdersWithDetails() const;
+
+    // Train search: JOIN Station for display
+    struct TrainWithStations {
+        int trainId = 0, totalSeats = 0, remainingSeats = 0;
+        QString trainNumber, departureStationName, arrivalStationName;
+        QString departureTime, arrivalTime;
+        bool enabled = true;
+    };
+    QList<TrainWithStations> searchTrainsByStation(
+        const QString &depStation, const QString &arrStation, const QString &date) const;
+
+    // Seat delta (positive=refund, negative=booking)
+    bool adjustTrainSeats(int trainId, int delta);
+
+    // ── Statistics aggregates ──────────────────────────────────
+    int countOrdersByStatus(int status) const;
+    int countAllOrders() const;
+
+    struct RouteStat { QString dep; QString arr; int count = 0; };
+    QList<RouteStat> popularRoutes(int limit = 10) const;
+
+    struct MonthlyStat { QString month; int total = 0; int booked = 0; int refunded = 0; };
+    QList<MonthlyStat> monthlyPassengerFlow() const;
+
 private:
     // * This block connect helpers
     // openDatabase() only worries about creating & opening the SQLite file.
