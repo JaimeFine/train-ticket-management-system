@@ -52,10 +52,10 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
                 QStringLiteral("登录服务不可用，请检查数据库。")};
     }
 
-    // 账号密码认证只通过 DatabaseManager 接口，保持 UI -> LoginManager -> DatabaseManager 的分层。
-    const auto userAccount = m_databaseManager->findUserByCredentials(trimmedUsername, password);
+    // 用户查询只通过 DatabaseManager，密码和角色判断留在 LoginManager。
+    const auto userAccount = m_databaseManager->findUserByUsername(trimmedUsername);
 
-    if (!userAccount.has_value()) {
+    if (!userAccount.has_value() || userAccount->password != password) {
         return {false,
                 UserRole::Guest,
                 trimmedUsername,

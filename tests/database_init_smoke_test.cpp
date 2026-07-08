@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
 }
 
 /*
-* Test Log:
+$ Test Log:
 PS C:\Users\13647\OneDrive\Desktop\train> cmake --build build --config Debug
 CMake is re-running because C:/Users/13647/OneDrive/Desktop/train/build/CMakeFiles/generate.stamp is out-of-date.
   the file 'C:/Users/13647/OneDrive/Desktop/train/CMakeLists.txt'
@@ -63,5 +63,4 @@ Test project C:/Users/13647/OneDrive/Desktop/train/build
 100% tests passed, 0 tests failed out of 1
 
 Total Test time (real) =   1.19 sec
-PS C:\Users\13647\OneDrive\Desktop\train>
 */
