@@ -82,3 +82,18 @@ LoginResult LoginManager::loginAsGuest() const
             QStringLiteral("游客"),
             QStringLiteral("游客访问已开启。")};
 }
+
+bool LoginManager::canAccessGuestFunctions(UserRole role)
+{
+    return role == UserRole::Guest || role == UserRole::Seller || role == UserRole::Admin;
+}
+
+bool LoginManager::canAccessSellerFunctions(UserRole role)
+{
+    return role == UserRole::Seller || role == UserRole::Admin;
+}
+
+bool LoginManager::canAccessAdminFunctions(UserRole role)
+{
+    return role == UserRole::Admin;
+}

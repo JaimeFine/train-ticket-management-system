@@ -29,6 +29,11 @@ public:
     LoginResult authenticate(const QString &username, const QString &password) const;
     LoginResult loginAsGuest() const;
 
+    // 这里只判断身份，不访问数据库，后面接入模块时可以继续用。
+    static bool canAccessGuestFunctions(UserRole role);
+    static bool canAccessSellerFunctions(UserRole role);
+    static bool canAccessAdminFunctions(UserRole role);
+
 private:
     const DatabaseManager *m_databaseManager = nullptr;
 };
