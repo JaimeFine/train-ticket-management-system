@@ -17,7 +17,7 @@ public:
 private:
     void handleLogin();
     void handleGuestAccess();
-    void showMessage(const QString &message, bool isError);
+    void showMessage(const QString &message);
 
     const LoginManager &m_loginManager;
     LoginResult m_loginResult;

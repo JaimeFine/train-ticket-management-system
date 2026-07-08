@@ -1,5 +1,6 @@
 #include "login_dialog.h"
 
+#include <QColor>
 #include <QFrame>
 #include <QFormLayout>
 #include <QGraphicsDropShadowEffect>
@@ -17,7 +18,7 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     setModal(true);
     setFixedSize(680, 430);
 
-    // 所有视觉样式集中写在登录对话框内部，避免影响其他模块窗口。
+    // 样式先放在登录窗口里，避免影响别的窗口。
     setStyleSheet(QStringLiteral(R"QSS(
         QDialog {
             background: #eef2f3;
@@ -118,7 +119,7 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     auto *rootLayout = new QVBoxLayout(this);
     rootLayout->setContentsMargins(22, 22, 22, 22);
 
-    // shellFrame 是登录卡片的外层容器，用来统一圆角、边框和阴影。
+    // 外层框负责白色背景、圆角和阴影。
     auto *shellFrame = new QFrame(this);
     shellFrame->setObjectName(QStringLiteral("loginShell"));
 
@@ -132,7 +133,7 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     shellLayout->setContentsMargins(0, 0, 0, 0);
     shellLayout->setSpacing(0);
 
-    // 左侧品牌区负责展示系统身份，右侧表单区负责真正的输入交互。
+    // 左边放标题，右边放输入框。
     auto *brandPanel = new QFrame(shellFrame);
     brandPanel->setObjectName(QStringLiteral("brandPanel"));
     brandPanel->setFixedWidth(245);
@@ -157,22 +158,21 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     brandLayout->addWidget(brandSubtitle);
     brandLayout->addSpacing(18);
 
-    // 这些短标签只做展示，表达游客、售票员、管理员三类入口已经预留。
-    const QStringList metricTexts = {
-        QStringLiteral("游客余票查询"),
-        QStringLiteral("售票员业务入口"),
-        QStringLiteral("管理员权限预留")
-    };
+    // 三个小标签暂时只做提示用。
+    auto *guestMetricLabel = new QLabel(QStringLiteral("游客余票查询"), brandPanel);
+    guestMetricLabel->setProperty("class", QStringLiteral("brandMetric"));
+    auto *sellerMetricLabel = new QLabel(QStringLiteral("售票员业务入口"), brandPanel);
+    sellerMetricLabel->setProperty("class", QStringLiteral("brandMetric"));
+    auto *adminMetricLabel = new QLabel(QStringLiteral("管理员权限预留"), brandPanel);
+    adminMetricLabel->setProperty("class", QStringLiteral("brandMetric"));
 
-    for (const QString &text : metricTexts) {
-        auto *metricLabel = new QLabel(text, brandPanel);
-        metricLabel->setProperty("class", QStringLiteral("brandMetric"));
-        brandLayout->addWidget(metricLabel);
-    }
+    brandLayout->addWidget(guestMetricLabel);
+    brandLayout->addWidget(sellerMetricLabel);
+    brandLayout->addWidget(adminMetricLabel);
 
     brandLayout->addStretch();
 
-    // 右侧表单继续沿用 LoginManager 认证逻辑，只改变控件排版和视觉层级。
+    // 右侧只写表单，不在这里写登录规则。
     auto *formPanel = new QFrame(shellFrame);
     auto *formLayout = new QVBoxLayout(formPanel);
     formLayout->setContentsMargins(44, 38, 44, 34);
@@ -215,7 +215,7 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     auto *buttonLayout = new QHBoxLayout;
     buttonLayout->setSpacing(12);
 
-    // Guest 是次要入口，Login 是主操作按钮，所以使用不同的按钮样式。
+    // 游客入口放左边，登录按钮放右边。
     auto *guestButton = new QPushButton(QStringLiteral("游客进入"), formPanel);
     guestButton->setObjectName(QStringLiteral("guestButton"));
 
@@ -238,7 +238,7 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     shellLayout->addWidget(formPanel, 1);
     rootLayout->addWidget(shellFrame);
 
-    // 登录按钮和回车键复用同一处理函数，避免登录流程分散在多个 UI 事件里。
+    // 按按钮和按回车都走同一个登录函数。
     connect(loginButton, &QPushButton::clicked, this, [this]() {
         handleLogin();
     });
@@ -257,11 +257,11 @@ LoginResult LoginDialog::loginResult() const
 
 void LoginDialog::handleLogin()
 {
-    // 对话框只负责收集输入和展示结果，具体认证规则交给 LoginManager。
+    // 这里只负责拿输入，真正的判断交给 LoginManager。
     m_loginResult = m_loginManager.authenticate(m_usernameEdit->text(), m_passwordEdit->text());
 
     if (!m_loginResult.success) {
-        showMessage(m_loginResult.message, true);
+        showMessage(m_loginResult.message);
         return;
     }
 
@@ -274,11 +274,9 @@ void LoginDialog::handleGuestAccess()
     accept();
 }
 
-void LoginDialog::showMessage(const QString &message, bool isError)
+void LoginDialog::showMessage(const QString &message)
 {
     m_messageLabel->setText(message);
-    // 错误和成功提示使用不同底色，便于快速观察验证结果。
-    m_messageLabel->setStyleSheet(isError
-                                      ? QStringLiteral("color: #9f1239; background: #fff1f2; border: 1px solid #fecdd3;")
-                                      : QStringLiteral("color: #14532d; background: #f0fdf4; border: 1px solid #bbf7d0;"));
+    // 登录失败时把提示染成红色。
+    m_messageLabel->setStyleSheet(QStringLiteral("color: #9f1239; background: #fff1f2; border: 1px solid #fecdd3;"));
 }
