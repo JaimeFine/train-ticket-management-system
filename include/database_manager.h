@@ -51,7 +51,9 @@ public:
     // >>> Station APIs
     bool addStation(const StationRecord &station);
     std::optional<StationRecord> findStationById(int stationId) const;
-    std::optional<StationRecord> findStationByName(const QString &stationName) const;
+    std::optional<StationRecord> findStationByName(
+        const QString &stationName
+    ) const;
 
     // >>> Train APIs
     bool addTrain(const TrainRecord &train);
@@ -80,6 +82,6 @@ private:
     // later modules can ask what happened without doing SQL themselves.
     QString m_connectionName;
     QString m_databasePath;
-    QString m_lastError;
+    mutable QString m_lastError;
     bool m_wasCreated = false;
 };

@@ -26,3 +26,30 @@ add_custom_command(TARGET database_init_smoke_test POST_BUILD
         ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql
         $<TARGET_FILE_DIR:database_init_smoke_test>/database/schema_v1.sql
 )
+
+add_executable(user_api_smoke_test
+    user_api_smoke_test.cpp
+    ../src/database/database_manager.cpp
+)
+
+target_include_directories(user_api_smoke_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
+
+target_link_libraries(user_api_smoke_test PRIVATE
+    Qt${QT_VERSION_MAJOR}::Core
+    Qt${QT_VERSION_MAJOR}::Sql
+)
+
+add_test(
+    NAME user_api_smoke_test
+    COMMAND user_api_smoke_test
+)
+
+add_custom_command(TARGET user_api_smoke_test POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        $<TARGET_FILE_DIR:user_api_smoke_test>/database
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql
+        $<TARGET_FILE_DIR:user_api_smoke_test>/database/schema_v1.sql
+)
