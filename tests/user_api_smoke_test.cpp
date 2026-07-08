@@ -133,27 +133,21 @@ PS C:\Users\13647\OneDrive\Desktop\train> cmake --build build --config Debug
 适用于 .NET Framework MSBuild 版本 18.7.8+1ac568fee
 
   Automatic MOC and UIC for target TrainTicketSystem
-  database_manager.cpp
+  database_manager_user.cpp
   TrainTicketSystem.vcxproj -> C:\Users\13647\OneDrive\Desktop\train\build\Debug\TrainTicketSystem.exe
   Automatic MOC and UIC for target database_init_smoke_test
-  database_manager.cpp
-  database_init_smoke_test.cpp
-  正在生成代码...
   database_init_smoke_test.vcxproj -> C:\Users\13647\OneDrive\Desktop\train\build\tests\Debug\database_init_smoke_test.
   exe
   Automatic MOC and UIC for target user_api_smoke_test
-  Building Custom Rule C:/Users/13647/OneDrive/Desktop/train/tests/CMakeLists.txt
-  mocs_compilation_Debug.cpp
-  user_api_smoke_test.cpp
-  database_manager.cpp
-  正在生成代码...
+  database_manager_user.cpp
   user_api_smoke_test.vcxproj -> C:\Users\13647\OneDrive\Desktop\train\build\tests\Debug\user_api_smoke_test.exe
 PS C:\Users\13647\OneDrive\Desktop\train> ctest --test-dir build -C Debug -R user_api_smoke_test --output-on-failure
 Test project C:/Users/13647/OneDrive/Desktop/train/build
     Start 2: user_api_smoke_test
-1/1 Test #2: user_api_smoke_test ..............   Passed    1.33 sec
+1/1 Test #2: user_api_smoke_test ..............   Passed    0.23 sec
 
 100% tests passed, 0 tests failed out of 1
 
-Total Test time (real) =   1.48 sec
+Total Test time (real) =   0.39 sec
+PS C:\Users\13647\OneDrive\Desktop\train>
 */

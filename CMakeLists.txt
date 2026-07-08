@@ -21,6 +21,8 @@ set(SOURCES
     src/train/train_manager.cpp
     src/statistics/statistics_manager.cpp
     src/database/database_manager.cpp
+    src/database/database_manager_user.cpp
+    src/database/database_manager_station.cpp
     src/ui/main_window.cpp
 )
 
