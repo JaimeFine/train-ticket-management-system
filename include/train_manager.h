@@ -28,6 +28,9 @@ public:
 
     // ---------- 查询 ----------
     QVector<Train> getAllTrains(bool onlyEnabled = true);
+    // ---------- CRUD 操作 ----------
+    bool addTrain(const Train& train);
+    bool updateTrain(const Train& train);
 
 private:
     QString m_lastStatus;        // 记录最后一次操作的状态信息
