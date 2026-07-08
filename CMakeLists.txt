@@ -23,6 +23,7 @@ set(SOURCES
     src/database/database_manager.cpp
     src/database/database_manager_user.cpp
     src/database/database_manager_station.cpp
+    src/database/database_manager_train.cpp
     src/ui/main_window.cpp
 )
 
