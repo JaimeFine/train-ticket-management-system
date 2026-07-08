@@ -2,8 +2,13 @@
 
 #include <QMainWindow>
 
+#include "login_manager.h"
+
 class MainWindow : public QMainWindow
 {
 public:
-    explicit MainWindow(QWidget *parent = nullptr);
+    explicit MainWindow(const LoginResult &loginResult, QWidget *parent = nullptr);
+
+private:
+    LoginResult m_loginResult;
 };

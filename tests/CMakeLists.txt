@@ -1,5 +1,27 @@
 cmake_minimum_required(VERSION 3.16)
 
+set(QT_TEST_RUNTIME_DIR "" CACHE PATH "Qt runtime bin directory used by CTest on Windows")
+if(WIN32 AND NOT QT_TEST_RUNTIME_DIR AND EXISTS "C:/msys64/ucrt64/bin")
+    set(QT_TEST_RUNTIME_DIR "C:/msys64/ucrt64/bin")
+endif()
+
+function(add_qt_smoke_test testTarget)
+    # Windows 下 CTest 有时找不到 Qt6*.dll，这里给测试程序补上 Qt 运行库目录。
+    if(WIN32 AND QT_TEST_RUNTIME_DIR)
+        add_test(
+            NAME ${testTarget}
+            COMMAND ${CMAKE_COMMAND} -E env
+                "PATH=${QT_TEST_RUNTIME_DIR}"
+                $<TARGET_FILE:${testTarget}>
+        )
+    else()
+        add_test(
+            NAME ${testTarget}
+            COMMAND ${testTarget}
+        )
+    endif()
+endfunction()
+
 add_executable(database_init_smoke_test
     database_init_smoke_test.cpp
     ../src/database/database_manager.cpp
@@ -14,10 +36,7 @@ target_link_libraries(database_init_smoke_test PRIVATE
     Qt${QT_VERSION_MAJOR}::Sql
 )
 
-add_test(
-    NAME database_init_smoke_test
-    COMMAND database_init_smoke_test
-)
+add_qt_smoke_test(database_init_smoke_test)
 
 add_custom_command(TARGET database_init_smoke_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
@@ -42,10 +61,7 @@ target_link_libraries(user_api_smoke_test PRIVATE
     Qt${QT_VERSION_MAJOR}::Sql
 )
 
-add_test(
-    NAME user_api_smoke_test
-    COMMAND user_api_smoke_test
-)
+add_qt_smoke_test(user_api_smoke_test)
 
 add_custom_command(TARGET user_api_smoke_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
@@ -70,10 +86,7 @@ target_link_libraries(station_api_smoke_test PRIVATE
     Qt${QT_VERSION_MAJOR}::Sql
 )
 
-add_test(
-    NAME station_api_smoke_test
-    COMMAND station_api_smoke_test
-)
+add_qt_smoke_test(station_api_smoke_test)
 
 add_custom_command(TARGET station_api_smoke_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
@@ -99,10 +112,7 @@ target_link_libraries(train_api_smoke_test PRIVATE
     Qt${QT_VERSION_MAJOR}::Sql
 )
 
-add_test(
-    NAME train_api_smoke_test
-    COMMAND train_api_smoke_test
-)
+add_qt_smoke_test(train_api_smoke_test)
 
 add_custom_command(TARGET train_api_smoke_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
@@ -130,10 +140,7 @@ target_link_libraries(order_api_smoke_test PRIVATE
     Qt${QT_VERSION_MAJOR}::Sql
 )
 
-add_test(
-    NAME order_api_smoke_test
-    COMMAND order_api_smoke_test
-)
+add_qt_smoke_test(order_api_smoke_test)
 
 add_custom_command(TARGET order_api_smoke_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
