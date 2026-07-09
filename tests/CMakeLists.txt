@@ -97,6 +97,32 @@ add_custom_command(TARGET login_role_permission_test POST_BUILD
         $<TARGET_FILE_DIR:login_role_permission_test>/database/schema_v1.sql
 )
 
+add_executable(login_account_management_test
+    login_account_management_test.cpp
+    ../src/login/login_manager.cpp
+    ../src/database/database_manager.cpp
+    ../src/database/database_manager_user.cpp
+)
+
+target_include_directories(login_account_management_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
+
+target_link_libraries(login_account_management_test PRIVATE
+    Qt${QT_VERSION_MAJOR}::Core
+    Qt${QT_VERSION_MAJOR}::Sql
+)
+
+add_qt_smoke_test(login_account_management_test)
+
+add_custom_command(TARGET login_account_management_test POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        $<TARGET_FILE_DIR:login_account_management_test>/database
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql
+        $<TARGET_FILE_DIR:login_account_management_test>/database/schema_v1.sql
+)
+
 add_executable(station_api_smoke_test
     station_api_smoke_test.cpp
     ../src/database/database_manager.cpp

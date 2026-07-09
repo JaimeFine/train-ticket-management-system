@@ -1,0 +1,340 @@
+#include "account_management_dialog.h"
+
+#include <QFormLayout>
+#include <QGroupBox>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QVBoxLayout>
+
+namespace {
+QString roleText(UserRole role)
+{
+    switch (role) {
+    case UserRole::Admin:
+        return QStringLiteral("管理员");
+    case UserRole::Seller:
+        return QStringLiteral("售票员");
+    case UserRole::Guest:
+        return QStringLiteral("游客");
+    }
+
+    return QStringLiteral("未知身份");
+}
+
+void setupPasswordEdit(QLineEdit *lineEdit)
+{
+    lineEdit->setEchoMode(QLineEdit::Password);
+    lineEdit->setClearButtonEnabled(true);
+}
+}
+
+AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManager,
+                                                 const LoginResult &loginResult,
+                                                 QWidget *parent)
+    : QDialog(parent)
+    , m_loginManager(loginManager)
+    , m_loginResult(loginResult)
+{
+    setWindowTitle(QStringLiteral("账号管理"));
+    setModal(true);
+    resize(720, 560);
+
+    setStyleSheet(QStringLiteral(R"QSS(
+        QDialog {
+            background: #eef2f3;
+            color: #1f2933;
+            font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI";
+            font-size: 14px;
+        }
+        QGroupBox {
+            background: #fbfcfb;
+            border: 1px solid #d8e0dc;
+            border-radius: 10px;
+            margin-top: 12px;
+            padding: 12px;
+            font-weight: 700;
+        }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            left: 12px;
+            padding: 0 6px;
+        }
+        QLabel#pageTitle {
+            color: #17231f;
+            font-size: 22px;
+            font-weight: 700;
+        }
+        QLabel#pageHint {
+            color: #65716c;
+        }
+        QLabel#messageLabel {
+            border-radius: 8px;
+            padding: 8px 10px;
+        }
+        QLineEdit {
+            min-height: 32px;
+            border: 1px solid #cbd8d2;
+            border-radius: 8px;
+            padding: 4px 10px;
+            background: #ffffff;
+        }
+        QLineEdit:focus {
+            border: 2px solid #0f766e;
+            padding: 3px 9px;
+        }
+        QPushButton {
+            min-height: 32px;
+            border-radius: 8px;
+            padding: 5px 14px;
+            font-weight: 700;
+            color: #ffffff;
+            background: #176b5b;
+            border: none;
+        }
+        QPushButton:hover {
+            background: #0f5749;
+        }
+        QPushButton#dangerButton {
+            background: #b91c1c;
+        }
+        QPushButton#dangerButton:hover {
+            background: #991b1b;
+        }
+    )QSS"));
+
+    auto *rootLayout = new QVBoxLayout(this);
+    rootLayout->setContentsMargins(24, 22, 24, 22);
+    rootLayout->setSpacing(14);
+
+    auto *titleLabel = new QLabel(QStringLiteral("账号管理"), this);
+    titleLabel->setObjectName(QStringLiteral("pageTitle"));
+
+    auto *hintLabel = new QLabel(
+        QStringLiteral("当前用户：%1（%2）").arg(m_loginResult.username, roleText(m_loginResult.role)),
+        this);
+    hintLabel->setObjectName(QStringLiteral("pageHint"));
+
+    m_messageLabel = new QLabel(QStringLiteral(" "), this);
+    m_messageLabel->setObjectName(QStringLiteral("messageLabel"));
+    m_messageLabel->setMinimumHeight(38);
+    m_messageLabel->setWordWrap(true);
+
+    rootLayout->addWidget(titleLabel);
+    rootLayout->addWidget(hintLabel);
+    rootLayout->addWidget(m_messageLabel);
+
+    if (m_loginResult.role == UserRole::Admin) {
+        // 管理员区域只在管理员登录后显示，售票员看不到这些操作。
+        auto *createGroup = new QGroupBox(QStringLiteral("创建售票员账号"), this);
+        auto *createLayout = new QVBoxLayout(createGroup);
+        auto *createForm = new QFormLayout;
+        createForm->setHorizontalSpacing(14);
+        createForm->setVerticalSpacing(10);
+
+        m_createUsernameEdit = new QLineEdit(createGroup);
+        m_createUsernameEdit->setPlaceholderText(QStringLiteral("请输入新售票员用户名"));
+
+        m_createPasswordEdit = new QLineEdit(createGroup);
+        m_createPasswordEdit->setPlaceholderText(QStringLiteral("请输入初始密码"));
+        setupPasswordEdit(m_createPasswordEdit);
+
+        m_createConfirmEdit = new QLineEdit(createGroup);
+        m_createConfirmEdit->setPlaceholderText(QStringLiteral("请再次输入初始密码"));
+        setupPasswordEdit(m_createConfirmEdit);
+
+        createForm->addRow(QStringLiteral("用户名"), m_createUsernameEdit);
+        createForm->addRow(QStringLiteral("初始密码"), m_createPasswordEdit);
+        createForm->addRow(QStringLiteral("确认密码"), m_createConfirmEdit);
+
+        auto *createButton = new QPushButton(QStringLiteral("创建售票员"), createGroup);
+        connect(createButton, &QPushButton::clicked, this, [this]() {
+            handleCreateSeller();
+        });
+
+        createLayout->addLayout(createForm);
+        createLayout->addWidget(createButton, 0, Qt::AlignRight);
+        rootLayout->addWidget(createGroup);
+
+        auto *manageGroup = new QGroupBox(QStringLiteral("售票员账号状态与密码"), this);
+        auto *manageLayout = new QVBoxLayout(manageGroup);
+        auto *manageForm = new QFormLayout;
+        manageForm->setHorizontalSpacing(14);
+        manageForm->setVerticalSpacing(10);
+
+        m_manageUsernameEdit = new QLineEdit(manageGroup);
+        m_manageUsernameEdit->setPlaceholderText(QStringLiteral("请输入售票员用户名"));
+
+        m_resetPasswordEdit = new QLineEdit(manageGroup);
+        m_resetPasswordEdit->setPlaceholderText(QStringLiteral("请输入新密码"));
+        setupPasswordEdit(m_resetPasswordEdit);
+
+        m_resetConfirmEdit = new QLineEdit(manageGroup);
+        m_resetConfirmEdit->setPlaceholderText(QStringLiteral("请再次输入新密码"));
+        setupPasswordEdit(m_resetConfirmEdit);
+
+        manageForm->addRow(QStringLiteral("售票员用户名"), m_manageUsernameEdit);
+        manageForm->addRow(QStringLiteral("新密码"), m_resetPasswordEdit);
+        manageForm->addRow(QStringLiteral("确认新密码"), m_resetConfirmEdit);
+
+        auto *manageButtonLayout = new QHBoxLayout;
+        auto *resetButton = new QPushButton(QStringLiteral("重置密码"), manageGroup);
+        auto *enableButton = new QPushButton(QStringLiteral("启用账号"), manageGroup);
+        auto *disableButton = new QPushButton(QStringLiteral("禁用账号"), manageGroup);
+        disableButton->setObjectName(QStringLiteral("dangerButton"));
+
+        connect(resetButton, &QPushButton::clicked, this, [this]() {
+            handleResetSellerPassword();
+        });
+        connect(enableButton, &QPushButton::clicked, this, [this]() {
+            handleSetSellerEnabled(true);
+        });
+        connect(disableButton, &QPushButton::clicked, this, [this]() {
+            handleSetSellerEnabled(false);
+        });
+
+        manageButtonLayout->addStretch();
+        manageButtonLayout->addWidget(resetButton);
+        manageButtonLayout->addWidget(enableButton);
+        manageButtonLayout->addWidget(disableButton);
+
+        manageLayout->addLayout(manageForm);
+        manageLayout->addLayout(manageButtonLayout);
+        rootLayout->addWidget(manageGroup);
+    }
+
+    if (m_loginResult.role == UserRole::Admin || m_loginResult.role == UserRole::Seller) {
+        // 管理员和售票员都有数据库账号，可以修改自己的密码。
+        auto *ownGroup = new QGroupBox(QStringLiteral("修改当前账号密码"), this);
+        auto *ownLayout = new QVBoxLayout(ownGroup);
+        auto *ownForm = new QFormLayout;
+        ownForm->setHorizontalSpacing(14);
+        ownForm->setVerticalSpacing(10);
+
+        m_oldPasswordEdit = new QLineEdit(ownGroup);
+        m_oldPasswordEdit->setPlaceholderText(QStringLiteral("请输入原密码"));
+        setupPasswordEdit(m_oldPasswordEdit);
+
+        m_newPasswordEdit = new QLineEdit(ownGroup);
+        m_newPasswordEdit->setPlaceholderText(QStringLiteral("请输入新密码"));
+        setupPasswordEdit(m_newPasswordEdit);
+
+        m_newConfirmEdit = new QLineEdit(ownGroup);
+        m_newConfirmEdit->setPlaceholderText(QStringLiteral("请再次输入新密码"));
+        setupPasswordEdit(m_newConfirmEdit);
+
+        ownForm->addRow(QStringLiteral("原密码"), m_oldPasswordEdit);
+        ownForm->addRow(QStringLiteral("新密码"), m_newPasswordEdit);
+        ownForm->addRow(QStringLiteral("确认新密码"), m_newConfirmEdit);
+
+        auto *changeButton = new QPushButton(QStringLiteral("修改密码"), ownGroup);
+        connect(changeButton, &QPushButton::clicked, this, [this]() {
+            handleChangeOwnPassword();
+        });
+
+        ownLayout->addLayout(ownForm);
+        ownLayout->addWidget(changeButton, 0, Qt::AlignRight);
+        rootLayout->addWidget(ownGroup);
+    } else {
+        auto *guestHint = new QLabel(QStringLiteral("游客没有数据库账号，不能进行账号管理。"), this);
+        guestHint->setWordWrap(true);
+        rootLayout->addWidget(guestHint);
+    }
+
+    rootLayout->addStretch();
+
+    auto *closeButton = new QPushButton(QStringLiteral("关闭"), this);
+    connect(closeButton, &QPushButton::clicked, this, [this]() {
+        close();
+    });
+    rootLayout->addWidget(closeButton, 0, Qt::AlignRight);
+}
+
+void AccountManagementDialog::handleCreateSeller()
+{
+    if (m_createPasswordEdit->text() != m_createConfirmEdit->text()) {
+        showPlainMessage(false, QStringLiteral("两次输入的密码不一致。"));
+        return;
+    }
+
+    const AccountResult result =
+        m_loginManager.createSellerAccount(m_loginResult.role,
+                                           m_createUsernameEdit->text(),
+                                           m_createPasswordEdit->text());
+    showMessage(result);
+
+    if (result.success) {
+        m_createUsernameEdit->clear();
+        m_createPasswordEdit->clear();
+        m_createConfirmEdit->clear();
+    }
+}
+
+void AccountManagementDialog::handleResetSellerPassword()
+{
+    if (m_resetPasswordEdit->text() != m_resetConfirmEdit->text()) {
+        showPlainMessage(false, QStringLiteral("两次输入的新密码不一致。"));
+        return;
+    }
+
+    const AccountResult result =
+        m_loginManager.resetSellerPassword(m_loginResult.role,
+                                           m_manageUsernameEdit->text(),
+                                           m_resetPasswordEdit->text());
+    showMessage(result);
+
+    if (result.success) {
+        m_resetPasswordEdit->clear();
+        m_resetConfirmEdit->clear();
+    }
+}
+
+void AccountManagementDialog::handleSetSellerEnabled(bool enabled)
+{
+    const AccountResult result =
+        m_loginManager.setSellerEnabled(m_loginResult.role,
+                                        m_manageUsernameEdit->text(),
+                                        enabled);
+    showMessage(result);
+}
+
+void AccountManagementDialog::handleChangeOwnPassword()
+{
+    if (m_newPasswordEdit->text() != m_newConfirmEdit->text()) {
+        showPlainMessage(false, QStringLiteral("两次输入的新密码不一致。"));
+        return;
+    }
+
+    const AccountResult result =
+        m_loginManager.changeOwnPassword(m_loginResult.username,
+                                         m_loginResult.role,
+                                         m_oldPasswordEdit->text(),
+                                         m_newPasswordEdit->text());
+    showMessage(result);
+
+    if (result.success) {
+        m_oldPasswordEdit->clear();
+        m_newPasswordEdit->clear();
+        m_newConfirmEdit->clear();
+    }
+}
+
+void AccountManagementDialog::showMessage(const AccountResult &result)
+{
+    showPlainMessage(result.success, result.message);
+}
+
+void AccountManagementDialog::showPlainMessage(bool success, const QString &message)
+{
+    m_messageLabel->setText(message);
+
+    if (success) {
+        m_messageLabel->setStyleSheet(QStringLiteral(
+            "color: #14532d; background: #dcfce7; border: 1px solid #86efac;"));
+        return;
+    }
+
+    m_messageLabel->setStyleSheet(QStringLiteral(
+        "color: #9f1239; background: #fff1f2; border: 1px solid #fecdd3;"));
+}

@@ -21,13 +21,33 @@ struct LoginResult
     QString message;
 };
 
+struct AccountResult
+{
+    bool success = false;
+    QString message;
+};
+
 class LoginManager
 {
 public:
-    explicit LoginManager(const DatabaseManager *databaseManager = nullptr);
+    explicit LoginManager(DatabaseManager *databaseManager = nullptr);
 
     LoginResult authenticate(const QString &username, const QString &password) const;
     LoginResult loginAsGuest() const;
+
+    AccountResult createSellerAccount(UserRole currentRole,
+                                      const QString &username,
+                                      const QString &password) const;
+    AccountResult resetSellerPassword(UserRole currentRole,
+                                      const QString &username,
+                                      const QString &newPassword) const;
+    AccountResult setSellerEnabled(UserRole currentRole,
+                                   const QString &username,
+                                   bool enabled) const;
+    AccountResult changeOwnPassword(const QString &username,
+                                    UserRole currentRole,
+                                    const QString &oldPassword,
+                                    const QString &newPassword) const;
 
     // 这里只判断身份，不访问数据库，后面接入模块时可以继续用。
     static bool canAccessGuestFunctions(UserRole role);
@@ -35,5 +55,5 @@ public:
     static bool canAccessAdminFunctions(UserRole role);
 
 private:
-    const DatabaseManager *m_databaseManager = nullptr;
+    DatabaseManager *m_databaseManager = nullptr;
 };

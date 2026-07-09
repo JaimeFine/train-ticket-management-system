@@ -1,3 +1,4 @@
+#include "account_management_dialog.h"
 #include "main_window.h"
 
 #include <QFrame>
@@ -59,9 +60,12 @@ QString buttonText(bool allowed)
 
 }
 
-MainWindow::MainWindow(const LoginResult &loginResult, QWidget *parent)
+MainWindow::MainWindow(const LoginResult &loginResult,
+                       const LoginManager &loginManager,
+                       QWidget *parent)
     : QMainWindow(parent)
     , m_loginResult(loginResult)
+    , m_loginManager(&loginManager)
 {
     setWindowTitle(QStringLiteral("火车票务管理系统"));
     resize(980, 640);
@@ -196,6 +200,20 @@ MainWindow::MainWindow(const LoginResult &loginResult, QWidget *parent)
     const bool guestAllowed = LoginManager::canAccessGuestFunctions(m_loginResult.role);
     const bool sellerAllowed = LoginManager::canAccessSellerFunctions(m_loginResult.role);
     const bool adminAllowed = LoginManager::canAccessAdminFunctions(m_loginResult.role);
+    const bool passwordAllowed = m_loginResult.role == UserRole::Admin
+                                 || m_loginResult.role == UserRole::Seller;
+
+    auto openAccountDialog = [this]() {
+        if (m_loginManager == nullptr) {
+            QMessageBox::warning(this,
+                                 QStringLiteral("账号管理"),
+                                 QStringLiteral("账号管理服务尚未连接。"));
+            return;
+        }
+
+        AccountManagementDialog dialog(*m_loginManager, m_loginResult, this);
+        dialog.exec();
+    };
 
     // 下面的入口先做权限展示，真正的业务页面等对应模块完成后再接入。
     auto *gridLayout = new QGridLayout;
@@ -214,10 +232,15 @@ MainWindow::MainWindow(const LoginResult &loginResult, QWidget *parent)
     auto *loginTagLabel = new QLabel(QStringLiteral("已登录"), loginCard);
     loginTagLabel->setObjectName(QStringLiteral("openTag"));
     loginTagLabel->setAlignment(Qt::AlignCenter);
+    auto *passwordButton = new QPushButton(passwordAllowed ? QStringLiteral("修改密码")
+                                                           : QStringLiteral("游客无账号"), loginCard);
+    passwordButton->setEnabled(passwordAllowed);
+    connect(passwordButton, &QPushButton::clicked, this, openAccountDialog);
     loginCardLayout->addWidget(loginTitleLabel);
     loginCardLayout->addWidget(loginDescriptionLabel);
     loginCardLayout->addWidget(loginTagLabel, 0, Qt::AlignLeft);
     loginCardLayout->addStretch();
+    loginCardLayout->addWidget(passwordButton, 0, Qt::AlignRight);
 
     auto *trainCard = new QFrame(centralWidget);
     trainCard->setObjectName(QStringLiteral("moduleCard"));
@@ -286,11 +309,7 @@ MainWindow::MainWindow(const LoginResult &loginResult, QWidget *parent)
     accountTagLabel->setAlignment(Qt::AlignCenter);
     auto *accountButton = new QPushButton(buttonText(adminAllowed), accountCard);
     accountButton->setEnabled(adminAllowed);
-    connect(accountButton, &QPushButton::clicked, this, [this]() {
-        QMessageBox::information(this,
-                                 QStringLiteral("账号管理"),
-                                 QStringLiteral("账号管理页面将在账号管理功能完成后接入。"));
-    });
+    connect(accountButton, &QPushButton::clicked, this, openAccountDialog);
     accountCardLayout->addWidget(accountTitleLabel);
     accountCardLayout->addWidget(accountDescriptionLabel);
     accountCardLayout->addWidget(accountTagLabel, 0, Qt::AlignLeft);
