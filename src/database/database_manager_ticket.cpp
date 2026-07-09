@@ -56,3 +56,31 @@ QList<DatabaseManager::TrainWithStations> DatabaseManager::searchTrainsByStation
         rs.append(t);}
     return rs;
 }
+
+// ══════════════════════ Issue 10 ══════════════════════
+std::optional<OrderRecord> DatabaseManager::findOrderById(int orderId) const {
+    m_lastError.clear();
+    QSqlQuery q(QSqlDatabase::database(m_connectionName));
+    q.prepare("SELECT orderId,userId,trainId,passengerName,purchaseTime,status "
+              "FROM \"Order\" WHERE orderId=:id");
+    q.bindValue(":id",orderId);
+    if(!q.exec()){m_lastError=q.lastError().text();return std::nullopt;}
+    if(!q.next())return std::nullopt;
+    OrderRecord r;r.orderId=q.value(0).toInt();r.userId=q.value(1).toInt();
+    r.trainId=q.value(2).toInt();r.passengerName=q.value(3).toString();
+    r.purchaseTime=q.value(4).toString();r.status=q.value(5).toInt();
+    return r;
+}
+QList<OrderRecord> DatabaseManager::findOrdersByPassenger(const QString &name) const {
+    m_lastError.clear();
+    QSqlQuery q(QSqlDatabase::database(m_connectionName));
+    q.prepare("SELECT orderId,userId,trainId,passengerName,purchaseTime,status "
+              "FROM \"Order\" WHERE passengerName LIKE :n ORDER BY purchaseTime DESC");
+    q.bindValue(":n","%"+name+"%");
+    QList<OrderRecord> rs;
+    if(!q.exec()){m_lastError=q.lastError().text();return rs;}
+    while(q.next()){OrderRecord r;r.orderId=q.value(0).toInt();r.userId=q.value(1).toInt();
+        r.trainId=q.value(2).toInt();r.passengerName=q.value(3).toString();
+        r.purchaseTime=q.value(4).toString();r.status=q.value(5).toInt();rs.append(r);}
+    return rs;
+}
