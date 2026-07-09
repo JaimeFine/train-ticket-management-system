@@ -32,6 +32,7 @@ public:
     bool addTrain(const Train& train);
     bool updateTrain(const Train& train);
     bool deleteTrain(int trainId);              // 逻辑删除（停运）
+    QVector<Train> searchTrains(const QString& keyword);
     QVector<Train> searchByStation(int stationId, bool isDeparture = true);  // 按车站搜索
 
 private:
