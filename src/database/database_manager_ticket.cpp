@@ -84,3 +84,62 @@ QList<OrderRecord> DatabaseManager::findOrdersByPassenger(const QString &name) c
         r.purchaseTime=q.value(4).toString();r.status=q.value(5).toInt();rs.append(r);}
     return rs;
 }
+
+// ══════════════════════ Issue 11 ══════════════════════
+QList<DatabaseManager::OrderWithDetails> DatabaseManager::findAllOrdersWithDetails() const {
+    m_lastError.clear();
+    QSqlQuery q(QSqlDatabase::database(m_connectionName));
+    q.prepare("SELECT o.orderId,o.userId,o.trainId,o.status,t.trainNumber,"
+              "o.passengerName,o.purchaseTime,ds.stationName,as2.stationName "
+              "FROM \"Order\" o JOIN Train t ON o.trainId=t.trainId "
+              "JOIN Station ds ON t.departureStationId=ds.stationId "
+              "JOIN Station as2 ON t.arrivalStationId=as2.stationId "
+              "ORDER BY o.purchaseTime DESC");
+    QList<OrderWithDetails> rs;
+    if(!q.exec()){m_lastError=q.lastError().text();return rs;}
+    while(q.next()){OrderWithDetails d;d.orderId=q.value(0).toInt();d.userId=q.value(1).toInt();
+        d.trainId=q.value(2).toInt();d.status=q.value(3).toInt();d.trainNumber=q.value(4).toString();
+        d.passengerName=q.value(5).toString();d.purchaseTime=q.value(6).toString();
+        d.departureStationName=q.value(7).toString();d.arrivalStationName=q.value(8).toString();
+        rs.append(d);}
+    return rs;
+}
+int DatabaseManager::countOrdersByStatus(int s) const {
+    m_lastError.clear();
+    QSqlQuery q(QSqlDatabase::database(m_connectionName));
+    q.prepare("SELECT COUNT(*) FROM \"Order\" WHERE status=:s");q.bindValue(":s",s);
+    if(!q.exec())return 0; return q.next()?q.value(0).toInt():0;
+}
+int DatabaseManager::countAllOrders() const {
+    m_lastError.clear();
+    QSqlQuery q(QSqlDatabase::database(m_connectionName));
+    q.prepare("SELECT COUNT(*) FROM \"Order\"");
+    if(!q.exec())return 0; return q.next()?q.value(0).toInt():0;
+}
+QList<DatabaseManager::RouteStat> DatabaseManager::popularRoutes(int limit) const {
+    m_lastError.clear();
+    QSqlQuery q(QSqlDatabase::database(m_connectionName));
+    q.prepare(QString("SELECT ds.stationName,as2.stationName,COUNT(o.orderId) "
+        "FROM Train t JOIN \"Order\" o ON t.trainId=o.trainId "
+        "JOIN Station ds ON t.departureStationId=ds.stationId "
+        "JOIN Station as2 ON t.arrivalStationId=as2.stationId "
+        "WHERE o.status=0 GROUP BY ds.stationName,as2.stationName "
+        "ORDER BY COUNT(o.orderId) DESC LIMIT %1").arg(limit));
+    QList<RouteStat> rs;
+    if(!q.exec()){m_lastError=q.lastError().text();return rs;}
+    while(q.next())rs.append({q.value(0).toString(),q.value(1).toString(),q.value(2).toInt()});
+    return rs;
+}
+QList<DatabaseManager::MonthlyStat> DatabaseManager::monthlyPassengerFlow() const {
+    m_lastError.clear();
+    QSqlQuery q(QSqlDatabase::database(m_connectionName));
+    q.prepare("SELECT SUBSTR(purchaseTime,1,7),COUNT(*),"
+              "SUM(CASE WHEN status=0 THEN 1 ELSE 0 END),"
+              "SUM(CASE WHEN status=1 THEN 1 ELSE 0 END) "
+              "FROM \"Order\" GROUP BY month ORDER BY month DESC");
+    QList<MonthlyStat> rs;
+    if(!q.exec()){m_lastError=q.lastError().text();return rs;}
+    while(q.next())rs.append({q.value(0).toString(),q.value(1).toInt(),
+                              q.value(2).toInt(),q.value(3).toInt()});
+    return rs;
+}

@@ -95,3 +95,16 @@ QVector<QVariantMap> TicketManager::queryOrderByOrderId(int orderId) const {
     QVector<QVariantMap> r;auto o=m_db.findOrderById(orderId);
     if(o)r.append(ord2map(*o));return r;
 }
+
+// ══════════════════════ Issue 11: 订单历史 ══════════════════════
+QVector<QVariantMap> TicketManager::queryAllOrders() const {
+    QVector<QVariantMap> r;
+    for(auto &d:m_db.findAllOrdersWithDetails()){
+        QVariantMap m;m["orderId"]=d.orderId;m["userId"]=d.userId;
+        m["trainId"]=d.trainId;m["status"]=d.status;m["trainNumber"]=d.trainNumber;
+        m["passengerName"]=d.passengerName;m["purchaseTime"]=d.purchaseTime;
+        m["departureStation"]=d.departureStationName;
+        m["arrivalStation"]=d.arrivalStationName;r.append(m);
+    }
+    return r;
+}

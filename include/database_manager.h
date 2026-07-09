@@ -73,6 +73,20 @@ public:
     std::optional<OrderRecord> findOrderById(int orderId) const;
     QList<OrderRecord> findOrdersByPassenger(const QString &name) const;
 
+    // ── Issue 11: 订单历史 + 统计 ──────────────────────────
+    struct OrderWithDetails {
+        int orderId=0,userId=0,trainId=0,status=0;
+        QString trainNumber,passengerName,purchaseTime;
+        QString departureStationName,arrivalStationName;
+    };
+    QList<OrderWithDetails> findAllOrdersWithDetails() const;
+    int countOrdersByStatus(int status) const;
+    int countAllOrders() const;
+    struct RouteStat { QString dep,arr; int count=0; };
+    QList<RouteStat> popularRoutes(int limit=10) const;
+    struct MonthlyStat { QString month; int total=0,booked=0,refunded=0; };
+    QList<MonthlyStat> monthlyPassengerFlow() const;
+
 private:
     // * This block connect helpers
     // openDatabase() only worries about creating & opening the SQLite file.
