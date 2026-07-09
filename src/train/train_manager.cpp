@@ -3,6 +3,7 @@
 #include "database_manager.h"
 #include "database/train_record.h"
 
+#include <QDateTime>
 #include <QRegularExpression>
 
 // ============================================================
@@ -123,8 +124,10 @@ bool TrainManager::addTrain(const Train& train)
         return false;
     }
 
-    if (train.departureTime >= train.arrivalTime) {
-        setStatus("出发时间必须早于到达时间");
+    QDateTime dep = QDateTime::fromString(train.departureTime, "yyyy-MM-dd HH:mm");
+    QDateTime arr = QDateTime::fromString(train.arrivalTime, "yyyy-MM-dd HH:mm");
+    if (!dep.isValid() || !arr.isValid() || dep >= arr) {
+        setStatus("出发时间必须早于到达时间，且格式正确");
         return false;
     }
 
@@ -191,7 +194,7 @@ bool TrainManager::updateTrain(const Train& train)
         return false;
     }
 
-    QRegularExpression dateTimeRegex("^([0-1][0-9]|2[0-3]):[0-5][0-9]$");
+    QRegularExpression dateTimeRegex(R"(^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$)");
     if (!dateTimeRegex.match(train.departureTime).hasMatch()) {
         setStatus("出发时间格式无效，请使用 yyyy-MM-dd HH:mm 格式");
         return false;
@@ -201,8 +204,10 @@ bool TrainManager::updateTrain(const Train& train)
         return false;
     }
 
-    if (train.departureTime >= train.arrivalTime) {
-        setStatus("出发时间必须早于到达时间");
+    QDateTime dep = QDateTime::fromString(train.departureTime, "yyyy-MM-dd HH:mm");
+    QDateTime arr = QDateTime::fromString(train.arrivalTime, "yyyy-MM-dd HH:mm");
+    if (!dep.isValid() || !arr.isValid() || dep >= arr) {
+        setStatus("出发时间必须早于到达时间，且格式正确");
         return false;
     }
 
@@ -244,6 +249,7 @@ bool TrainManager::updateTrain(const Train& train)
     //        enabled = ?
     //      WHERE trainId = ?;
     TrainRecord record = convertToRecord(train);
+    record.enabled = true;   // 新增行
     if (!m_dbManager->updateTrain(record)) {
         setStatus("更新车次失败: " + m_dbManager->lastError());
         return false;
