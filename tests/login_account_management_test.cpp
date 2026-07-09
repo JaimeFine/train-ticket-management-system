@@ -50,6 +50,7 @@ int main(int argc, char *argv[])
     LoginManager loginManager(&manager);
 
     const QString adminUsername = makeUsername(QStringLiteral("account_admin"));
+    const QString userUsername = makeUsername(QStringLiteral("account_user"));
     const QString sellerUsername = makeUsername(QStringLiteral("account_seller"));
     const QString newSellerUsername = makeUsername(QStringLiteral("account_new_seller"));
 
@@ -57,6 +58,20 @@ int main(int argc, char *argv[])
                      "Admin user should be created.") && ok;
     ok = checkResult(addLoginUser(manager, sellerUsername, QStringLiteral("seller_old"), 1),
                      "Seller user should be created.") && ok;
+
+    const AccountResult registerResult =
+        loginManager.registerUser(userUsername, QStringLiteral("user_old"));
+    ok = checkResult(registerResult.success,
+                     "Normal user should register.") && ok;
+    const LoginResult userLogin =
+        loginManager.authenticate(userUsername, QStringLiteral("user_old"));
+    ok = checkResult(userLogin.success && userLogin.role == UserRole::User,
+                     "Registered normal user should login as user.") && ok;
+
+    const AccountResult duplicateRegister =
+        loginManager.registerUser(userUsername, QStringLiteral("user_other"));
+    ok = checkResult(!duplicateRegister.success,
+                     "Duplicate normal username should be rejected.") && ok;
 
     const AccountResult createResult =
         loginManager.createSellerAccount(UserRole::Admin,
@@ -138,6 +153,17 @@ int main(int argc, char *argv[])
     ok = checkResult(loginManager.authenticate(sellerUsername,
                                                QStringLiteral("seller_new")).success,
                      "Seller new password should login.") && ok;
+
+    const AccountResult userChange =
+        loginManager.changeOwnPassword(userUsername,
+                                       UserRole::User,
+                                       QStringLiteral("user_old"),
+                                       QStringLiteral("user_new"));
+    ok = checkResult(userChange.success,
+                     "Normal user should change own password.") && ok;
+    ok = checkResult(loginManager.authenticate(userUsername,
+                                               QStringLiteral("user_new")).success,
+                     "Normal user new password should login.") && ok;
 
     const AccountResult adminChange =
         loginManager.changeOwnPassword(adminUsername,

@@ -21,6 +21,8 @@ QString roleName(UserRole role)
         return QStringLiteral("售票员");
     case UserRole::Guest:
         return QStringLiteral("游客");
+    case UserRole::User:
+        return QStringLiteral("普通用户");
     }
 
     return QStringLiteral("未知角色");
@@ -35,6 +37,8 @@ QString roleHint(UserRole role)
         return QStringLiteral("售票员可进入票务办理和查询入口，不能进入账号管理。");
     case UserRole::Guest:
         return QStringLiteral("游客只开放基础查询入口，不能办理售票和账号管理。");
+    case UserRole::User:
+        return QStringLiteral("普通用户可查询车票信息，并可修改自己的登录密码。");
     }
 
     return QStringLiteral("当前身份暂未配置权限。");
@@ -201,7 +205,8 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     const bool sellerAllowed = LoginManager::canAccessSellerFunctions(m_loginResult.role);
     const bool adminAllowed = LoginManager::canAccessAdminFunctions(m_loginResult.role);
     const bool passwordAllowed = m_loginResult.role == UserRole::Admin
-                                 || m_loginResult.role == UserRole::Seller;
+                                 || m_loginResult.role == UserRole::Seller
+                                 || m_loginResult.role == UserRole::User;
 
     auto openAccountDialog = [this]() {
         if (m_loginManager == nullptr) {
@@ -249,7 +254,7 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     trainCardLayout->setSpacing(8);
     auto *trainTitleLabel = new QLabel(QStringLiteral("车票查询"), trainCard);
     trainTitleLabel->setObjectName(QStringLiteral("cardTitle"));
-    auto *trainDescriptionLabel = new QLabel(QStringLiteral("游客、售票员和管理员都可以查看车次和余票信息。"), trainCard);
+    auto *trainDescriptionLabel = new QLabel(QStringLiteral("游客、普通用户、售票员和管理员都可以查看车次和余票信息。"), trainCard);
     trainDescriptionLabel->setObjectName(QStringLiteral("cardDescription"));
     trainDescriptionLabel->setWordWrap(true);
     auto *trainTagLabel = new QLabel(accessText(guestAllowed), trainCard);

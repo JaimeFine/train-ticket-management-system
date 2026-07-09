@@ -18,6 +18,8 @@ QString roleText(UserRole role)
         return QStringLiteral("售票员");
     case UserRole::Guest:
         return QStringLiteral("游客");
+    case UserRole::User:
+        return QStringLiteral("普通用户");
     }
 
     return QStringLiteral("未知身份");
@@ -204,8 +206,9 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
         rootLayout->addWidget(manageGroup);
     }
 
-    if (m_loginResult.role == UserRole::Admin || m_loginResult.role == UserRole::Seller) {
-        // 管理员和售票员都有数据库账号，可以修改自己的密码。
+    if (m_loginResult.role == UserRole::Admin || m_loginResult.role == UserRole::Seller
+        || m_loginResult.role == UserRole::User) {
+        // 管理员、售票员和普通用户都有数据库账号，可以修改自己的密码。
         auto *ownGroup = new QGroupBox(QStringLiteral("修改当前账号密码"), this);
         auto *ownLayout = new QVBoxLayout(ownGroup);
         auto *ownForm = new QFormLayout;

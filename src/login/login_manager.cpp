@@ -10,6 +10,8 @@ namespace {
 std::optional<UserRole> roleFromDatabaseValue(int role)
 {
     switch (role) {
+    case 3:
+        return UserRole::User;
     case 2:
         return UserRole::Admin;
     case 1:
@@ -97,6 +99,41 @@ LoginResult LoginManager::loginAsGuest() const
             UserRole::Guest,
             QStringLiteral("游客"),
             QStringLiteral("游客访问已开启。")};
+}
+
+AccountResult LoginManager::registerUser(const QString &username,
+                                         const QString &password) const
+{
+    if (!databaseReady(m_databaseManager)) {
+        return {false, QStringLiteral("注册服务不可用。")};
+    }
+
+    const QString trimmedUsername = username.trimmed();
+
+    if (trimmedUsername.isEmpty()) {
+        return {false, QStringLiteral("请输入用户名。")};
+    }
+
+    if (password.isEmpty()) {
+        return {false, QStringLiteral("请输入密码。")};
+    }
+
+    if (m_databaseManager->findUserByUsername(trimmedUsername).has_value()) {
+        return {false, QStringLiteral("用户名已存在。")};
+    }
+
+    // 普通注册只创建 role=3 的用户账号，不创建售票员或管理员。
+    UserRecord user;
+    user.username = trimmedUsername;
+    user.password = password;
+    user.role = static_cast<int>(UserRole::User);
+    user.enabled = true;
+
+    if (!m_databaseManager->addUser(user)) {
+        return {false, QStringLiteral("用户注册失败。")};
+    }
+
+    return {true, QStringLiteral("用户注册成功，请使用新账号登录。")};
 }
 
 AccountResult LoginManager::createSellerAccount(UserRole currentRole,
@@ -273,7 +310,8 @@ AccountResult LoginManager::changeOwnPassword(const QString &username,
 
 bool LoginManager::canAccessGuestFunctions(UserRole role)
 {
-    return role == UserRole::Guest || role == UserRole::Seller || role == UserRole::Admin;
+    return role == UserRole::Guest || role == UserRole::User
+           || role == UserRole::Seller || role == UserRole::Admin;
 }
 
 bool LoginManager::canAccessSellerFunctions(UserRole role)
