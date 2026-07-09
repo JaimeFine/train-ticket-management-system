@@ -318,3 +318,62 @@ QVector<Train> TrainManager::searchByStation(int stationId, bool isDeparture) {
     setStatus("按站查询完成，共 " + QString::number(result.size()) + " 条记录");
     return result;
 }
+// ---------- 更新剩余座位 ----------
+bool TrainManager::updateRemainingSeats(int trainId, int delta) {
+    QSqlDatabase db = getDB();
+    if (!db.isOpen()) {
+        setStatus("数据库未连接");
+        return false;
+    }
+
+    // 1. 查询当前余票和总座位数
+    QSqlQuery query(db);
+    query.prepare("SELECT remainingSeats, totalSeats, trainNumber FROM Train WHERE trainId = ?");
+    query.addBindValue(trainId);
+    if (!query.exec()) {
+        setStatus("查询车次失败: " + query.lastError().text());
+        return false;
+    }
+    if (!query.next()) {
+        setStatus("未找到车次 (ID: " + QString::number(trainId) + ")");
+        return false;
+    }
+
+    int currentRemaining = query.value("remainingSeats").toInt();
+    int totalSeats = query.value("totalSeats").toInt();
+    QString trainNumber = query.value("trainNumber").toString();
+
+    // 2. 计算新余票并校验
+    int newRemaining = currentRemaining + delta;
+    if (newRemaining < 0) {
+        setStatus("余票不足，当前余票: " + QString::number(currentRemaining) +
+                  ", 需求: " + QString::number(delta));
+        return false;
+    }
+    if (newRemaining > totalSeats) {
+        setStatus("超售，总座位: " + QString::number(totalSeats) +
+                  ", 当前余票: " + QString::number(currentRemaining) +
+                  ", 增量: " + QString::number(delta));
+        return false;
+    }
+
+    // 3. 执行更新
+    QSqlQuery updateQuery(db);
+    updateQuery.prepare("UPDATE Train SET remainingSeats = ? WHERE trainId = ?");
+    updateQuery.addBindValue(newRemaining);
+    updateQuery.addBindValue(trainId);
+
+    if (!updateQuery.exec()) {
+        setStatus("更新余票失败: " + updateQuery.lastError().text());
+        return false;
+    }
+
+    if (updateQuery.numRowsAffected() == 0) {
+        setStatus("更新余票失败，未找到匹配的记录");
+        return false;
+    }
+
+    setStatus("车次 " + trainNumber + " 余票更新成功，当前余票: " +
+              QString::number(newRemaining));
+    return true;
+}
