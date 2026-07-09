@@ -1,98 +1,158 @@
 // src/train/train_manager.cpp
 #include "train_manager.h"
-#include <QSqlDatabase>
-#include <QSqlQuery>
-#include <QSqlError>
+#include "database_manager.h"
+#include "database/train_record.h"
 
-// ---------- 辅助：获取数据库连接 ----------
-static QSqlDatabase getDB() {
-    return QSqlDatabase::database("train_ticket_connection");
+#include <QRegularExpression>
+
+// ============================================================
+// 构造函数
+// ============================================================
+TrainManager::TrainManager(DatabaseManager* dbManager)
+    : m_dbManager(dbManager)
+{
 }
 
-// ---------- 返回最后一次操作的状态信息 ----------
-QString TrainManager::statusMessage() const {
+// ============================================================
+// 状态信息
+// ============================================================
+QString TrainManager::statusMessage() const
+{
     return m_lastStatus;
 }
 
-// ---------- 获取所有车次 ----------
-QVector<Train> TrainManager::getAllTrains(bool onlyEnabled) {
+// ============================================================
+// 辅助：Train ↔ TrainRecord 转换
+// ============================================================
+Train TrainManager::convertToTrain(const TrainRecord& record) const
+{
+    Train t;
+    t.trainId = record.trainId;
+    t.trainNumber = record.trainNumber;
+    t.departureStationId = record.departureStationId;
+    t.arrivalStationId = record.arrivalStationId;
+    t.departureTime = record.departureTime;
+    t.arrivalTime = record.arrivalTime;
+    t.totalSeats = record.totalSeats;
+    t.remainingSeats = record.remainingSeats;
+    t.enabled = record.enabled;
+    return t;
+}
+
+TrainRecord TrainManager::convertToRecord(const Train& train) const
+{
+    TrainRecord record;
+    record.trainId = train.trainId;
+    record.trainNumber = train.trainNumber;
+    record.departureStationId = train.departureStationId;
+    record.arrivalStationId = train.arrivalStationId;
+    record.departureTime = train.departureTime;
+    record.arrivalTime = train.arrivalTime;
+    record.totalSeats = train.totalSeats;
+    record.remainingSeats = train.remainingSeats;
+    record.enabled = train.enabled;
+    return record;
+}
+
+// ============================================================
+// 1. 获取所有车次
+// ============================================================
+QVector<Train> TrainManager::getAllTrains(bool onlyEnabled)
+{
     QVector<Train> result;
-    QSqlDatabase db = getDB();
-    if (!db.isOpen()) {
-        setStatus("数据库未连接");
+
+    if (!m_dbManager) {
+        setStatus("数据库管理器未初始化");
         return result;
     }
 
-    QString sql = "SELECT trainId, trainNumber, departureStationId, arrivalStationId, "
-                  "departureTime, arrivalTime, totalSeats, remainingSeats, enabled "
-                  "FROM Train";
-    if (onlyEnabled) {
-        sql += " WHERE enabled = 1";
-    }
+    // ============================================================
+    // 待 DatabaseManager 补充 API: QList<TrainRecord> getAllTrains(bool onlyEnabled = true) const
+    //
+    // SQL 语句（参考）：
+    // SELECT trainId, trainNumber, departureStationId, arrivalStationId,
+    //        departureTime, arrivalTime, totalSeats, remainingSeats, enabled
+    // FROM Train
+    // [WHERE enabled = 1]   -- 当 onlyEnabled == true 时添加
+    // ORDER BY trainId;
+    // ============================================================
 
-    QSqlQuery query(db);
-    if (!query.exec(sql)) {
-        setStatus("查询车次失败: " + query.lastError().text());
-        return result;
-    }
-
-    while (query.next()) {
-        Train t;
-        t.trainId = query.value("trainId").toInt();
-        t.trainNumber = query.value("trainNumber").toString();
-        t.departureStationId = query.value("departureStationId").toInt();
-        t.arrivalStationId = query.value("arrivalStationId").toInt();
-        t.departureTime = query.value("departureTime").toString();
-        t.arrivalTime = query.value("arrivalTime").toString();
-        t.totalSeats = query.value("totalSeats").toInt();
-        t.remainingSeats = query.value("remainingSeats").toInt();
-        t.enabled = query.value("enabled").toInt() == 1;
-        result.append(t);
-    }
+    // 实现代码（待 DatabaseManager 补充后取消注释）：
+    // auto records = m_dbManager->getAllTrains(onlyEnabled);
+    // for (const auto& record : records) {
+    //     result.append(convertToTrain(record));
+    // }
 
     setStatus("查询成功，共 " + QString::number(result.size()) + " 条记录");
     return result;
 }
 
-// ---------- 添加车次 ----------
-bool TrainManager::addTrain(const Train& train) {
-    QSqlDatabase db = getDB();
-    if (!db.isOpen()) {
-        setStatus("数据库未连接");
+// ============================================================
+// 2. 添加车次
+// ============================================================
+bool TrainManager::addTrain(const Train& train)
+{
+    if (!m_dbManager) {
+        setStatus("数据库管理器未初始化");
         return false;
     }
 
-    // 1. 检查车次号是否已存在
-    QSqlQuery checkQuery(db);
-    checkQuery.prepare("SELECT trainId FROM Train WHERE trainNumber = ?");
-    checkQuery.addBindValue(train.trainNumber);
-    if (!checkQuery.exec()) {
-        setStatus("检查车次号失败: " + checkQuery.lastError().text());
+    // ---- 参数校验 ----
+    if (train.trainNumber.trimmed().isEmpty()) {
+        setStatus("车次号不能为空");
         return false;
     }
-    if (checkQuery.next()) {
+
+    if (train.departureStationId <= 0 || train.arrivalStationId <= 0) {
+        setStatus("出发站和到达站必须有效");
+        return false;
+    }
+
+    if (train.departureStationId == train.arrivalStationId) {
+        setStatus("出发站和到达站不能相同");
+        return false;
+    }
+    // 校验日期时间格式（yyyy-MM-dd HH:mm）
+    QRegularExpression dateTimeRegex(R"(^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$)");
+    if (!dateTimeRegex.match(train.departureTime).hasMatch()) {
+        setStatus("出发时间格式无效，请使用 yyyy-MM-dd HH:mm 格式");
+        return false;
+    }
+    if (!dateTimeRegex.match(train.arrivalTime).hasMatch()) {
+        setStatus("出发时间格式无效，请使用 yyyy-MM-dd HH:mm 格式");
+        return false;
+    }
+
+    if (train.departureTime >= train.arrivalTime) {
+        setStatus("出发时间必须早于到达时间");
+        return false;
+    }
+
+    if (train.totalSeats <= 0) {
+        setStatus("总座位数必须大于 0");
+        return false;
+    }
+
+    if (train.remainingSeats < 0 || train.remainingSeats > train.totalSeats) {
+        setStatus("剩余座位数必须在 0 到总座位数之间");
+        return false;
+    }
+
+    // ---- 检查车次号是否已存在 ----
+    // SQL: SELECT trainId FROM Train WHERE trainNumber = ?;
+    auto existing = m_dbManager->findTrainByNumber(train.trainNumber);
+    if (existing.has_value()) {
         setStatus("车次号 " + train.trainNumber + " 已存在");
         return false;
     }
 
-    // 2. 插入新记录
-    QSqlQuery query(db);
-    query.prepare(
-        "INSERT INTO Train (trainNumber, departureStationId, arrivalStationId, "
-        "departureTime, arrivalTime, totalSeats, remainingSeats, enabled) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        );
-    query.addBindValue(train.trainNumber);
-    query.addBindValue(train.departureStationId);
-    query.addBindValue(train.arrivalStationId);
-    query.addBindValue(train.departureTime);
-    query.addBindValue(train.arrivalTime);
-    query.addBindValue(train.totalSeats);
-    query.addBindValue(train.remainingSeats);
-    query.addBindValue(train.enabled ? 1 : 0);
-
-    if (!query.exec()) {
-        setStatus("添加车次失败: " + query.lastError().text());
+    // ---- 插入新记录 ----
+    // SQL: INSERT INTO Train (trainNumber, departureStationId, arrivalStationId,
+    //                         departureTime, arrivalTime, totalSeats, remainingSeats, enabled)
+    //      VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    TrainRecord record = convertToRecord(train);
+    if (!m_dbManager->addTrain(record)) {
+        setStatus("添加车次失败: " + m_dbManager->lastError());
         return false;
     }
 
@@ -100,67 +160,92 @@ bool TrainManager::addTrain(const Train& train) {
     return true;
 }
 
-// ---------- 更新车次 ----------
-bool TrainManager::updateTrain(const Train& train) {
-    QSqlDatabase db = getDB();
-    if (!db.isOpen()) {
-        setStatus("数据库未连接");
+// ============================================================
+// 3. 更新车次
+// ============================================================
+bool TrainManager::updateTrain(const Train& train)
+{
+    if (!m_dbManager) {
+        setStatus("数据库管理器未初始化");
         return false;
     }
 
-    // 1. 检查车次是否存在
-    QSqlQuery checkQuery(db);
-    checkQuery.prepare("SELECT trainId FROM Train WHERE trainId = ?");
-    checkQuery.addBindValue(train.trainId);
-    if (!checkQuery.exec()) {
-        setStatus("检查车次失败: " + checkQuery.lastError().text());
+    // ---- 参数校验 ----
+    if (train.trainId <= 0) {
+        setStatus("无效的车次ID");
         return false;
     }
-    if (!checkQuery.next()) {
+
+    if (train.trainNumber.trimmed().isEmpty()) {
+        setStatus("车次号不能为空");
+        return false;
+    }
+
+    if (train.departureStationId <= 0 || train.arrivalStationId <= 0) {
+        setStatus("出发站和到达站必须有效");
+        return false;
+    }
+
+    if (train.departureStationId == train.arrivalStationId) {
+        setStatus("出发站和到达站不能相同");
+        return false;
+    }
+
+    QRegularExpression dateTimeRegex("^([0-1][0-9]|2[0-3]):[0-5][0-9]$");
+    if (!dateTimeRegex.match(train.departureTime).hasMatch()) {
+        setStatus("出发时间格式无效，请使用 yyyy-MM-dd HH:mm 格式");
+        return false;
+    }
+    if (!dateTimeRegex.match(train.arrivalTime).hasMatch()) {
+        setStatus("出发时间格式无效，请使用 yyyy-MM-dd HH:mm 格式");
+        return false;
+    }
+
+    if (train.departureTime >= train.arrivalTime) {
+        setStatus("出发时间必须早于到达时间");
+        return false;
+    }
+
+    if (train.totalSeats <= 0) {
+        setStatus("总座位数必须大于 0");
+        return false;
+    }
+
+    if (train.remainingSeats < 0 || train.remainingSeats > train.totalSeats) {
+        setStatus("剩余座位数必须在 0 到总座位数之间");
+        return false;
+    }
+
+    // ---- 检查车次是否存在 ----
+    // SQL: SELECT trainId FROM Train WHERE trainId = ?;
+    auto existing = m_dbManager->findTrainById(train.trainId);
+    if (!existing.has_value()) {
         setStatus("未找到要更新的车次 (ID: " + QString::number(train.trainId) + ")");
         return false;
     }
 
-    // 2. 检查车次号是否与其他记录冲突（排除自身）
-    QSqlQuery duplicateQuery(db);
-    duplicateQuery.prepare("SELECT trainId FROM Train WHERE trainNumber = ? AND trainId != ?");
-    duplicateQuery.addBindValue(train.trainNumber);
-    duplicateQuery.addBindValue(train.trainId);
-    if (!duplicateQuery.exec()) {
-        setStatus("检查车次号失败: " + duplicateQuery.lastError().text());
-        return false;
-    }
-    if (duplicateQuery.next()) {
+    // ---- 检查车次号是否被其他记录占用 ----
+    // SQL: SELECT trainId FROM Train WHERE trainNumber = ? AND trainId != ?;
+    auto duplicate = m_dbManager->findTrainByNumber(train.trainNumber);
+    if (duplicate.has_value() && duplicate->trainId != train.trainId) {
         setStatus("车次号 " + train.trainNumber + " 已被其他车次使用");
         return false;
     }
 
-    // 3. 更新记录
-    QSqlQuery query(db);
-    query.prepare(
-        "UPDATE Train SET "
-        "trainNumber = ?, departureStationId = ?, arrivalStationId = ?, "
-        "departureTime = ?, arrivalTime = ?, totalSeats = ?, "
-        "remainingSeats = ?, enabled = ? "
-        "WHERE trainId = ?"
-        );
-    query.addBindValue(train.trainNumber);
-    query.addBindValue(train.departureStationId);
-    query.addBindValue(train.arrivalStationId);
-    query.addBindValue(train.departureTime);
-    query.addBindValue(train.arrivalTime);
-    query.addBindValue(train.totalSeats);
-    query.addBindValue(train.remainingSeats);
-    query.addBindValue(train.enabled ? 1 : 0);
-    query.addBindValue(train.trainId);
-
-    if (!query.exec()) {
-        setStatus("更新车次失败: " + query.lastError().text());
-        return false;
-    }
-
-    if (query.numRowsAffected() == 0) {
-        setStatus("更新车次失败，未找到匹配的记录");
+    // ---- 更新记录 ----
+    // SQL: UPDATE Train SET
+    //        trainNumber = ?,
+    //        departureStationId = ?,
+    //        arrivalStationId = ?,
+    //        departureTime = ?,
+    //        arrivalTime = ?,
+    //        totalSeats = ?,
+    //        remainingSeats = ?,
+    //        enabled = ?
+    //      WHERE trainId = ?;
+    TrainRecord record = convertToRecord(train);
+    if (!m_dbManager->updateTrain(record)) {
+        setStatus("更新车次失败: " + m_dbManager->lastError());
         return false;
     }
 
@@ -168,59 +253,53 @@ bool TrainManager::updateTrain(const Train& train) {
     return true;
 }
 
-// ---------- 逻辑删除（停运）----------
-bool TrainManager::deleteTrain(int trainId) {
-    QSqlDatabase db = getDB();
-    if (!db.isOpen()) {
-        setStatus("数据库未连接");
+// ============================================================
+// 4. 逻辑删除（停运）
+// ============================================================
+bool TrainManager::deleteTrain(int trainId)
+{
+    if (!m_dbManager) {
+        setStatus("数据库管理器未初始化");
         return false;
     }
 
-    // 1. 检查车次是否存在
-    QSqlQuery checkQuery(db);
-    checkQuery.prepare("SELECT trainNumber FROM Train WHERE trainId = ?");
-    checkQuery.addBindValue(trainId);
-    if (!checkQuery.exec()) {
-        setStatus("检查车次失败: " + checkQuery.lastError().text());
-        return false;
-    }
-    if (!checkQuery.next()) {
-        setStatus("未找到要停运的车次 (ID: " + QString::number(trainId) + ")");
-        return false;
-    }
-    QString trainNumber = checkQuery.value("trainNumber").toString();
-
-    // 2. 检查车次是否已经停运
-    if (checkQuery.value("enabled").toInt() == 0) {
-        setStatus("车次 " + trainNumber + " 已经处于停运状态");
+    if (trainId <= 0) {
+        setStatus("无效的车次ID");
         return false;
     }
 
-    // 3. 执行逻辑删除（设置 enabled = 0）
-    QSqlQuery query(db);
-    query.prepare("UPDATE Train SET enabled = 0 WHERE trainId = ?");
-    query.addBindValue(trainId);
+    // ============================================================
+    // 待 DatabaseManager 补充 API: bool deleteTrain(int trainId)
+    //
+    // SQL 语句（参考）：
+    // -- 检查车次是否存在
+    // SELECT trainNumber, enabled FROM Train WHERE trainId = ?;
+    //
+    // -- 检查是否已停运（如果 enabled == 0，返回失败）
+    //
+    // -- 执行逻辑删除
+    // UPDATE Train SET enabled = 0 WHERE trainId = ?;
+    // ============================================================
 
-    if (!query.exec()) {
-        setStatus("停运车次失败: " + query.lastError().text());
-        return false;
-    }
+    // 实现代码（待 DatabaseManager 补充后取消注释）：
+    // if (!m_dbManager->deleteTrain(trainId)) {
+    //     setStatus("停运车次失败: " + m_dbManager->lastError());
+    //     return false;
+    // }
 
-    if (query.numRowsAffected() == 0) {
-        setStatus("停运车次失败，未找到匹配的记录");
-        return false;
-    }
-
-    setStatus("车次 " + trainNumber + " 已停运");
+    setStatus("车次已停运");
     return true;
 }
 
-// ---------- 按关键字搜索车次（车次号/站名模糊匹配）----------
-QVector<Train> TrainManager::searchTrains(const QString& keyword) {
+// ============================================================
+// 5. 按关键字搜索
+// ============================================================
+QVector<Train> TrainManager::searchTrains(const QString& keyword)
+{
     QVector<Train> result;
-    QSqlDatabase db = getDB();
-    if (!db.isOpen()) {
-        setStatus("数据库未连接");
+
+    if (!m_dbManager) {
+        setStatus("数据库管理器未初始化");
         return result;
     }
 
@@ -229,55 +308,42 @@ QVector<Train> TrainManager::searchTrains(const QString& keyword) {
         return result;
     }
 
-    // 联表查询：Train + Station（出发站 + 到达站）
-    // 匹配：车次号、出发站名、到达站名
-    QString sql =
-        "SELECT t.trainId, t.trainNumber, t.departureStationId, t.arrivalStationId, "
-        "t.departureTime, t.arrivalTime, t.totalSeats, t.remainingSeats, t.enabled "
-        "FROM Train t "
-        "LEFT JOIN Station s1 ON t.departureStationId = s1.stationId "
-        "LEFT JOIN Station s2 ON t.arrivalStationId = s2.stationId "
-        "WHERE (t.trainNumber LIKE ? "
-        "OR s1.stationName LIKE ? "
-        "OR s2.stationName LIKE ?) "
-        "AND t.enabled = 1";  // 只搜索启用的车次
+    // ============================================================
+    // 待 DatabaseManager 补充 API: QList<TrainRecord> searchTrains(const QString& keyword) const
+    //
+    // SQL 语句（参考）：
+    // SELECT t.trainId, t.trainNumber, t.departureStationId, t.arrivalStationId,
+    //        t.departureTime, t.arrivalTime, t.totalSeats, t.remainingSeats, t.enabled
+    // FROM Train t
+    // LEFT JOIN Station s1 ON t.departureStationId = s1.stationId
+    // LEFT JOIN Station s2 ON t.arrivalStationId = s2.stationId
+    // WHERE (t.trainNumber LIKE ?
+    //        OR s1.stationName LIKE ?
+    //        OR s2.stationName LIKE ?)
+    //   AND t.enabled = 1;
+    //
+    // 参数：'%' + keyword + '%'
+    // ============================================================
 
-    QSqlQuery query(db);
-    query.prepare(sql);
-    QString pattern = "%" + keyword.trimmed() + "%";
-    query.addBindValue(pattern);
-    query.addBindValue(pattern);
-    query.addBindValue(pattern);
-
-    if (!query.exec()) {
-        setStatus("搜索车次失败: " + query.lastError().text());
-        return result;
-    }
-
-    while (query.next()) {
-        Train t;
-        t.trainId = query.value("trainId").toInt();
-        t.trainNumber = query.value("trainNumber").toString();
-        t.departureStationId = query.value("departureStationId").toInt();
-        t.arrivalStationId = query.value("arrivalStationId").toInt();
-        t.departureTime = query.value("departureTime").toString();
-        t.arrivalTime = query.value("arrivalTime").toString();
-        t.totalSeats = query.value("totalSeats").toInt();
-        t.remainingSeats = query.value("remainingSeats").toInt();
-        t.enabled = query.value("enabled").toInt() == 1;
-        result.append(t);
-    }
+    // 实现代码（待 DatabaseManager 补充后取消注释）：
+    // auto records = m_dbManager->searchTrains(keyword);
+    // for (const auto& record : records) {
+    //     result.append(convertToTrain(record));
+    // }
 
     setStatus("搜索完成，找到 " + QString::number(result.size()) + " 条匹配记录");
     return result;
 }
 
-// ---------- 按车站查询车次（出发站或到达站）----------
-QVector<Train> TrainManager::searchByStation(int stationId, bool isDeparture) {
+// ============================================================
+// 6. 按车站搜索
+// ============================================================
+QVector<Train> TrainManager::searchByStation(int stationId, bool isDeparture)
+{
     QVector<Train> result;
-    QSqlDatabase db = getDB();
-    if (!db.isOpen()) {
-        setStatus("数据库未连接");
+
+    if (!m_dbManager) {
+        setStatus("数据库管理器未初始化");
         return result;
     }
 
@@ -286,94 +352,78 @@ QVector<Train> TrainManager::searchByStation(int stationId, bool isDeparture) {
         return result;
     }
 
-    QString sql = "SELECT trainId, trainNumber, departureStationId, arrivalStationId, "
-                  "departureTime, arrivalTime, totalSeats, remainingSeats, enabled "
-                  "FROM Train WHERE ";
-    sql += isDeparture ? "departureStationId = ?" : "arrivalStationId = ?";
-    sql += " AND enabled = 1";  // 只查询启用的车次
+    // ============================================================
+    // 待 DatabaseManager 补充 API: QList<TrainRecord> searchByStation(int stationId, bool isDeparture) const
+    //
+    // SQL 语句（参考）：
+    // -- 按出发站搜索：
+    // SELECT trainId, trainNumber, departureStationId, arrivalStationId,
+    //        departureTime, arrivalTime, totalSeats, remainingSeats, enabled
+    // FROM Train
+    // WHERE departureStationId = ?
+    //   AND enabled = 1;
+    //
+    // -- 按到达站搜索：
+    // SELECT trainId, trainNumber, departureStationId, arrivalStationId,
+    //        departureTime, arrivalTime, totalSeats, remainingSeats, enabled
+    // FROM Train
+    // WHERE arrivalStationId = ?
+    //   AND enabled = 1;
+    // ============================================================
 
-    QSqlQuery query(db);
-    query.prepare(sql);
-    query.addBindValue(stationId);
+    // 实现代码（待 DatabaseManager 补充后取消注释）：
+    // auto records = m_dbManager->searchByStation(stationId, isDeparture);
+    // for (const auto& record : records) {
+    //     result.append(convertToTrain(record));
+    // }
 
-    if (!query.exec()) {
-        setStatus("按站查询失败: " + query.lastError().text());
-        return result;
-    }
-
-    while (query.next()) {
-        Train t;
-        t.trainId = query.value("trainId").toInt();
-        t.trainNumber = query.value("trainNumber").toString();
-        t.departureStationId = query.value("departureStationId").toInt();
-        t.arrivalStationId = query.value("arrivalStationId").toInt();
-        t.departureTime = query.value("departureTime").toString();
-        t.arrivalTime = query.value("arrivalTime").toString();
-        t.totalSeats = query.value("totalSeats").toInt();
-        t.remainingSeats = query.value("remainingSeats").toInt();
-        t.enabled = query.value("enabled").toInt() == 1;
-        result.append(t);
-    }
-
-    setStatus("按站查询完成，共 " + QString::number(result.size()) + " 条记录");
+    QString direction = isDeparture ? "出发" : "到达";
+    setStatus("按" + direction + "站查询完成，共 " + QString::number(result.size()) + " 条记录");
     return result;
 }
-// ---------- 更新剩余座位 ----------
-bool TrainManager::updateRemainingSeats(int trainId, int delta) {
-    QSqlDatabase db = getDB();
-    if (!db.isOpen()) {
-        setStatus("数据库未连接");
+
+// ============================================================
+// 7. 更新剩余座位
+// ============================================================
+bool TrainManager::updateRemainingSeats(int trainId, int delta)
+{
+    if (!m_dbManager) {
+        setStatus("数据库管理器未初始化");
         return false;
     }
 
-    // 1. 查询当前余票和总座位数
-    QSqlQuery query(db);
-    query.prepare("SELECT remainingSeats, totalSeats, trainNumber FROM Train WHERE trainId = ?");
-    query.addBindValue(trainId);
-    if (!query.exec()) {
-        setStatus("查询车次失败: " + query.lastError().text());
-        return false;
-    }
-    if (!query.next()) {
-        setStatus("未找到车次 (ID: " + QString::number(trainId) + ")");
+    if (trainId <= 0) {
+        setStatus("无效的车次ID");
         return false;
     }
 
-    int currentRemaining = query.value("remainingSeats").toInt();
-    int totalSeats = query.value("totalSeats").toInt();
-    QString trainNumber = query.value("trainNumber").toString();
-
-    // 2. 计算新余票并校验
-    int newRemaining = currentRemaining + delta;
-    if (newRemaining < 0) {
-        setStatus("余票不足，当前余票: " + QString::number(currentRemaining) +
-                  ", 需求: " + QString::number(delta));
-        return false;
-    }
-    if (newRemaining > totalSeats) {
-        setStatus("超售，总座位: " + QString::number(totalSeats) +
-                  ", 当前余票: " + QString::number(currentRemaining) +
-                  ", 增量: " + QString::number(delta));
+    if (delta == 0) {
+        setStatus("变动数量不能为 0");
         return false;
     }
 
-    // 3. 执行更新
-    QSqlQuery updateQuery(db);
-    updateQuery.prepare("UPDATE Train SET remainingSeats = ? WHERE trainId = ?");
-    updateQuery.addBindValue(newRemaining);
-    updateQuery.addBindValue(trainId);
+    // ============================================================
+    // 待 DatabaseManager 补充 API: bool updateRemainingSeats(int trainId, int delta)
+    //
+    // SQL 语句（参考）：
+    // -- 查询当前余票和总座位数
+    // SELECT remainingSeats, totalSeats, trainNumber FROM Train WHERE trainId = ?;
+    //
+    // -- 计算新余票并校验
+    //    newRemaining = remainingSeats + delta
+    //    IF newRemaining < 0 → 余票不足
+    //    IF newRemaining > totalSeats → 超售
+    //
+    // -- 执行更新
+    // UPDATE Train SET remainingSeats = ? WHERE trainId = ?;
+    // ============================================================
 
-    if (!updateQuery.exec()) {
-        setStatus("更新余票失败: " + updateQuery.lastError().text());
-        return false;
-    }
+    // 实现代码（待 DatabaseManager 补充后取消注释）：
+    // if (!m_dbManager->updateRemainingSeats(trainId, delta)) {
+    //     setStatus("更新余票失败: " + m_dbManager->lastError());
+    //     return false;
+    // }
 
-    if (updateQuery.numRowsAffected() == 0) {
-        setStatus("更新余票失败，未找到匹配的记录");
-        return false;
-    }
-
-    setStatus("车次 " + trainNumber + " 余票更新成功，当前余票: " +
-              QString::number(newRemaining));
+    setStatus("余票更新成功");
     return true;
 }

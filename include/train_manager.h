@@ -4,7 +4,11 @@
 #include <QString>
 #include <QVector>
 
-// ---------- 车次数据结构（对齐数据库 schema）----------
+class DatabaseManager;
+
+// ============================================================
+// 车次数据结构（业务层使用）
+// ============================================================
 struct Train {
     int trainId;                 // 自增主键
     QString trainNumber;         // 车次号，如 G1234
@@ -14,29 +18,41 @@ struct Train {
     QString arrivalTime;         // 到达时间，如 "12:30"
     int totalSeats;              // 总座位数
     int remainingSeats;          // 剩余座位数
-    bool enabled;                // 是否启用（1=启用，0=停运）
+    bool enabled;                // true=启用，false=停运
 };
 
-// ---------- 车次管理类 ----------
+// ============================================================
+// 车次管理类
+// ============================================================
 class TrainManager
 {
 public:
-    TrainManager() = default;
+    explicit TrainManager(DatabaseManager* dbManager = nullptr);
 
-    // 获取最后一次操作的状态信息（供 UI 调用）
+    // ---------- 状态信息 ----------
     QString statusMessage() const;
 
     // ---------- 查询 ----------
     QVector<Train> getAllTrains(bool onlyEnabled = true);
-    // ---------- CRUD 操作 ----------
+
+    // ---------- CRUD ----------
     bool addTrain(const Train& train);
     bool updateTrain(const Train& train);
-    bool deleteTrain(int trainId);              // 逻辑删除（停运）
+    bool deleteTrain(int trainId);          // 逻辑删除（停运）
+
+    // ---------- 搜索 ----------
     QVector<Train> searchTrains(const QString& keyword);
-    QVector<Train> searchByStation(int stationId, bool isDeparture = true);  // 按车站搜索
+    QVector<Train> searchByStation(int stationId, bool isDeparture = true);
+
     // ---------- 座位管理 ----------
-    bool updateRemainingSeats(int trainId, int delta);  // delta 可正可负
+    bool updateRemainingSeats(int trainId, int delta);
+
 private:
-    QString m_lastStatus;        // 记录最后一次操作的状态信息
+    DatabaseManager* m_dbManager;
+    QString m_lastStatus;
     void setStatus(const QString& msg) { m_lastStatus = msg; }
+
+    // ---------- 辅助转换函数 ----------
+    Train convertToTrain(const struct TrainRecord& record) const;
+    struct TrainRecord convertToRecord(const Train& train) const;
 };
