@@ -6,7 +6,7 @@
 
 namespace {
 // 数据库中 role 用整数保存，这里集中转换为登录模块使用的枚举。
-UserRole roleFromDatabaseValue(int role)
+std::optional<UserRole> roleFromDatabaseValue(int role)
 {
     switch (role) {
     case 2:
@@ -14,8 +14,9 @@ UserRole roleFromDatabaseValue(int role)
     case 1:
         return UserRole::Seller;
     case 0:
-    default:
         return UserRole::Guest;
+    default:
+        return std::nullopt;    // >>> MANAGER FIX
     }
 }
 }
@@ -54,6 +55,15 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
 
     // 用户查询只通过 DatabaseManager，密码和角色判断留在 LoginManager。
     const auto userAccount = m_databaseManager->findUserByUsername(trimmedUsername);
+    // >>> MANAGER ADDED THIS:
+    const auto role = roleFromDatabaseValue(userAccount->role);
+
+    if (!role.has_value()) {
+        return {false,
+                UserRole::Guest,
+                userAccount->username,
+                QStringLiteral("账号角色无效。")};
+    }
 
     if (!userAccount.has_value() || userAccount->password != password) {
         return {false,
@@ -64,13 +74,13 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
 
     if (!userAccount->enabled) {
         return {false,
-                roleFromDatabaseValue(userAccount->role),
+                *role,
                 userAccount->username,
                 QStringLiteral("账号已被禁用。")};
     }
 
     return {true,
-            roleFromDatabaseValue(userAccount->role),
+            *role,
             userAccount->username,
             QStringLiteral("登录成功。")};
 }
