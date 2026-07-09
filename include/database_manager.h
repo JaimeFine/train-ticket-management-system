@@ -56,6 +56,19 @@ public:
     QList<OrderRecord> findOrdersByUser(int userId) const;
     bool updateOrderStatus(int orderId, int status);
 
+    // ── Issue 9: 订票 + 余票查询 + 车次搜索 ─────────────────
+    bool adjustTrainSeats(int trainId, int delta);
+    bool beginTransaction();
+    bool commitTransaction();
+    bool rollbackTransaction();
+    struct TrainWithStations {
+        int trainId=0,totalSeats=0,remainingSeats=0;
+        QString trainNumber,departureStationName,arrivalStationName;
+        QString departureTime,arrivalTime; bool enabled=true;
+    };
+    QList<TrainWithStations> searchTrainsByStation(
+        const QString &dep,const QString &arr,const QString &date) const;
+
 private:
     // * This block connect helpers
     // openDatabase() only worries about creating & opening the SQLite file.
