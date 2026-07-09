@@ -16,7 +16,7 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
 {
     setWindowTitle(QStringLiteral("火车票务管理系统登录"));
     setModal(true);
-    setFixedSize(560, 520);
+    setFixedSize(760, 520);
 
     // 样式先放在登录窗口里，避免影响别的窗口。
     setStyleSheet(QStringLiteral(R"QSS(
@@ -29,29 +29,38 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
         QFrame#loginShell {
             background: #fbfdfc;
             border: 1px solid #d5dfda;
-            border-radius: 14px;
+            border-radius: 16px;
+        }
+        QFrame#visualPanel {
+            background: #123c35;
+            border-top-left-radius: 16px;
+            border-bottom-left-radius: 16px;
         }
         QLabel#systemTag {
-            color: #0f766e;
+            color: #a7f3d0;
             font-size: 13px;
             font-weight: 700;
             letter-spacing: 0px;
         }
         QLabel#systemTitle {
-            color: #12221e;
+            color: #ffffff;
             font-size: 28px;
             font-weight: 700;
         }
         QLabel#systemSubtitle {
-            color: #65716c;
+            color: #d7eee6;
             font-size: 13px;
         }
-        QLabel#roleLine {
-            color: #37534b;
-            background: #eef7f3;
-            border: 1px solid #cfe2da;
+        QLabel[class="visualPill"] {
+            color: #f7fffc;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.14);
             border-radius: 8px;
-            padding: 7px 12px;
+            padding: 8px 10px;
+            font-size: 12px;
+        }
+        QLabel#visualFooter {
+            color: #b9dfd3;
             font-size: 12px;
         }
         QLabel#formTitle {
@@ -124,27 +133,54 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     shadow->setColor(QColor(24, 45, 39, 55));
     shellFrame->setGraphicsEffect(shadow);
 
-    auto *shellLayout = new QVBoxLayout(shellFrame);
-    shellLayout->setContentsMargins(42, 34, 42, 34);
-    shellLayout->setSpacing(16);
+    auto *shellLayout = new QHBoxLayout(shellFrame);
+    shellLayout->setContentsMargins(0, 0, 0, 0);
+    shellLayout->setSpacing(0);
 
-    auto *systemTag = new QLabel(QStringLiteral("铁路票务入口"), shellFrame);
+    auto *visualPanel = new QFrame(shellFrame);
+    visualPanel->setObjectName(QStringLiteral("visualPanel"));
+    visualPanel->setFixedWidth(260);
+
+    auto *visualLayout = new QVBoxLayout(visualPanel);
+    visualLayout->setContentsMargins(28, 34, 28, 30);
+    visualLayout->setSpacing(14);
+
+    auto *systemTag = new QLabel(QStringLiteral("铁路票务入口"), visualPanel);
     systemTag->setObjectName(QStringLiteral("systemTag"));
 
-    auto *systemTitle = new QLabel(QStringLiteral("火车票务管理系统"), shellFrame);
+    auto *systemTitle = new QLabel(QStringLiteral("火车票务\n管理系统"), visualPanel);
     systemTitle->setObjectName(QStringLiteral("systemTitle"));
+    systemTitle->setWordWrap(true);
 
-    auto *systemSubtitle = new QLabel(QStringLiteral("按账号身份进入对应功能，也可以游客身份查询余票。"), shellFrame);
+    auto *systemSubtitle = new QLabel(QStringLiteral("让不同身份进入各自的工作台。"), visualPanel);
     systemSubtitle->setObjectName(QStringLiteral("systemSubtitle"));
     systemSubtitle->setWordWrap(true);
 
-    auto *roleLine = new QLabel(QStringLiteral("游客查询 / 普通用户 / 售票员 / 管理员"), shellFrame);
-    roleLine->setObjectName(QStringLiteral("roleLine"));
+    auto *queryPill = new QLabel(QStringLiteral("清晰分工"), visualPanel);
+    queryPill->setProperty("class", QStringLiteral("visualPill"));
+    auto *ticketPill = new QLabel(QStringLiteral("快速办理"), visualPanel);
+    ticketPill->setProperty("class", QStringLiteral("visualPill"));
+    auto *accountPill = new QLabel(QStringLiteral("安全访问"), visualPanel);
+    accountPill->setProperty("class", QStringLiteral("visualPill"));
+
+    auto *visualFooter = new QLabel(QStringLiteral("登录后进入专属工作台"), visualPanel);
+    visualFooter->setObjectName(QStringLiteral("visualFooter"));
+    visualFooter->setWordWrap(true);
+
+    visualLayout->addWidget(systemTag);
+    visualLayout->addWidget(systemTitle);
+    visualLayout->addWidget(systemSubtitle);
+    visualLayout->addSpacing(16);
+    visualLayout->addWidget(queryPill);
+    visualLayout->addWidget(ticketPill);
+    visualLayout->addWidget(accountPill);
+    visualLayout->addStretch();
+    visualLayout->addWidget(visualFooter);
 
     // 表单区域只放控件，不在这里写账号规则。
     auto *formPanel = new QFrame(shellFrame);
     auto *formLayout = new QVBoxLayout(formPanel);
-    formLayout->setContentsMargins(0, 10, 0, 0);
+    formLayout->setContentsMargins(42, 38, 42, 34);
     formLayout->setSpacing(16);
 
     m_formTitleLabel = new QLabel(QStringLiteral("欢迎登录"), formPanel);
@@ -216,10 +252,6 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     buttonLayout->addWidget(m_registerButton);
     buttonLayout->addWidget(m_loginButton);
 
-    shellLayout->addWidget(systemTag);
-    shellLayout->addWidget(systemTitle);
-    shellLayout->addWidget(systemSubtitle);
-    shellLayout->addWidget(roleLine);
     formLayout->addWidget(m_formTitleLabel);
     formLayout->addWidget(m_formSubtitleLabel);
     formLayout->addLayout(inputLayout);
@@ -227,7 +259,8 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     formLayout->addStretch();
     formLayout->addLayout(buttonLayout);
 
-    shellLayout->addWidget(formPanel);
+    shellLayout->addWidget(visualPanel);
+    shellLayout->addWidget(formPanel, 1);
     rootLayout->addWidget(shellFrame);
 
     // 按钮只负责切换界面或提交输入，具体账号判断仍然交给 LoginManager。

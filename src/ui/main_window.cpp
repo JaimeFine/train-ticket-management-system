@@ -32,34 +32,32 @@ QString roleHint(UserRole role)
 {
     switch (role) {
     case UserRole::Admin:
-        return QStringLiteral("管理员可进入账号管理、票务办理和查询入口。");
+        return QStringLiteral("账号管理和权限维护是当前工作重点。");
     case UserRole::Seller:
-        return QStringLiteral("售票员可进入票务办理和查询入口，不能进入账号管理。");
+        return QStringLiteral("优先处理售票、退票、改签和车票查询。");
     case UserRole::Guest:
-        return QStringLiteral("游客只开放基础查询入口，不能办理售票和账号管理。");
+        return QStringLiteral("游客模式只保留基础查询入口。");
     case UserRole::User:
-        return QStringLiteral("普通用户可查询车票信息，并可修改自己的登录密码。");
+        return QStringLiteral("查看车票信息，并维护自己的账号密码。");
     }
 
     return QStringLiteral("当前身份暂未配置权限。");
 }
 
-QString accessText(bool allowed)
+QString workspaceTitle(UserRole role)
 {
-    if (allowed) {
-        return QStringLiteral("可访问");
+    switch (role) {
+    case UserRole::Admin:
+        return QStringLiteral("管理员工作台");
+    case UserRole::Seller:
+        return QStringLiteral("售票员工作台");
+    case UserRole::Guest:
+        return QStringLiteral("游客查询入口");
+    case UserRole::User:
+        return QStringLiteral("用户服务台");
     }
 
-    return QStringLiteral("无权限");
-}
-
-QString buttonText(bool allowed)
-{
-    if (allowed) {
-        return QStringLiteral("进入");
-    }
-
-    return QStringLiteral("锁定");
+    return QStringLiteral("系统工作台");
 }
 
 }
@@ -184,10 +182,12 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     auto *eyebrow = new QLabel(QStringLiteral("火车票务管理系统"), headerPanel);
     eyebrow->setObjectName(QStringLiteral("eyebrow"));
 
-    auto *title = new QLabel(QStringLiteral("欢迎，%1").arg(m_loginResult.username), headerPanel);
+    auto *title = new QLabel(workspaceTitle(m_loginResult.role), headerPanel);
     title->setObjectName(QStringLiteral("mainTitle"));
 
-    auto *subtitle = new QLabel(roleHint(m_loginResult.role), headerPanel);
+    auto *subtitle = new QLabel(QStringLiteral("%1，%2")
+                                    .arg(m_loginResult.username, roleHint(m_loginResult.role)),
+                                headerPanel);
     subtitle->setObjectName(QStringLiteral("mainSubtitle"));
 
     titleBlock->addWidget(eyebrow);
@@ -201,7 +201,6 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     headerLayout->addLayout(titleBlock, 1);
     headerLayout->addWidget(roleBadge, 0, Qt::AlignTop);
 
-    const bool guestAllowed = LoginManager::canAccessGuestFunctions(m_loginResult.role);
     const bool sellerAllowed = LoginManager::canAccessSellerFunctions(m_loginResult.role);
     const bool adminAllowed = LoginManager::canAccessAdminFunctions(m_loginResult.role);
     const bool passwordAllowed = m_loginResult.role == UserRole::Admin
@@ -220,111 +219,104 @@ MainWindow::MainWindow(const LoginResult &loginResult,
         dialog.exec();
     };
 
-    // 下面的入口先做权限展示，真正的业务页面等对应模块完成后再接入。
-    auto *gridLayout = new QGridLayout;
-    gridLayout->setSpacing(16);
-
-    auto *loginCard = new QFrame(centralWidget);
-    loginCard->setObjectName(QStringLiteral("moduleCard"));
-    auto *loginCardLayout = new QVBoxLayout(loginCard);
-    loginCardLayout->setContentsMargins(18, 16, 18, 16);
-    loginCardLayout->setSpacing(8);
-    auto *loginTitleLabel = new QLabel(QStringLiteral("登录模块"), loginCard);
-    loginTitleLabel->setObjectName(QStringLiteral("cardTitle"));
-    auto *loginDescriptionLabel = new QLabel(QStringLiteral("当前会话和角色状态已准备就绪。"), loginCard);
-    loginDescriptionLabel->setObjectName(QStringLiteral("cardDescription"));
-    loginDescriptionLabel->setWordWrap(true);
-    auto *loginTagLabel = new QLabel(QStringLiteral("已登录"), loginCard);
-    loginTagLabel->setObjectName(QStringLiteral("openTag"));
-    loginTagLabel->setAlignment(Qt::AlignCenter);
-    auto *passwordButton = new QPushButton(passwordAllowed ? QStringLiteral("修改密码")
-                                                           : QStringLiteral("游客无账号"), loginCard);
-    passwordButton->setEnabled(passwordAllowed);
-    connect(passwordButton, &QPushButton::clicked, this, openAccountDialog);
-    loginCardLayout->addWidget(loginTitleLabel);
-    loginCardLayout->addWidget(loginDescriptionLabel);
-    loginCardLayout->addWidget(loginTagLabel, 0, Qt::AlignLeft);
-    loginCardLayout->addStretch();
-    loginCardLayout->addWidget(passwordButton, 0, Qt::AlignRight);
-
-    auto *trainCard = new QFrame(centralWidget);
-    trainCard->setObjectName(QStringLiteral("moduleCard"));
-    auto *trainCardLayout = new QVBoxLayout(trainCard);
-    trainCardLayout->setContentsMargins(18, 16, 18, 16);
-    trainCardLayout->setSpacing(8);
-    auto *trainTitleLabel = new QLabel(QStringLiteral("车票查询"), trainCard);
-    trainTitleLabel->setObjectName(QStringLiteral("cardTitle"));
-    auto *trainDescriptionLabel = new QLabel(QStringLiteral("游客、普通用户、售票员和管理员都可以查看车次和余票信息。"), trainCard);
-    trainDescriptionLabel->setObjectName(QStringLiteral("cardDescription"));
-    trainDescriptionLabel->setWordWrap(true);
-    auto *trainTagLabel = new QLabel(accessText(guestAllowed), trainCard);
-    trainTagLabel->setObjectName(guestAllowed ? QStringLiteral("openTag") : QStringLiteral("lockedTag"));
-    trainTagLabel->setAlignment(Qt::AlignCenter);
-    auto *trainButton = new QPushButton(buttonText(guestAllowed), trainCard);
-    trainButton->setEnabled(guestAllowed);
-    connect(trainButton, &QPushButton::clicked, this, [this]() {
+    auto showQueryMessage = [this]() {
         QMessageBox::information(this,
                                  QStringLiteral("车票查询"),
-                                 QStringLiteral("车票查询页面等待车次模块接入。"));
-    });
-    trainCardLayout->addWidget(trainTitleLabel);
-    trainCardLayout->addWidget(trainDescriptionLabel);
-    trainCardLayout->addWidget(trainTagLabel, 0, Qt::AlignLeft);
-    trainCardLayout->addStretch();
-    trainCardLayout->addWidget(trainButton, 0, Qt::AlignRight);
+                                 QStringLiteral("车票查询页面暂未开放。"));
+    };
 
-    auto *ticketCard = new QFrame(centralWidget);
-    ticketCard->setObjectName(QStringLiteral("moduleCard"));
-    auto *ticketCardLayout = new QVBoxLayout(ticketCard);
-    ticketCardLayout->setContentsMargins(18, 16, 18, 16);
-    ticketCardLayout->setSpacing(8);
-    auto *ticketTitleLabel = new QLabel(QStringLiteral("票务办理"), ticketCard);
-    ticketTitleLabel->setObjectName(QStringLiteral("cardTitle"));
-    auto *ticketDescriptionLabel = new QLabel(QStringLiteral("订票、退票、改签和订单流程将在此接入。"), ticketCard);
-    ticketDescriptionLabel->setObjectName(QStringLiteral("cardDescription"));
-    ticketDescriptionLabel->setWordWrap(true);
-    auto *ticketTagLabel = new QLabel(accessText(sellerAllowed), ticketCard);
-    ticketTagLabel->setObjectName(sellerAllowed ? QStringLiteral("openTag") : QStringLiteral("lockedTag"));
-    ticketTagLabel->setAlignment(Qt::AlignCenter);
-    auto *ticketButton = new QPushButton(buttonText(sellerAllowed), ticketCard);
-    ticketButton->setEnabled(sellerAllowed);
-    connect(ticketButton, &QPushButton::clicked, this, [this]() {
+    auto showTicketMessage = [this]() {
         QMessageBox::information(this,
                                  QStringLiteral("票务办理"),
-                                 QStringLiteral("票务办理页面等待票务模块接入。"));
-    });
-    ticketCardLayout->addWidget(ticketTitleLabel);
-    ticketCardLayout->addWidget(ticketDescriptionLabel);
-    ticketCardLayout->addWidget(ticketTagLabel, 0, Qt::AlignLeft);
-    ticketCardLayout->addStretch();
-    ticketCardLayout->addWidget(ticketButton, 0, Qt::AlignRight);
+                                 QStringLiteral("票务办理页面暂未开放。"));
+    };
 
-    auto *accountCard = new QFrame(centralWidget);
-    accountCard->setObjectName(QStringLiteral("moduleCard"));
-    auto *accountCardLayout = new QVBoxLayout(accountCard);
-    accountCardLayout->setContentsMargins(18, 16, 18, 16);
-    accountCardLayout->setSpacing(8);
-    auto *accountTitleLabel = new QLabel(QStringLiteral("账号管理"), accountCard);
-    accountTitleLabel->setObjectName(QStringLiteral("cardTitle"));
-    auto *accountDescriptionLabel = new QLabel(QStringLiteral("管理员可进入后台管理入口，具体账号管理功能后续接入。"), accountCard);
-    accountDescriptionLabel->setObjectName(QStringLiteral("cardDescription"));
-    accountDescriptionLabel->setWordWrap(true);
-    auto *accountTagLabel = new QLabel(accessText(adminAllowed), accountCard);
-    accountTagLabel->setObjectName(adminAllowed ? QStringLiteral("openTag") : QStringLiteral("lockedTag"));
-    accountTagLabel->setAlignment(Qt::AlignCenter);
-    auto *accountButton = new QPushButton(buttonText(adminAllowed), accountCard);
-    accountButton->setEnabled(adminAllowed);
-    connect(accountButton, &QPushButton::clicked, this, openAccountDialog);
-    accountCardLayout->addWidget(accountTitleLabel);
-    accountCardLayout->addWidget(accountDescriptionLabel);
-    accountCardLayout->addWidget(accountTagLabel, 0, Qt::AlignLeft);
-    accountCardLayout->addStretch();
-    accountCardLayout->addWidget(accountButton, 0, Qt::AlignRight);
+    // 下面按身份生成工作台，避免普通用户看到管理员才需要的入口。
+    auto *gridLayout = new QGridLayout;
+    gridLayout->setSpacing(16);
+    gridLayout->setColumnStretch(0, 1);
+    gridLayout->setColumnStretch(1, 1);
 
-    gridLayout->addWidget(loginCard, 0, 0);
-    gridLayout->addWidget(trainCard, 0, 1);
-    gridLayout->addWidget(ticketCard, 1, 0);
-    gridLayout->addWidget(accountCard, 1, 1);
+    int cardCount = 0;
+    auto addModuleCard = [&](const QString &titleText,
+                             const QString &descriptionText,
+                             const QString &tagText,
+                             const QString &buttonText,
+                             bool buttonEnabled,
+                             auto onClicked) {
+        auto *card = new QFrame(centralWidget);
+        card->setObjectName(QStringLiteral("moduleCard"));
+
+        auto *cardLayout = new QVBoxLayout(card);
+        cardLayout->setContentsMargins(18, 16, 18, 16);
+        cardLayout->setSpacing(8);
+
+        auto *titleLabel = new QLabel(titleText, card);
+        titleLabel->setObjectName(QStringLiteral("cardTitle"));
+
+        auto *descriptionLabel = new QLabel(descriptionText, card);
+        descriptionLabel->setObjectName(QStringLiteral("cardDescription"));
+        descriptionLabel->setWordWrap(true);
+
+        auto *tagLabel = new QLabel(tagText, card);
+        tagLabel->setObjectName(buttonEnabled ? QStringLiteral("openTag")
+                                              : QStringLiteral("lockedTag"));
+        tagLabel->setAlignment(Qt::AlignCenter);
+
+        auto *button = new QPushButton(buttonText, card);
+        button->setEnabled(buttonEnabled);
+        connect(button, &QPushButton::clicked, this, onClicked);
+
+        cardLayout->addWidget(titleLabel);
+        cardLayout->addWidget(descriptionLabel);
+        cardLayout->addWidget(tagLabel, 0, Qt::AlignLeft);
+        cardLayout->addStretch();
+        cardLayout->addWidget(button, 0, Qt::AlignRight);
+
+        gridLayout->addWidget(card, cardCount / 2, cardCount % 2);
+        ++cardCount;
+    };
+
+    if (adminAllowed) {
+        addModuleCard(QStringLiteral("账号管理"),
+                      QStringLiteral("创建售票员账号、重置密码、启用或禁用账号。"),
+                      QStringLiteral("管理员专属"),
+                      QStringLiteral("进入管理"),
+                      true,
+                      openAccountDialog);
+    }
+
+    if (sellerAllowed) {
+        addModuleCard(QStringLiteral("票务办理"),
+                      QStringLiteral("处理售票、退票、改签等柜台业务。"),
+                      QStringLiteral("业务办理"),
+                      QStringLiteral("进入办理"),
+                      true,
+                      showTicketMessage);
+    }
+
+    addModuleCard(QStringLiteral("车票查询"),
+                  QStringLiteral("查看车次、站点和余票信息。"),
+                  QStringLiteral("查询开放"),
+                  QStringLiteral("进入查询"),
+                  true,
+                  showQueryMessage);
+
+    if (passwordAllowed) {
+        addModuleCard(QStringLiteral("我的账号"),
+                      QStringLiteral("修改当前登录账号的密码。"),
+                      QStringLiteral("个人设置"),
+                      QStringLiteral("修改密码"),
+                      true,
+                      openAccountDialog);
+    } else {
+        addModuleCard(QStringLiteral("游客模式"),
+                      QStringLiteral("可以先查询车票信息，登录账号后再使用个人服务。"),
+                      QStringLiteral("基础访问"),
+                      QStringLiteral("请先登录"),
+                      false,
+                      []() {});
+    }
 
     pageLayout->addWidget(headerPanel);
     pageLayout->addLayout(gridLayout);
