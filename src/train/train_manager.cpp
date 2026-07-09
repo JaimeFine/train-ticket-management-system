@@ -237,9 +237,9 @@ QVector<Train> TrainManager::searchTrains(const QString& keyword) {
         "FROM Train t "
         "LEFT JOIN Station s1 ON t.departureStationId = s1.stationId "
         "LEFT JOIN Station s2 ON t.arrivalStationId = s2.stationId "
-        "WHERE t.trainNumber LIKE ? "
+        "WHERE (t.trainNumber LIKE ? "
         "OR s1.stationName LIKE ? "
-        "OR s2.stationName LIKE ? "
+        "OR s2.stationName LIKE ?) "
         "AND t.enabled = 1";  // 只搜索启用的车次
 
     QSqlQuery query(db);
