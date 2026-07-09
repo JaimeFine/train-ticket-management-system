@@ -34,7 +34,8 @@ public:
     bool deleteTrain(int trainId);              // 逻辑删除（停运）
     QVector<Train> searchTrains(const QString& keyword);
     QVector<Train> searchByStation(int stationId, bool isDeparture = true);  // 按车站搜索
-
+    // ---------- 座位管理 ----------
+    bool updateRemainingSeats(int trainId, int delta);  // delta 可正可负
 private:
     QString m_lastStatus;        // 记录最后一次操作的状态信息
     void setStatus(const QString& msg) { m_lastStatus = msg; }
