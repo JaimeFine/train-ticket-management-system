@@ -31,6 +31,8 @@ public:
     // ---------- CRUD 操作 ----------
     bool addTrain(const Train& train);
     bool updateTrain(const Train& train);
+    bool deleteTrain(int trainId);              // 逻辑删除（停运）
+    QVector<Train> searchByStation(int stationId, bool isDeparture = true);  // 按车站搜索
 
 private:
     QString m_lastStatus;        // 记录最后一次操作的状态信息
