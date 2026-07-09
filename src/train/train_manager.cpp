@@ -167,3 +167,154 @@ bool TrainManager::updateTrain(const Train& train) {
     setStatus("车次 " + train.trainNumber + " 更新成功");
     return true;
 }
+
+// ---------- 逻辑删除（停运）----------
+bool TrainManager::deleteTrain(int trainId) {
+    QSqlDatabase db = getDB();
+    if (!db.isOpen()) {
+        setStatus("数据库未连接");
+        return false;
+    }
+
+    // 1. 检查车次是否存在
+    QSqlQuery checkQuery(db);
+    checkQuery.prepare("SELECT trainNumber FROM Train WHERE trainId = ?");
+    checkQuery.addBindValue(trainId);
+    if (!checkQuery.exec()) {
+        setStatus("检查车次失败: " + checkQuery.lastError().text());
+        return false;
+    }
+    if (!checkQuery.next()) {
+        setStatus("未找到要停运的车次 (ID: " + QString::number(trainId) + ")");
+        return false;
+    }
+    QString trainNumber = checkQuery.value("trainNumber").toString();
+
+    // 2. 检查车次是否已经停运
+    if (checkQuery.value("enabled").toInt() == 0) {
+        setStatus("车次 " + trainNumber + " 已经处于停运状态");
+        return false;
+    }
+
+    // 3. 执行逻辑删除（设置 enabled = 0）
+    QSqlQuery query(db);
+    query.prepare("UPDATE Train SET enabled = 0 WHERE trainId = ?");
+    query.addBindValue(trainId);
+
+    if (!query.exec()) {
+        setStatus("停运车次失败: " + query.lastError().text());
+        return false;
+    }
+
+    if (query.numRowsAffected() == 0) {
+        setStatus("停运车次失败，未找到匹配的记录");
+        return false;
+    }
+
+    setStatus("车次 " + trainNumber + " 已停运");
+    return true;
+}
+
+// ---------- 按关键字搜索车次（车次号/站名模糊匹配）----------
+QVector<Train> TrainManager::searchTrains(const QString& keyword) {
+    QVector<Train> result;
+    QSqlDatabase db = getDB();
+    if (!db.isOpen()) {
+        setStatus("数据库未连接");
+        return result;
+    }
+
+    if (keyword.trimmed().isEmpty()) {
+        setStatus("搜索关键字不能为空");
+        return result;
+    }
+
+    // 联表查询：Train + Station（出发站 + 到达站）
+    // 匹配：车次号、出发站名、到达站名
+    QString sql =
+        "SELECT t.trainId, t.trainNumber, t.departureStationId, t.arrivalStationId, "
+        "t.departureTime, t.arrivalTime, t.totalSeats, t.remainingSeats, t.enabled "
+        "FROM Train t "
+        "LEFT JOIN Station s1 ON t.departureStationId = s1.stationId "
+        "LEFT JOIN Station s2 ON t.arrivalStationId = s2.stationId "
+        "WHERE t.trainNumber LIKE ? "
+        "OR s1.stationName LIKE ? "
+        "OR s2.stationName LIKE ? "
+        "AND t.enabled = 1";  // 只搜索启用的车次
+
+    QSqlQuery query(db);
+    query.prepare(sql);
+    QString pattern = "%" + keyword.trimmed() + "%";
+    query.addBindValue(pattern);
+    query.addBindValue(pattern);
+    query.addBindValue(pattern);
+
+    if (!query.exec()) {
+        setStatus("搜索车次失败: " + query.lastError().text());
+        return result;
+    }
+
+    while (query.next()) {
+        Train t;
+        t.trainId = query.value("trainId").toInt();
+        t.trainNumber = query.value("trainNumber").toString();
+        t.departureStationId = query.value("departureStationId").toInt();
+        t.arrivalStationId = query.value("arrivalStationId").toInt();
+        t.departureTime = query.value("departureTime").toString();
+        t.arrivalTime = query.value("arrivalTime").toString();
+        t.totalSeats = query.value("totalSeats").toInt();
+        t.remainingSeats = query.value("remainingSeats").toInt();
+        t.enabled = query.value("enabled").toInt() == 1;
+        result.append(t);
+    }
+
+    setStatus("搜索完成，找到 " + QString::number(result.size()) + " 条匹配记录");
+    return result;
+}
+
+// ---------- 按车站查询车次（出发站或到达站）----------
+QVector<Train> TrainManager::searchByStation(int stationId, bool isDeparture) {
+    QVector<Train> result;
+    QSqlDatabase db = getDB();
+    if (!db.isOpen()) {
+        setStatus("数据库未连接");
+        return result;
+    }
+
+    if (stationId <= 0) {
+        setStatus("无效的车站ID");
+        return result;
+    }
+
+    QString sql = "SELECT trainId, trainNumber, departureStationId, arrivalStationId, "
+                  "departureTime, arrivalTime, totalSeats, remainingSeats, enabled "
+                  "FROM Train WHERE ";
+    sql += isDeparture ? "departureStationId = ?" : "arrivalStationId = ?";
+    sql += " AND enabled = 1";  // 只查询启用的车次
+
+    QSqlQuery query(db);
+    query.prepare(sql);
+    query.addBindValue(stationId);
+
+    if (!query.exec()) {
+        setStatus("按站查询失败: " + query.lastError().text());
+        return result;
+    }
+
+    while (query.next()) {
+        Train t;
+        t.trainId = query.value("trainId").toInt();
+        t.trainNumber = query.value("trainNumber").toString();
+        t.departureStationId = query.value("departureStationId").toInt();
+        t.arrivalStationId = query.value("arrivalStationId").toInt();
+        t.departureTime = query.value("departureTime").toString();
+        t.arrivalTime = query.value("arrivalTime").toString();
+        t.totalSeats = query.value("totalSeats").toInt();
+        t.remainingSeats = query.value("remainingSeats").toInt();
+        t.enabled = query.value("enabled").toInt() == 1;
+        result.append(t);
+    }
+
+    setStatus("按站查询完成，共 " + QString::number(result.size()) + " 条记录");
+    return result;
+}
