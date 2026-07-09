@@ -30,16 +30,44 @@ void setupPasswordEdit(QLineEdit *lineEdit)
     lineEdit->setEchoMode(QLineEdit::Password);
     lineEdit->setClearButtonEnabled(true);
 }
+
+QString pageTitleText(UserRole role, bool accountOnly)
+{
+    if (role == UserRole::Guest) {
+        return QStringLiteral("账户注册");
+    }
+
+    if (role == UserRole::Admin && !accountOnly) {
+        return QStringLiteral("员工权限管理");
+    }
+
+    return QStringLiteral("我的账户");
+}
+
+QString pageHintText(const LoginResult &loginResult, bool accountOnly)
+{
+    if (loginResult.role == UserRole::Guest) {
+        return QStringLiteral("注册普通用户账号后，可以登录使用完整功能。");
+    }
+
+    if (loginResult.role == UserRole::Admin && !accountOnly) {
+        return QStringLiteral("管理售票员账号的创建、密码和启用状态。");
+    }
+
+    return QStringLiteral("当前用户：%1（%2）").arg(loginResult.username, roleText(loginResult.role));
+}
 }
 
 AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManager,
                                                  const LoginResult &loginResult,
-                                                 QWidget *parent)
+                                                 QWidget *parent,
+                                                 bool accountOnly)
     : QDialog(parent)
     , m_loginManager(loginManager)
     , m_loginResult(loginResult)
+    , m_accountOnly(accountOnly)
 {
-    setWindowTitle(QStringLiteral("账号管理"));
+    setWindowTitle(pageTitleText(m_loginResult.role, m_accountOnly));
     setModal(true);
     resize(720, 560);
 
@@ -110,12 +138,10 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
     rootLayout->setContentsMargins(24, 22, 24, 22);
     rootLayout->setSpacing(14);
 
-    auto *titleLabel = new QLabel(QStringLiteral("账号管理"), this);
+    auto *titleLabel = new QLabel(pageTitleText(m_loginResult.role, m_accountOnly), this);
     titleLabel->setObjectName(QStringLiteral("pageTitle"));
 
-    auto *hintLabel = new QLabel(
-        QStringLiteral("当前用户：%1（%2）").arg(m_loginResult.username, roleText(m_loginResult.role)),
-        this);
+    auto *hintLabel = new QLabel(pageHintText(m_loginResult, m_accountOnly), this);
     hintLabel->setObjectName(QStringLiteral("pageHint"));
 
     m_messageLabel = new QLabel(QStringLiteral(" "), this);
@@ -127,7 +153,7 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
     rootLayout->addWidget(hintLabel);
     rootLayout->addWidget(m_messageLabel);
 
-    if (m_loginResult.role == UserRole::Admin) {
+    if (m_loginResult.role == UserRole::Admin && !m_accountOnly) {
         // 管理员区域只在管理员登录后显示，售票员看不到这些操作。
         auto *createGroup = new QGroupBox(QStringLiteral("创建售票员账号"), this);
         auto *createLayout = new QVBoxLayout(createGroup);
@@ -159,7 +185,7 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
         createLayout->addWidget(createButton, 0, Qt::AlignRight);
         rootLayout->addWidget(createGroup);
 
-        auto *manageGroup = new QGroupBox(QStringLiteral("售票员账号状态与密码"), this);
+        auto *manageGroup = new QGroupBox(QStringLiteral("现有售票员账号管理"), this);
         auto *manageLayout = new QVBoxLayout(manageGroup);
         auto *manageForm = new QFormLayout;
         manageForm->setHorizontalSpacing(14);
@@ -206,7 +232,8 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
         rootLayout->addWidget(manageGroup);
     }
 
-    if (m_loginResult.role == UserRole::Admin || m_loginResult.role == UserRole::Seller
+    if ((m_loginResult.role == UserRole::Admin && m_accountOnly)
+        || m_loginResult.role == UserRole::Seller
         || m_loginResult.role == UserRole::User) {
         // 管理员、售票员和普通用户都有数据库账号，可以修改自己的密码。
         auto *ownGroup = new QGroupBox(QStringLiteral("修改当前账号密码"), this);
@@ -239,10 +266,38 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
         ownLayout->addLayout(ownForm);
         ownLayout->addWidget(changeButton, 0, Qt::AlignRight);
         rootLayout->addWidget(ownGroup);
-    } else {
-        auto *guestHint = new QLabel(QStringLiteral("游客没有数据库账号，不能进行账号管理。"), this);
-        guestHint->setWordWrap(true);
-        rootLayout->addWidget(guestHint);
+    }
+
+    if (m_loginResult.role == UserRole::Guest) {
+        auto *registerGroup = new QGroupBox(QStringLiteral("注册普通用户账号"), this);
+        auto *registerLayout = new QVBoxLayout(registerGroup);
+        auto *registerForm = new QFormLayout;
+        registerForm->setHorizontalSpacing(14);
+        registerForm->setVerticalSpacing(10);
+
+        m_registerUsernameEdit = new QLineEdit(registerGroup);
+        m_registerUsernameEdit->setPlaceholderText(QStringLiteral("请输入用户名"));
+
+        m_registerPasswordEdit = new QLineEdit(registerGroup);
+        m_registerPasswordEdit->setPlaceholderText(QStringLiteral("请输入密码"));
+        setupPasswordEdit(m_registerPasswordEdit);
+
+        m_registerConfirmEdit = new QLineEdit(registerGroup);
+        m_registerConfirmEdit->setPlaceholderText(QStringLiteral("请再次输入密码"));
+        setupPasswordEdit(m_registerConfirmEdit);
+
+        registerForm->addRow(QStringLiteral("用户名"), m_registerUsernameEdit);
+        registerForm->addRow(QStringLiteral("密码"), m_registerPasswordEdit);
+        registerForm->addRow(QStringLiteral("确认密码"), m_registerConfirmEdit);
+
+        auto *registerButton = new QPushButton(QStringLiteral("注册账号"), registerGroup);
+        connect(registerButton, &QPushButton::clicked, this, [this]() {
+            handleRegisterUser();
+        });
+
+        registerLayout->addLayout(registerForm);
+        registerLayout->addWidget(registerButton, 0, Qt::AlignRight);
+        rootLayout->addWidget(registerGroup);
     }
 
     rootLayout->addStretch();
@@ -252,6 +307,25 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
         close();
     });
     rootLayout->addWidget(closeButton, 0, Qt::AlignRight);
+}
+
+void AccountManagementDialog::handleRegisterUser()
+{
+    if (m_registerPasswordEdit->text() != m_registerConfirmEdit->text()) {
+        showPlainMessage(false, QStringLiteral("两次输入的密码不一致。"));
+        return;
+    }
+
+    const AccountResult result =
+        m_loginManager.registerUser(m_registerUsernameEdit->text(),
+                                    m_registerPasswordEdit->text());
+    showMessage(result);
+
+    if (result.success) {
+        m_registerUsernameEdit->clear();
+        m_registerPasswordEdit->clear();
+        m_registerConfirmEdit->clear();
+    }
 }
 
 void AccountManagementDialog::handleCreateSeller()

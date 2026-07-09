@@ -12,9 +12,11 @@ class AccountManagementDialog : public QDialog
 public:
     explicit AccountManagementDialog(const LoginManager &loginManager,
                                      const LoginResult &loginResult,
-                                     QWidget *parent = nullptr);
+                                     QWidget *parent = nullptr,
+                                     bool accountOnly = false);
 
 private:
+    void handleRegisterUser();
     void handleCreateSeller();
     void handleResetSellerPassword();
     void handleSetSellerEnabled(bool enabled);
@@ -24,6 +26,11 @@ private:
 
     const LoginManager &m_loginManager;
     LoginResult m_loginResult;
+    bool m_accountOnly = false;
+
+    QLineEdit *m_registerUsernameEdit = nullptr;
+    QLineEdit *m_registerPasswordEdit = nullptr;
+    QLineEdit *m_registerConfirmEdit = nullptr;
 
     QLineEdit *m_createUsernameEdit = nullptr;
     QLineEdit *m_createPasswordEdit = nullptr;

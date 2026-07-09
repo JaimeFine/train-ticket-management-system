@@ -152,18 +152,18 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     systemTitle->setObjectName(QStringLiteral("systemTitle"));
     systemTitle->setWordWrap(true);
 
-    auto *systemSubtitle = new QLabel(QStringLiteral("让不同身份进入各自的工作台。"), visualPanel);
+    auto *systemSubtitle = new QLabel(QStringLiteral("每一次出发，都从这里开始。"), visualPanel);
     systemSubtitle->setObjectName(QStringLiteral("systemSubtitle"));
     systemSubtitle->setWordWrap(true);
 
-    auto *queryPill = new QLabel(QStringLiteral("清晰分工"), visualPanel);
+    auto *queryPill = new QLabel(QStringLiteral("准点出发"), visualPanel);
     queryPill->setProperty("class", QStringLiteral("visualPill"));
-    auto *ticketPill = new QLabel(QStringLiteral("快速办理"), visualPanel);
+    auto *ticketPill = new QLabel(QStringLiteral("平安抵达"), visualPanel);
     ticketPill->setProperty("class", QStringLiteral("visualPill"));
-    auto *accountPill = new QLabel(QStringLiteral("安全访问"), visualPanel);
+    auto *accountPill = new QLabel(QStringLiteral("一路顺风"), visualPanel);
     accountPill->setProperty("class", QStringLiteral("visualPill"));
 
-    auto *visualFooter = new QLabel(QStringLiteral("登录后进入专属工作台"), visualPanel);
+    auto *visualFooter = new QLabel(QStringLiteral("愿今天的旅程轻松顺利"), visualPanel);
     visualFooter->setObjectName(QStringLiteral("visualFooter"));
     visualFooter->setWordWrap(true);
 
