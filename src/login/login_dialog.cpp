@@ -16,52 +16,55 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
 {
     setWindowTitle(QStringLiteral("火车票务管理系统登录"));
     setModal(true);
-    setFixedSize(680, 430);
+    setFixedSize(760, 520);
 
-    // 样式先放在登录窗口里，避免影响别的窗口。
     setStyleSheet(QStringLiteral(R"QSS(
         QDialog {
-            background: #eef2f3;
+            background: #edf3f1;
             color: #1f2933;
             font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI";
             font-size: 14px;
         }
         QFrame#loginShell {
-            background: #fbfcfb;
-            border: 1px solid #d8e0dc;
+            background: #fbfdfc;
+            border: 1px solid #d5dfda;
             border-radius: 16px;
         }
-        QFrame#brandPanel {
-            background: #153832;
+        QFrame#visualPanel {
+            background: #123c35;
             border-top-left-radius: 16px;
             border-bottom-left-radius: 16px;
         }
-        QLabel#brandTag {
+        QLabel#systemTag {
             color: #a7f3d0;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 700;
             letter-spacing: 0px;
         }
-        QLabel#brandTitle {
+        QLabel#systemTitle {
             color: #ffffff;
-            font-size: 26px;
+            font-size: 28px;
             font-weight: 700;
         }
-        QLabel#brandSubtitle {
-            color: #d5e7df;
+        QLabel#systemSubtitle {
+            color: #d7eee6;
             font-size: 13px;
-            line-height: 1.4;
         }
-        QLabel[class="brandMetric"] {
-            color: #effaf5;
+        QLabel[class="visualPill"] {
+            color: #f7fffc;
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.14);
             border-radius: 8px;
             padding: 8px 10px;
+            font-size: 12px;
+        }
+        QLabel#visualFooter {
+            color: #b9dfd3;
+            font-size: 12px;
         }
         QLabel#formTitle {
             color: #17231f;
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 700;
         }
         QLabel#formSubtitle {
@@ -117,9 +120,8 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     )QSS"));
 
     auto *rootLayout = new QVBoxLayout(this);
-    rootLayout->setContentsMargins(22, 22, 22, 22);
+    rootLayout->setContentsMargins(30, 28, 30, 28);
 
-    // 外层框负责白色背景、圆角和阴影。
     auto *shellFrame = new QFrame(this);
     shellFrame->setObjectName(QStringLiteral("loginShell"));
 
@@ -133,56 +135,58 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     shellLayout->setContentsMargins(0, 0, 0, 0);
     shellLayout->setSpacing(0);
 
-    // 左边放标题，右边放输入框。
-    auto *brandPanel = new QFrame(shellFrame);
-    brandPanel->setObjectName(QStringLiteral("brandPanel"));
-    brandPanel->setFixedWidth(245);
+    auto *visualPanel = new QFrame(shellFrame);
+    visualPanel->setObjectName(QStringLiteral("visualPanel"));
+    visualPanel->setFixedWidth(260);
 
-    auto *brandLayout = new QVBoxLayout(brandPanel);
-    brandLayout->setContentsMargins(28, 34, 28, 30);
-    brandLayout->setSpacing(14);
+    auto *visualLayout = new QVBoxLayout(visualPanel);
+    visualLayout->setContentsMargins(28, 34, 28, 30);
+    visualLayout->setSpacing(14);
 
-    auto *brandTag = new QLabel(QStringLiteral("铁路票务入口"), brandPanel);
-    brandTag->setObjectName(QStringLiteral("brandTag"));
+    auto *systemTag = new QLabel(QStringLiteral("铁路票务入口"), visualPanel);
+    systemTag->setObjectName(QStringLiteral("systemTag"));
 
-    auto *brandTitle = new QLabel(QStringLiteral("火车票务\n管理系统"), brandPanel);
-    brandTitle->setObjectName(QStringLiteral("brandTitle"));
-    brandTitle->setWordWrap(true);
+    auto *systemTitle = new QLabel(QStringLiteral("火车票务\n管理系统"), visualPanel);
+    systemTitle->setObjectName(QStringLiteral("systemTitle"));
+    systemTitle->setWordWrap(true);
 
-    auto *brandSubtitle = new QLabel(QStringLiteral("面向售票、查询与管理流程的统一登录入口。"), brandPanel);
-    brandSubtitle->setObjectName(QStringLiteral("brandSubtitle"));
-    brandSubtitle->setWordWrap(true);
+    auto *systemSubtitle = new QLabel(QStringLiteral("每一次出发，都从这里开始。"), visualPanel);
+    systemSubtitle->setObjectName(QStringLiteral("systemSubtitle"));
+    systemSubtitle->setWordWrap(true);
 
-    brandLayout->addWidget(brandTag);
-    brandLayout->addWidget(brandTitle);
-    brandLayout->addWidget(brandSubtitle);
-    brandLayout->addSpacing(18);
+    auto *queryPill = new QLabel(QStringLiteral("准点出发"), visualPanel);
+    queryPill->setProperty("class", QStringLiteral("visualPill"));
+    auto *ticketPill = new QLabel(QStringLiteral("平安抵达"), visualPanel);
+    ticketPill->setProperty("class", QStringLiteral("visualPill"));
+    auto *accountPill = new QLabel(QStringLiteral("一路顺风"), visualPanel);
+    accountPill->setProperty("class", QStringLiteral("visualPill"));
 
-    // 三个小标签暂时只做提示用。
-    auto *guestMetricLabel = new QLabel(QStringLiteral("游客余票查询"), brandPanel);
-    guestMetricLabel->setProperty("class", QStringLiteral("brandMetric"));
-    auto *sellerMetricLabel = new QLabel(QStringLiteral("售票员业务入口"), brandPanel);
-    sellerMetricLabel->setProperty("class", QStringLiteral("brandMetric"));
-    auto *adminMetricLabel = new QLabel(QStringLiteral("管理员权限预留"), brandPanel);
-    adminMetricLabel->setProperty("class", QStringLiteral("brandMetric"));
+    auto *visualFooter = new QLabel(QStringLiteral("愿今天的旅程轻松顺利"), visualPanel);
+    visualFooter->setObjectName(QStringLiteral("visualFooter"));
+    visualFooter->setWordWrap(true);
 
-    brandLayout->addWidget(guestMetricLabel);
-    brandLayout->addWidget(sellerMetricLabel);
-    brandLayout->addWidget(adminMetricLabel);
+    visualLayout->addWidget(systemTag);
+    visualLayout->addWidget(systemTitle);
+    visualLayout->addWidget(systemSubtitle);
+    visualLayout->addSpacing(16);
+    visualLayout->addWidget(queryPill);
+    visualLayout->addWidget(ticketPill);
+    visualLayout->addWidget(accountPill);
+    visualLayout->addStretch();
+    visualLayout->addWidget(visualFooter);
 
-    brandLayout->addStretch();
-
-    // 右侧只写表单，不在这里写登录规则。
+    // 这个窗口只收集输入和显示提示，账号是否存在、密码是否正确等判断
+    // 都交给 LoginManager。这样界面里不会混进数据库代码。
     auto *formPanel = new QFrame(shellFrame);
     auto *formLayout = new QVBoxLayout(formPanel);
-    formLayout->setContentsMargins(44, 38, 44, 34);
-    formLayout->setSpacing(18);
+    formLayout->setContentsMargins(42, 38, 42, 34);
+    formLayout->setSpacing(16);
 
-    auto *formTitle = new QLabel(QStringLiteral("欢迎登录"), formPanel);
-    formTitle->setObjectName(QStringLiteral("formTitle"));
+    m_formTitleLabel = new QLabel(QStringLiteral("欢迎登录"), formPanel);
+    m_formTitleLabel->setObjectName(QStringLiteral("formTitle"));
 
-    auto *formSubtitle = new QLabel(QStringLiteral("请输入账号密码，或以游客身份进入系统。"), formPanel);
-    formSubtitle->setObjectName(QStringLiteral("formSubtitle"));
+    m_formSubtitleLabel = new QLabel(QStringLiteral("请输入账号密码，或以游客身份进入系统。"), formPanel);
+    m_formSubtitleLabel->setObjectName(QStringLiteral("formSubtitle"));
 
     auto *inputLayout = new QFormLayout;
     inputLayout->setContentsMargins(0, 4, 0, 0);
@@ -194,6 +198,8 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     usernameLabel->setProperty("class", QStringLiteral("formLabel"));
     auto *passwordLabel = new QLabel(QStringLiteral("密码"), formPanel);
     passwordLabel->setProperty("class", QStringLiteral("formLabel"));
+    m_confirmPasswordLabel = new QLabel(QStringLiteral("确认密码"), formPanel);
+    m_confirmPasswordLabel->setProperty("class", QStringLiteral("formLabel"));
 
     m_usernameEdit = new QLineEdit(formPanel);
     m_usernameEdit->setPlaceholderText(QStringLiteral("请输入用户名"));
@@ -204,8 +210,14 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     m_passwordEdit->setEchoMode(QLineEdit::Password);
     m_passwordEdit->setClearButtonEnabled(true);
 
+    m_confirmPasswordEdit = new QLineEdit(formPanel);
+    m_confirmPasswordEdit->setPlaceholderText(QStringLiteral("注册时请再次输入密码"));
+    m_confirmPasswordEdit->setEchoMode(QLineEdit::Password);
+    m_confirmPasswordEdit->setClearButtonEnabled(true);
+
     inputLayout->addRow(usernameLabel, m_usernameEdit);
     inputLayout->addRow(passwordLabel, m_passwordEdit);
+    inputLayout->addRow(m_confirmPasswordLabel, m_confirmPasswordEdit);
 
     m_messageLabel = new QLabel(QStringLiteral(" "), formPanel);
     m_messageLabel->setObjectName(QStringLiteral("messageLabel"));
@@ -215,39 +227,67 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     auto *buttonLayout = new QHBoxLayout;
     buttonLayout->setSpacing(12);
 
-    // 游客入口放左边，登录按钮放右边。
-    auto *guestButton = new QPushButton(QStringLiteral("游客进入"), formPanel);
-    guestButton->setObjectName(QStringLiteral("guestButton"));
+    m_guestButton = new QPushButton(QStringLiteral("游客进入"), formPanel);
+    m_guestButton->setObjectName(QStringLiteral("guestButton"));
 
-    auto *loginButton = new QPushButton(QStringLiteral("登录"), formPanel);
-    loginButton->setObjectName(QStringLiteral("loginButton"));
-    loginButton->setDefault(true);
+    m_backToLoginButton = new QPushButton(QStringLiteral("返回登录"), formPanel);
+    m_backToLoginButton->setObjectName(QStringLiteral("guestButton"));
 
-    buttonLayout->addWidget(guestButton);
+    m_openRegisterButton = new QPushButton(QStringLiteral("注册用户"), formPanel);
+    m_openRegisterButton->setObjectName(QStringLiteral("guestButton"));
+
+    m_registerButton = new QPushButton(QStringLiteral("完成注册"), formPanel);
+    m_registerButton->setObjectName(QStringLiteral("loginButton"));
+
+    m_loginButton = new QPushButton(QStringLiteral("登录"), formPanel);
+    m_loginButton->setObjectName(QStringLiteral("loginButton"));
+    m_loginButton->setDefault(true);
+
+    buttonLayout->addWidget(m_guestButton);
     buttonLayout->addStretch();
-    buttonLayout->addWidget(loginButton);
+    buttonLayout->addWidget(m_backToLoginButton);
+    buttonLayout->addWidget(m_openRegisterButton);
+    buttonLayout->addWidget(m_registerButton);
+    buttonLayout->addWidget(m_loginButton);
 
-    formLayout->addWidget(formTitle);
-    formLayout->addWidget(formSubtitle);
+    formLayout->addWidget(m_formTitleLabel);
+    formLayout->addWidget(m_formSubtitleLabel);
     formLayout->addLayout(inputLayout);
     formLayout->addWidget(m_messageLabel);
     formLayout->addStretch();
     formLayout->addLayout(buttonLayout);
 
-    shellLayout->addWidget(brandPanel);
+    shellLayout->addWidget(visualPanel);
     shellLayout->addWidget(formPanel, 1);
     rootLayout->addWidget(shellFrame);
 
-    // 按按钮和按回车都走同一个登录函数。
-    connect(loginButton, &QPushButton::clicked, this, [this]() {
+    connect(m_loginButton, &QPushButton::clicked, this, [this]() {
         handleLogin();
     });
-    connect(guestButton, &QPushButton::clicked, this, [this]() {
+    connect(m_openRegisterButton, &QPushButton::clicked, this, [this]() {
+        showRegisterForm();
+    });
+    connect(m_registerButton, &QPushButton::clicked, this, [this]() {
+        handleRegister();
+    });
+    connect(m_backToLoginButton, &QPushButton::clicked, this, [this]() {
+        showLoginForm();
+    });
+    connect(m_guestButton, &QPushButton::clicked, this, [this]() {
         handleGuestAccess();
     });
     connect(m_passwordEdit, &QLineEdit::returnPressed, this, [this]() {
+        if (m_isRegisterMode) {
+            m_confirmPasswordEdit->setFocus();
+            return;
+        }
         handleLogin();
     });
+    connect(m_confirmPasswordEdit, &QLineEdit::returnPressed, this, [this]() {
+        handleRegister();
+    });
+
+    showLoginForm();
 }
 
 LoginResult LoginDialog::loginResult() const
@@ -255,9 +295,65 @@ LoginResult LoginDialog::loginResult() const
     return m_loginResult;
 }
 
+void LoginDialog::showLoginForm()
+{
+    m_isRegisterMode = false;
+
+    m_formTitleLabel->setText(QStringLiteral("欢迎登录"));
+    m_formSubtitleLabel->setText(QStringLiteral("请输入账号密码，或以游客身份进入系统。"));
+
+    // 登录和注册共用同一组输入框。切回登录时把确认密码藏起来，
+    // 再把对应按钮显示出来，不需要另外做一个重复的窗口。
+    m_confirmPasswordLabel->setVisible(false);
+    m_confirmPasswordEdit->setVisible(false);
+    m_confirmPasswordEdit->clear();
+
+    m_guestButton->setVisible(true);
+    m_openRegisterButton->setVisible(true);
+    m_loginButton->setVisible(true);
+    m_backToLoginButton->setVisible(false);
+    m_registerButton->setVisible(false);
+
+    m_loginButton->setDefault(true);
+    m_registerButton->setDefault(false);
+    clearMessage();
+    m_usernameEdit->setFocus();
+}
+
+void LoginDialog::showRegisterForm()
+{
+    m_isRegisterMode = true;
+
+    m_formTitleLabel->setText(QStringLiteral("注册普通用户"));
+    m_formSubtitleLabel->setText(QStringLiteral("创建普通用户账号，注册后可以用账号密码登录。"));
+
+    m_confirmPasswordLabel->setVisible(true);
+    m_confirmPasswordEdit->setVisible(true);
+    m_passwordEdit->clear();
+    m_confirmPasswordEdit->clear();
+
+    m_guestButton->setVisible(false);
+    m_openRegisterButton->setVisible(false);
+    m_loginButton->setVisible(false);
+    m_backToLoginButton->setVisible(true);
+    m_registerButton->setVisible(true);
+
+    m_loginButton->setDefault(false);
+    m_registerButton->setDefault(true);
+    clearMessage();
+    m_passwordEdit->setFocus();
+}
+
+void LoginDialog::clearMessage()
+{
+    m_messageLabel->setText(QStringLiteral(" "));
+    m_messageLabel->setStyleSheet(QString());
+}
+
 void LoginDialog::handleLogin()
 {
-    // 这里只负责拿输入，真正的判断交给 LoginManager。
+    // 这里只把输入交出去。验证失败就留在当前窗口显示原因，
+    // 验证成功才调用 accept()，main.cpp 才会继续打开主窗口。
     m_loginResult = m_loginManager.authenticate(m_usernameEdit->text(), m_passwordEdit->text());
 
     if (!m_loginResult.success) {
@@ -268,15 +364,46 @@ void LoginDialog::handleLogin()
     accept();
 }
 
+void LoginDialog::handleRegister()
+{
+    if (!m_isRegisterMode) {
+        showRegisterForm();
+        return;
+    }
+
+    if (m_passwordEdit->text() != m_confirmPasswordEdit->text()) {
+        showMessage(QStringLiteral("两次输入的密码不一致。"));
+        return;
+    }
+
+    // 普通注册只创建普通用户。
+    const AccountResult result =
+        m_loginManager.registerUser(m_usernameEdit->text(), m_passwordEdit->text());
+
+    if (result.success) {
+        m_passwordEdit->clear();
+        m_confirmPasswordEdit->clear();
+        showLoginForm();
+        showMessage(result.message, true);
+        return;
+    }
+
+    showMessage(result.message);
+}
+
 void LoginDialog::handleGuestAccess()
 {
     m_loginResult = m_loginManager.loginAsGuest();
     accept();
 }
 
-void LoginDialog::showMessage(const QString &message)
+void LoginDialog::showMessage(const QString &message, bool success)
 {
     m_messageLabel->setText(message);
-    // 登录失败时把提示染成红色。
+    if (success) {
+        m_messageLabel->setStyleSheet(QStringLiteral("color: #14532d; background: #dcfce7; border: 1px solid #86efac;"));
+        return;
+    }
+
     m_messageLabel->setStyleSheet(QStringLiteral("color: #9f1239; background: #fff1f2; border: 1px solid #fecdd3;"));
 }

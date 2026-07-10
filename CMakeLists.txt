@@ -26,11 +26,13 @@ set(SOURCES
     src/database/database_manager_station.cpp
     src/database/database_manager_train.cpp
     src/database/database_manager_order.cpp
-    src/database/database_manager_ticket.cpp
+    src/ui/account_management_dialog.cpp
     src/ui/main_window.cpp
+    src/database/database_manager_ticket.cpp
 )
 
 set(HEADERS
+    include/account_management_dialog.h
     include/login_dialog.h
     include/login_manager.h
     include/ticket_manager.h

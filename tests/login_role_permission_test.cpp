@@ -54,6 +54,14 @@ int main(int argc, char *argv[])
     ok = checkResult(!LoginManager::canAccessAdminFunctions(UserRole::Guest),
                      "Guest should not access admin functions.") && ok;
 
+    // 普通用户可以查询，但不能进入售票员或管理员入口。
+    ok = checkResult(LoginManager::canAccessGuestFunctions(UserRole::User),
+                     "User should access guest functions.") && ok;
+    ok = checkResult(!LoginManager::canAccessSellerFunctions(UserRole::User),
+                     "User should not access seller functions.") && ok;
+    ok = checkResult(!LoginManager::canAccessAdminFunctions(UserRole::User),
+                     "User should not access admin functions.") && ok;
+
     // 售票员可以使用查询和票务入口。
     ok = checkResult(LoginManager::canAccessGuestFunctions(UserRole::Seller),
                      "Seller should access guest functions.") && ok;
@@ -71,12 +79,15 @@ int main(int argc, char *argv[])
                      "Admin should access admin functions.") && ok;
 
     const QString adminUsername = makeUsername(QStringLiteral("role_admin"));
+    const QString userUsername = makeUsername(QStringLiteral("role_user"));
     const QString sellerUsername = makeUsername(QStringLiteral("role_seller"));
     const QString invalidRoleUsername =
         makeUsername(QStringLiteral("role_invalid"));
 
     ok = checkResult(addLoginUser(manager, adminUsername, QStringLiteral("admin_pass"), 2),
                      "Admin user should be created.") && ok;
+    ok = checkResult(addLoginUser(manager, userUsername, QStringLiteral("user_pass"), 3),
+                     "Normal user should be created.") && ok;
     ok = checkResult(addLoginUser(manager, sellerUsername, QStringLiteral("seller_pass"), 1),
                      "Seller user should be created.") && ok;
     ok = checkResult(addLoginUser(manager,
@@ -87,6 +98,8 @@ int main(int argc, char *argv[])
 
     const LoginResult adminLogin =
         loginManager.authenticate(adminUsername, QStringLiteral("admin_pass"));
+    const LoginResult userLogin =
+        loginManager.authenticate(userUsername, QStringLiteral("user_pass"));
     const LoginResult sellerLogin =
         loginManager.authenticate(sellerUsername, QStringLiteral("seller_pass"));
     const LoginResult guestLogin = loginManager.loginAsGuest();
@@ -96,9 +109,11 @@ int main(int argc, char *argv[])
         loginManager.authenticate(invalidRoleUsername,
                                   QStringLiteral("invalid_pass"));
 
-    // 管理员和售票员都走正式数据库用户接口，再由 LoginManager 判断身份。
+    // 管理员、普通用户和售票员都走正式数据库用户接口，再由 LoginManager 判断身份。
     ok = checkResult(adminLogin.success && adminLogin.role == UserRole::Admin,
                      "Admin login should return admin role.") && ok;
+    ok = checkResult(userLogin.success && userLogin.role == UserRole::User,
+                     "Normal user login should return user role.") && ok;
     ok = checkResult(sellerLogin.success && sellerLogin.role == UserRole::Seller,
                      "Seller login should return seller role.") && ok;
 
