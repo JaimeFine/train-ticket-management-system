@@ -6,6 +6,7 @@
 #include "login_dialog.h"
 #include "login_manager.h"
 #include "main_window.h"
+#include "train_management_dialog.h"
 
 int main(int argc, char *argv[])
 {

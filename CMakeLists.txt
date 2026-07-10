@@ -40,6 +40,7 @@ set(HEADERS
     include/statistics_manager.h
     include/database_manager.h
     include/main_window.h
+    include/train_management_dialog.h
 )
 
 # ── Resources ────────────────────────────────────────────────────────────────
@@ -52,6 +53,8 @@ add_executable(${PROJECT_NAME}
     ${SOURCES}
     ${HEADERS}
     ${RESOURCES}
+    src/ui/train_management_dialog.cpp
+
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -77,3 +80,4 @@ if(BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
