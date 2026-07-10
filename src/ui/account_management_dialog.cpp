@@ -7,6 +7,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QTableWidget>
 #include <QTableWidgetItem>
@@ -59,6 +60,26 @@ QString pageHintText(const LoginResult &loginResult, bool accountOnly)
     }
 
     return QStringLiteral("当前用户：%1（%2）").arg(loginResult.username, roleText(loginResult.role));
+}
+
+bool confirmAction(QWidget *parent,
+                   const QString &title,
+                   const QString &message,
+                   const QString &confirmText)
+{
+    QMessageBox messageBox(parent);
+    messageBox.setWindowTitle(title);
+    messageBox.setIcon(QMessageBox::Warning);
+    messageBox.setText(message);
+
+    QPushButton *confirmButton =
+        messageBox.addButton(confirmText, QMessageBox::AcceptRole);
+    QPushButton *cancelButton =
+        messageBox.addButton(QStringLiteral("取消"), QMessageBox::RejectRole);
+    messageBox.setDefaultButton(cancelButton);
+    messageBox.exec();
+
+    return messageBox.clickedButton() == confirmButton;
 }
 }
 
@@ -399,6 +420,15 @@ void AccountManagementDialog::handleResetSelectedSellerPassword()
         return;
     }
 
+    // 重置后原密码会立刻失效，先让管理员确认，避免选错行时直接改掉密码。
+    if (!confirmAction(this,
+                       QStringLiteral("确认重置密码"),
+                       QStringLiteral("确定把售票员“%1”的密码重置为系统默认密码吗？")
+                           .arg(username),
+                       QStringLiteral("确认重置"))) {
+        return;
+    }
+
     const AccountResult result =
         m_loginManager.resetSellerPasswordToDefault(m_loginResult.role, username);
     showMessage(result);
@@ -413,6 +443,16 @@ void AccountManagementDialog::handleSetSelectedSellerEnabled(bool enabled)
     if (username.isEmpty()) {
         showPlainMessage(false, QStringLiteral("请先选中一个售票员账号。"));
         return;
+    }
+
+    if (!enabled) {
+        if (!confirmAction(this,
+                           QStringLiteral("确认禁用账号"),
+                           QStringLiteral("确定禁用售票员“%1”吗？禁用后该账号将不能登录。")
+                               .arg(username),
+                           QStringLiteral("确认禁用"))) {
+            return;
+        }
     }
 
     const AccountResult result =

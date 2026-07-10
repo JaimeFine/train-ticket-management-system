@@ -162,6 +162,14 @@ int main(int argc, char *argv[])
     ok = checkResult(!wrongOldPassword.success,
                      "Wrong old password should be rejected.") && ok;
 
+    const AccountResult unchangedPassword =
+        loginManager.changeOwnPassword(sellerUsername,
+                                       UserRole::Seller,
+                                       QStringLiteral("seller_old"),
+                                       QStringLiteral("seller_old"));
+    ok = checkResult(!unchangedPassword.success,
+                     "New password should differ from old password.") && ok;
+
     const AccountResult sellerChange =
         loginManager.changeOwnPassword(sellerUsername,
                                        UserRole::Seller,

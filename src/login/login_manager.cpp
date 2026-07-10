@@ -236,7 +236,8 @@ AccountResult LoginManager::resetSellerPasswordToDefault(UserRole currentRole,
         return result;
     }
 
-    return {true, QStringLiteral("已重置为默认密码：123456")};
+    return {true,
+            QStringLiteral("已重置为默认密码：%1").arg(defaultSellerPassword())};
 }
 
 AccountResult LoginManager::setSellerEnabled(UserRole currentRole,
@@ -318,6 +319,10 @@ AccountResult LoginManager::changeOwnPassword(const QString &username,
 
     if (user->password != oldPassword) {
         return {false, QStringLiteral("原密码不正确。")};
+    }
+
+    if (newPassword == oldPassword) {
+        return {false, QStringLiteral("新密码不能与原密码相同。")};
     }
 
     user->password = newPassword;
