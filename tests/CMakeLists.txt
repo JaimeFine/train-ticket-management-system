@@ -239,3 +239,33 @@ add_qt_smoke_test(ticket_search_smoke_test)
 add_custom_command(TARGET ticket_search_smoke_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:ticket_search_smoke_test>/database
     COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql $<TARGET_FILE_DIR:ticket_search_smoke_test>/database/schema_v1.sql)
+
+add_executable(ticket_issue10_smoke_test
+    ticket_issue10_smoke_test.cpp
+    ../src/database/database_manager.cpp
+    ../src/database/database_manager_user.cpp
+    ../src/database/database_manager_station.cpp
+    ../src/database/database_manager_train.cpp
+    ../src/database/database_manager_order.cpp
+    ../src/database/database_manager_ticket.cpp
+    ../src/ticket/ticket_manager.cpp
+)
+
+target_include_directories(ticket_issue10_smoke_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
+
+target_link_libraries(ticket_issue10_smoke_test PRIVATE
+    Qt${QT_VERSION_MAJOR}::Core
+    Qt${QT_VERSION_MAJOR}::Sql
+)
+
+add_qt_smoke_test(ticket_issue10_smoke_test)
+
+add_custom_command(TARGET ticket_issue10_smoke_test POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        $<TARGET_FILE_DIR:ticket_issue10_smoke_test>/database
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql
+        $<TARGET_FILE_DIR:ticket_issue10_smoke_test>/database/schema_v1.sql
+)
