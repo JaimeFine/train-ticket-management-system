@@ -18,7 +18,6 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     setModal(true);
     setFixedSize(760, 520);
 
-    // 样式先放在登录窗口里，避免影响别的窗口。
     setStyleSheet(QStringLiteral(R"QSS(
         QDialog {
             background: #edf3f1;
@@ -123,7 +122,6 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     auto *rootLayout = new QVBoxLayout(this);
     rootLayout->setContentsMargins(30, 28, 30, 28);
 
-    // 外层框负责白色背景、圆角和阴影。
     auto *shellFrame = new QFrame(this);
     shellFrame->setObjectName(QStringLiteral("loginShell"));
 
@@ -177,7 +175,8 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     visualLayout->addStretch();
     visualLayout->addWidget(visualFooter);
 
-    // 表单区域只放控件，不在这里写账号规则。
+    // 这个窗口只收集输入和显示提示，账号是否存在、密码是否正确等判断
+    // 都交给 LoginManager。这样界面里不会混进数据库代码。
     auto *formPanel = new QFrame(shellFrame);
     auto *formLayout = new QVBoxLayout(formPanel);
     formLayout->setContentsMargins(42, 38, 42, 34);
@@ -228,7 +227,6 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     auto *buttonLayout = new QHBoxLayout;
     buttonLayout->setSpacing(12);
 
-    // 游客入口放左边，登录和注册入口放右边。
     m_guestButton = new QPushButton(QStringLiteral("游客进入"), formPanel);
     m_guestButton->setObjectName(QStringLiteral("guestButton"));
 
@@ -263,7 +261,6 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     shellLayout->addWidget(formPanel, 1);
     rootLayout->addWidget(shellFrame);
 
-    // 按钮只负责切换界面或提交输入，具体账号判断仍然交给 LoginManager。
     connect(m_loginButton, &QPushButton::clicked, this, [this]() {
         handleLogin();
     });
@@ -305,7 +302,8 @@ void LoginDialog::showLoginForm()
     m_formTitleLabel->setText(QStringLiteral("欢迎登录"));
     m_formSubtitleLabel->setText(QStringLiteral("请输入账号密码，或以游客身份进入系统。"));
 
-    // 登录只需要用户名和密码，确认密码只在注册时出现。
+    // 登录和注册共用同一组输入框。切回登录时把确认密码藏起来，
+    // 再把对应按钮显示出来，不需要另外做一个重复的窗口。
     m_confirmPasswordLabel->setVisible(false);
     m_confirmPasswordEdit->setVisible(false);
     m_confirmPasswordEdit->clear();
@@ -354,7 +352,8 @@ void LoginDialog::clearMessage()
 
 void LoginDialog::handleLogin()
 {
-    // 这里只负责拿输入，真正的判断交给 LoginManager。
+    // 这里只把输入交出去。验证失败就留在当前窗口显示原因，
+    // 验证成功才调用 accept()，main.cpp 才会继续打开主窗口。
     m_loginResult = m_loginManager.authenticate(m_usernameEdit->text(), m_passwordEdit->text());
 
     if (!m_loginResult.success) {
@@ -377,7 +376,7 @@ void LoginDialog::handleRegister()
         return;
     }
 
-    // 注册只创建普通用户账号，具体写库逻辑交给 LoginManager。
+    // 普通注册只创建普通用户。
     const AccountResult result =
         m_loginManager.registerUser(m_usernameEdit->text(), m_passwordEdit->text());
 

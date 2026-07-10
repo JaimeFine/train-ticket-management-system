@@ -6,7 +6,7 @@
 #include <QString>
 
 namespace {
-// 数据库中 role 用整数保存，这里集中转换为登录模块使用的枚举。
+// 数据库存的是数字，这里转成代码里用的身份。
 std::optional<UserRole> roleFromDatabaseValue(int role)
 {
     switch (role) {
@@ -19,7 +19,7 @@ std::optional<UserRole> roleFromDatabaseValue(int role)
     case 0:
         return UserRole::Guest;
     default:
-        return std::nullopt;    // 数据库里出现非法角色时，不能静默当成游客。
+        return std::nullopt;    // 角色数字不对，就让登录失败。
     }
 }
 
@@ -41,7 +41,9 @@ LoginManager::LoginManager(DatabaseManager *databaseManager)
 
 LoginResult LoginManager::authenticate(const QString &username, const QString &password) const
 {
-    // 先做界面无关的基础输入校验，避免空值继续进入后续认证流程。
+    // 登录按固定顺序处理：先检查输入，再确认数据库可用，然后查账号、核对密码，
+    // 最后检查身份和启用状态。中间任何一步不通过就马上返回失败结果，
+    // 界面只负责把这个结果显示出来。
     const QString trimmedUsername = username.trimmed();
 
     if (trimmedUsername.isEmpty()) {
@@ -66,7 +68,7 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
                 QStringLiteral("登录服务不可用，请检查数据库。")};
     }
 
-    // 用户查询只通过 DatabaseManager，密码和角色判断留在 LoginManager。
+    // 查账号只能走 DatabaseManager，LoginManager 拿到记录后再做密码和身份判断。
     const auto userAccount = m_databaseManager->findUserByUsername(trimmedUsername);
 
     if (!userAccount.has_value() || userAccount->password != password) {
@@ -127,7 +129,8 @@ AccountResult LoginManager::registerUser(const QString &username,
         return {false, QStringLiteral("用户名已存在。")};
     }
 
-    // 普通注册只创建 role=3 的用户账号，不创建售票员或管理员。
+    // 普通注册固定写入 User 身份。管理员和售票员不能从公开注册入口创建，
+    // 避免有人通过注册界面给自己更高权限。
     UserRecord user;
     user.username = trimmedUsername;
     user.password = password;
@@ -167,7 +170,7 @@ AccountResult LoginManager::createSellerAccount(UserRole currentRole,
         return {false, QStringLiteral("用户名已存在。")};
     }
 
-    // 这里创建的是售票员账号，普通用户注册走 registerUser()。
+    // 管理员新增售票员走这里。
     UserRecord user;
     user.username = trimmedUsername;
     user.password = password;
@@ -209,7 +212,7 @@ AccountResult LoginManager::resetSellerPassword(UserRole currentRole,
         return {false, QStringLiteral("未找到该售票员账号。")};
     }
 
-    // 管理员只能处理售票员账号，避免误改管理员或游客数据。
+    // 先读出完整账号再确认身份，只允许改售票员，别误改管理员或普通用户。
     if (user->role != static_cast<int>(UserRole::Seller)) {
         return {false, QStringLiteral("只能重置售票员账号的密码。")};
     }
@@ -308,7 +311,7 @@ AccountResult LoginManager::changeOwnPassword(const QString &username,
         return {false, QStringLiteral("未找到当前账号。")};
     }
 
-    // 当前登录身份要和数据库中的账号角色一致，防止拿错账号改密码。
+    // 身份对得上，才允许改自己的密码。
     if (user->role != static_cast<int>(currentRole)) {
         return {false, QStringLiteral("当前身份与账号信息不一致。")};
     }
@@ -334,6 +337,8 @@ QList<SellerAccountInfo> LoginManager::sellerAccounts(UserRole currentRole) cons
         return sellers;
     }
 
+    // DatabaseManager 返回完整的 UserRecord，但列表页面只需要用户名和启用状态。
+    // 这里换成较小的 SellerAccountInfo，密码不会被带到界面层。
     const QList<UserRecord> users =
         m_databaseManager->findUsersByRole(static_cast<int>(UserRole::Seller));
 

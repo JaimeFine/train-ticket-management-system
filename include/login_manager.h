@@ -5,7 +5,7 @@
 
 class DatabaseManager;
 
-// 与开发规范中的 User.role 保持一致：0=游客，1=售票员，2=管理员，3=用户。
+// 这里的数字和 User.role 一一对应，不能自己改顺序。
 enum class UserRole
 {
     Guest = 0,
@@ -14,7 +14,7 @@ enum class UserRole
     User = 3
 };
 
-// UI 只依赖这个结果对象展示状态，不直接访问数据库或执行认证细节。
+// 登录结果统一从这里带回界面，界面不需要再去查数据库。
 struct LoginResult
 {
     bool success = false;
@@ -62,7 +62,7 @@ public:
                                     const QString &newPassword) const;
     QList<SellerAccountInfo> sellerAccounts(UserRole currentRole) const;
 
-    // 这里只判断身份，不访问数据库，后面接入模块时可以继续用。
+    // 其他模块接入主窗口后，可以先用这三个函数判断当前身份能不能进入。
     static bool canAccessGuestFunctions(UserRole role);
     static bool canAccessSellerFunctions(UserRole role);
     static bool canAccessAdminFunctions(UserRole role);

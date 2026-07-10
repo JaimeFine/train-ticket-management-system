@@ -72,7 +72,6 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     setWindowTitle(QStringLiteral("火车票务管理系统"));
     resize(980, 640);
 
-    // 主窗口的样式放在这里，颜色跟登录页保持一致。
     setStyleSheet(QStringLiteral(R"QSS(
         QMainWindow {
             background: #eef2f3;
@@ -179,6 +178,8 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     pageLayout->setContentsMargins(28, 28, 28, 24);
     pageLayout->setSpacing(22);
 
+    // “我的账户”和“员工权限管理”共用这个窗口。accountOnly 为 true 时只显示
+    // 当前账号自己的功能；管理员从工作台进入时传 false，才显示售票员管理区域。
     auto openAccountDialog = [this](bool accountOnly) {
         if (m_loginManager == nullptr) {
             QMessageBox::warning(this,
@@ -195,7 +196,7 @@ MainWindow::MainWindow(const LoginResult &loginResult,
         }
     };
 
-    // 顶部显示当前用户和身份。
+    // 顶部放身份和我的账户入口。
     auto *headerPanel = new QFrame(centralWidget);
     headerPanel->setObjectName(QStringLiteral("headerPanel"));
 
@@ -282,7 +283,9 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                                  QStringLiteral("车次和站点管理接口已预留，等待车次模块接入。"));
     };
 
-    // 下面按身份生成工作台，只放入口，不在这里写其他模块业务。
+    // 工作台卡片的排版都一样，所以集中在这里创建。点击后的函数由调用处传入，
+    // 以后车次、票务模块接入时，只需要把现在的提示函数换成真正的窗口入口，
+    // 不用重新改整套主界面布局。
     auto *gridLayout = new QGridLayout;
     gridLayout->setSpacing(16);
     gridLayout->setColumnStretch(0, 1);
@@ -328,6 +331,8 @@ MainWindow::MainWindow(const LoginResult &loginResult,
         ++cardCount;
     };
 
+    // 每种身份只创建自己该看到的卡片。游客和普通用户共用一套布局，
+    // 但游客的历史记录和票务管理按钮会被禁用。
     if (m_loginResult.role == UserRole::Admin) {
         addModuleCard(QStringLiteral("票务数据统计"),
                       QStringLiteral("查看售票、退款、客流和热门线路统计。"),

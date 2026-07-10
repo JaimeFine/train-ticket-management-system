@@ -180,7 +180,7 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
     rootLayout->addWidget(m_messageLabel);
 
     if (m_loginResult.role == UserRole::Admin && !m_accountOnly) {
-        // 管理员区域只在管理员登录后显示，售票员看不到这些操作。
+        // 只有管理员能看到这一块。
         auto *createGroup = new QGroupBox(QStringLiteral("创建售票员账号"), this);
         auto *createLayout = new QVBoxLayout(createGroup);
         auto *createForm = new QFormLayout;
@@ -258,7 +258,7 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
     if ((m_loginResult.role == UserRole::Admin && m_accountOnly)
         || m_loginResult.role == UserRole::Seller
         || m_loginResult.role == UserRole::User) {
-        // 管理员、售票员和普通用户都有数据库账号，可以修改自己的密码。
+        // 真实账号可以改自己的密码。
         auto *ownGroup = new QGroupBox(QStringLiteral("修改当前账号密码"), this);
         auto *ownLayout = new QVBoxLayout(ownGroup);
         auto *ownForm = new QFormLayout;
@@ -406,6 +406,8 @@ void AccountManagementDialog::handleResetSelectedSellerPassword()
 
 void AccountManagementDialog::handleSetSelectedSellerEnabled(bool enabled)
 {
+    // 账号管理按钮都以表格当前选中的行为准。这里先取出用户名，
+    // 再把“启用还是禁用”交给 LoginManager，成功后重新读取列表刷新状态。
     const QString username = selectedSellerUsername();
 
     if (username.isEmpty()) {
@@ -462,6 +464,8 @@ void AccountManagementDialog::refreshSellerTable()
         return;
     }
 
+    // 列表数据每次都重新向 LoginManager 获取，这样创建、启用或禁用账号后，
+    // 页面显示的就是数据库里的最新状态。界面只负责把结果逐行放进表格。
     const QList<SellerAccountInfo> sellers =
         m_loginManager.sellerAccounts(m_loginResult.role);
 
