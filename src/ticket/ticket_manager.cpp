@@ -164,3 +164,26 @@ QVector<QVariantMap> TicketManager::queryOrderByOrderId(int orderId) const
     if (order) result.append(orderToMap(*order));
     return result;
 }
+
+
+// ============================================ Issue 11 ============================================
+
+QVector<QVariantMap> TicketManager::queryAllOrders() const
+{
+    QVector<QVariantMap> result;
+    auto details = m_db.findAllOrdersWithDetails();
+    for (const auto &d : details) {
+        QVariantMap map;
+        map["orderId"]          = d.orderId;
+        map["userId"]           = d.userId;
+        map["trainId"]          = d.trainId;
+        map["status"]           = d.status;
+        map["trainNumber"]      = d.trainNumber;
+        map["passengerName"]    = d.passengerName;
+        map["purchaseTime"]     = d.purchaseTime;
+        map["departureStation"] = d.departureStationName;
+        map["arrivalStation"]   = d.arrivalStationName;
+        result.append(map);
+    }
+    return result;
+}

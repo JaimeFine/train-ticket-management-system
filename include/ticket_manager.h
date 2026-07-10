@@ -18,6 +18,7 @@ public:
     QVector<QVariantMap> queryOrdersByUser(int userId) const;
     QVector<QVariantMap> queryOrdersByPassenger(const QString &name) const;
     QVector<QVariantMap> queryOrderByOrderId(int orderId) const;
+    QVector<QVariantMap> queryAllOrders() const;
     QString lastError() const;
 private:
     DatabaseManager &m_db; QString m_lastError;
