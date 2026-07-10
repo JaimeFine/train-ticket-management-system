@@ -16,6 +16,7 @@ message(STATUS "Using Qt ${QT_VERSION_MAJOR}.${QT_VERSION_MINOR}")
 # ── Source files grouped by module ────────────────────────────────────────────
 set(SOURCES
     src/main.cpp
+    src/login/login_dialog.cpp
     src/login/login_manager.cpp
     src/ticket/ticket_manager.cpp
     src/train/train_manager.cpp
@@ -25,10 +26,14 @@ set(SOURCES
     src/database/database_manager_station.cpp
     src/database/database_manager_train.cpp
     src/database/database_manager_order.cpp
+    src/ui/account_management_dialog.cpp
     src/ui/main_window.cpp
+    src/database/database_manager_ticket.cpp
 )
 
 set(HEADERS
+    include/account_management_dialog.h
+    include/login_dialog.h
     include/login_manager.h
     include/ticket_manager.h
     include/train_manager.h
@@ -56,6 +61,14 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 target_link_libraries(${PROJECT_NAME} PRIVATE
     Qt${QT_VERSION_MAJOR}::Widgets
     Qt${QT_VERSION_MAJOR}::Sql
+)
+
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/database
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/database/schema_v1.sql
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/database/schema_v1.sql
 )
 
 # ── Tests (optional subdirectory) ────────────────────────────────────────────

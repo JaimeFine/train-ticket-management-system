@@ -68,6 +68,9 @@ vcpkg_installed/
 Testing/
 .cache/
 
+# runtime SQLite database files
+database/*.db
+
 # latex headers
 *.aux
 *.log
