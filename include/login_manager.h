@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QList>
 #include <QString>
 
 class DatabaseManager;
@@ -28,6 +29,12 @@ struct AccountResult
     QString message;
 };
 
+struct SellerAccountInfo
+{
+    QString username;
+    bool enabled = true;
+};
+
 class LoginManager
 {
 public:
@@ -44,6 +51,8 @@ public:
     AccountResult resetSellerPassword(UserRole currentRole,
                                       const QString &username,
                                       const QString &newPassword) const;
+    AccountResult resetSellerPasswordToDefault(UserRole currentRole,
+                                               const QString &username) const;
     AccountResult setSellerEnabled(UserRole currentRole,
                                    const QString &username,
                                    bool enabled) const;
@@ -51,6 +60,7 @@ public:
                                     UserRole currentRole,
                                     const QString &oldPassword,
                                     const QString &newPassword) const;
+    QList<SellerAccountInfo> sellerAccounts(UserRole currentRole) const;
 
     // 这里只判断身份，不访问数据库，后面接入模块时可以继续用。
     static bool canAccessGuestFunctions(UserRole role);

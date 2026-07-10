@@ -85,6 +85,17 @@ int main(int argc, char *argv[])
     ok = checkResult(newSellerLogin.success && newSellerLogin.role == UserRole::Seller,
                      "Created seller should login as seller.") && ok;
 
+    const QList<SellerAccountInfo> sellerAccounts =
+        loginManager.sellerAccounts(UserRole::Admin);
+    bool foundCreatedSeller = false;
+    for (const SellerAccountInfo &seller : sellerAccounts) {
+        if (seller.username == newSellerUsername && seller.enabled) {
+            foundCreatedSeller = true;
+        }
+    }
+    ok = checkResult(foundCreatedSeller,
+                     "Admin should see created seller account.") && ok;
+
     const AccountResult duplicateCreate =
         loginManager.createSellerAccount(UserRole::Admin,
                                          newSellerUsername,
@@ -112,6 +123,14 @@ int main(int argc, char *argv[])
                                                QStringLiteral("reset_pass")).success,
                      "Reset seller password should login.") && ok;
 
+    const AccountResult defaultResetResult =
+        loginManager.resetSellerPasswordToDefault(UserRole::Admin, newSellerUsername);
+    ok = checkResult(defaultResetResult.success,
+                     "Admin should reset seller password to default.") && ok;
+    ok = checkResult(loginManager.authenticate(newSellerUsername,
+                                               QStringLiteral("123456")).success,
+                     "Default seller password should login.") && ok;
+
     const AccountResult sellerReset =
         loginManager.resetSellerPassword(UserRole::Seller,
                                          newSellerUsername,
@@ -124,7 +143,7 @@ int main(int argc, char *argv[])
     ok = checkResult(disableResult.success,
                      "Admin should disable seller.") && ok;
     ok = checkResult(!loginManager.authenticate(newSellerUsername,
-                                                QStringLiteral("reset_pass")).success,
+                                                QStringLiteral("123456")).success,
                      "Disabled seller should not login.") && ok;
 
     const AccountResult enableResult =
@@ -132,7 +151,7 @@ int main(int argc, char *argv[])
     ok = checkResult(enableResult.success,
                      "Admin should enable seller.") && ok;
     ok = checkResult(loginManager.authenticate(newSellerUsername,
-                                               QStringLiteral("reset_pass")).success,
+                                               QStringLiteral("123456")).success,
                      "Enabled seller should login again.") && ok;
 
     const AccountResult wrongOldPassword =

@@ -1,11 +1,15 @@
 #include "account_management_dialog.h"
 
+#include <QAbstractItemView>
 #include <QFormLayout>
 #include <QGroupBox>
+#include <QHeaderView>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QTableWidget>
+#include <QTableWidgetItem>
 #include <QVBoxLayout>
 
 namespace {
@@ -114,6 +118,21 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
             border: 2px solid #0f766e;
             padding: 3px 9px;
         }
+        QTableWidget {
+            background: #ffffff;
+            border: 1px solid #cbd8d2;
+            border-radius: 8px;
+            gridline-color: #e5ece8;
+            selection-background-color: #d9f99d;
+            selection-color: #153832;
+        }
+        QHeaderView::section {
+            background: #eef5f1;
+            color: #33433d;
+            border: none;
+            padding: 7px;
+            font-weight: 700;
+        }
         QPushButton {
             min-height: 32px;
             border-radius: 8px;
@@ -187,39 +206,34 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
 
         auto *manageGroup = new QGroupBox(QStringLiteral("现有售票员账号管理"), this);
         auto *manageLayout = new QVBoxLayout(manageGroup);
-        auto *manageForm = new QFormLayout;
-        manageForm->setHorizontalSpacing(14);
-        manageForm->setVerticalSpacing(10);
 
-        m_manageUsernameEdit = new QLineEdit(manageGroup);
-        m_manageUsernameEdit->setPlaceholderText(QStringLiteral("请输入售票员用户名"));
-
-        m_resetPasswordEdit = new QLineEdit(manageGroup);
-        m_resetPasswordEdit->setPlaceholderText(QStringLiteral("请输入新密码"));
-        setupPasswordEdit(m_resetPasswordEdit);
-
-        m_resetConfirmEdit = new QLineEdit(manageGroup);
-        m_resetConfirmEdit->setPlaceholderText(QStringLiteral("请再次输入新密码"));
-        setupPasswordEdit(m_resetConfirmEdit);
-
-        manageForm->addRow(QStringLiteral("售票员用户名"), m_manageUsernameEdit);
-        manageForm->addRow(QStringLiteral("新密码"), m_resetPasswordEdit);
-        manageForm->addRow(QStringLiteral("确认新密码"), m_resetConfirmEdit);
+        m_sellerTable = new QTableWidget(manageGroup);
+        m_sellerTable->setColumnCount(2);
+        m_sellerTable->setHorizontalHeaderLabels({
+            QStringLiteral("售票员用户名"),
+            QStringLiteral("账号状态")
+        });
+        m_sellerTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        m_sellerTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+        m_sellerTable->setSelectionMode(QAbstractItemView::SingleSelection);
+        m_sellerTable->verticalHeader()->setVisible(false);
+        m_sellerTable->horizontalHeader()->setStretchLastSection(true);
+        m_sellerTable->setMinimumHeight(150);
 
         auto *manageButtonLayout = new QHBoxLayout;
-        auto *resetButton = new QPushButton(QStringLiteral("重置密码"), manageGroup);
+        auto *resetButton = new QPushButton(QStringLiteral("重置为默认密码"), manageGroup);
         auto *enableButton = new QPushButton(QStringLiteral("启用账号"), manageGroup);
         auto *disableButton = new QPushButton(QStringLiteral("禁用账号"), manageGroup);
         disableButton->setObjectName(QStringLiteral("dangerButton"));
 
         connect(resetButton, &QPushButton::clicked, this, [this]() {
-            handleResetSellerPassword();
+            handleResetSelectedSellerPassword();
         });
         connect(enableButton, &QPushButton::clicked, this, [this]() {
-            handleSetSellerEnabled(true);
+            handleSetSelectedSellerEnabled(true);
         });
         connect(disableButton, &QPushButton::clicked, this, [this]() {
-            handleSetSellerEnabled(false);
+            handleSetSelectedSellerEnabled(false);
         });
 
         manageButtonLayout->addStretch();
@@ -227,9 +241,11 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
         manageButtonLayout->addWidget(enableButton);
         manageButtonLayout->addWidget(disableButton);
 
-        manageLayout->addLayout(manageForm);
+        manageLayout->addWidget(m_sellerTable);
         manageLayout->addLayout(manageButtonLayout);
         rootLayout->addWidget(manageGroup);
+
+        refreshSellerTable();
     }
 
     if ((m_loginResult.role == UserRole::Admin && m_accountOnly)
@@ -345,35 +361,42 @@ void AccountManagementDialog::handleCreateSeller()
         m_createUsernameEdit->clear();
         m_createPasswordEdit->clear();
         m_createConfirmEdit->clear();
+        refreshSellerTable();
     }
 }
 
-void AccountManagementDialog::handleResetSellerPassword()
+void AccountManagementDialog::handleResetSelectedSellerPassword()
 {
-    if (m_resetPasswordEdit->text() != m_resetConfirmEdit->text()) {
-        showPlainMessage(false, QStringLiteral("两次输入的新密码不一致。"));
+    const QString username = selectedSellerUsername();
+
+    if (username.isEmpty()) {
+        showPlainMessage(false, QStringLiteral("请先选中一个售票员账号。"));
         return;
     }
 
     const AccountResult result =
-        m_loginManager.resetSellerPassword(m_loginResult.role,
-                                           m_manageUsernameEdit->text(),
-                                           m_resetPasswordEdit->text());
+        m_loginManager.resetSellerPasswordToDefault(m_loginResult.role, username);
+    showMessage(result);
+}
+
+void AccountManagementDialog::handleSetSelectedSellerEnabled(bool enabled)
+{
+    const QString username = selectedSellerUsername();
+
+    if (username.isEmpty()) {
+        showPlainMessage(false, QStringLiteral("请先选中一个售票员账号。"));
+        return;
+    }
+
+    const AccountResult result =
+        m_loginManager.setSellerEnabled(m_loginResult.role,
+                                        username,
+                                        enabled);
     showMessage(result);
 
     if (result.success) {
-        m_resetPasswordEdit->clear();
-        m_resetConfirmEdit->clear();
+        refreshSellerTable();
     }
-}
-
-void AccountManagementDialog::handleSetSellerEnabled(bool enabled)
-{
-    const AccountResult result =
-        m_loginManager.setSellerEnabled(m_loginResult.role,
-                                        m_manageUsernameEdit->text(),
-                                        enabled);
-    showMessage(result);
 }
 
 void AccountManagementDialog::handleChangeOwnPassword()
@@ -400,6 +423,50 @@ void AccountManagementDialog::handleChangeOwnPassword()
 void AccountManagementDialog::showMessage(const AccountResult &result)
 {
     showPlainMessage(result.success, result.message);
+}
+
+void AccountManagementDialog::refreshSellerTable()
+{
+    if (m_sellerTable == nullptr) {
+        return;
+    }
+
+    const QList<SellerAccountInfo> sellers =
+        m_loginManager.sellerAccounts(m_loginResult.role);
+
+    m_sellerTable->setRowCount(sellers.size());
+
+    for (int row = 0; row < sellers.size(); ++row) {
+        const SellerAccountInfo &seller = sellers.at(row);
+
+        auto *usernameItem = new QTableWidgetItem(seller.username);
+        auto *statusItem = new QTableWidgetItem(seller.enabled
+                                                    ? QStringLiteral("启用中")
+                                                    : QStringLiteral("已禁用"));
+
+        usernameItem->setTextAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+        statusItem->setTextAlignment(Qt::AlignCenter);
+
+        m_sellerTable->setItem(row, 0, usernameItem);
+        m_sellerTable->setItem(row, 1, statusItem);
+    }
+
+    m_sellerTable->resizeRowsToContents();
+}
+
+QString AccountManagementDialog::selectedSellerUsername() const
+{
+    if (m_sellerTable == nullptr || m_sellerTable->currentRow() < 0) {
+        return QString();
+    }
+
+    QTableWidgetItem *item = m_sellerTable->item(m_sellerTable->currentRow(), 0);
+
+    if (item == nullptr) {
+        return QString();
+    }
+
+    return item->text();
 }
 
 void AccountManagementDialog::showPlainMessage(bool success, const QString &message)

@@ -27,6 +27,11 @@ bool databaseReady(const DatabaseManager *databaseManager)
 {
     return databaseManager != nullptr && databaseManager->isOpen();
 }
+
+QString defaultSellerPassword()
+{
+    return QStringLiteral("123456");
+}
 }
 
 LoginManager::LoginManager(DatabaseManager *databaseManager)
@@ -162,7 +167,7 @@ AccountResult LoginManager::createSellerAccount(UserRole currentRole,
         return {false, QStringLiteral("用户名已存在。")};
     }
 
-    // issue3 只允许管理员创建售票员账号，不开放普通注册。
+    // 这里创建的是售票员账号，普通用户注册走 registerUser()。
     UserRecord user;
     user.username = trimmedUsername;
     user.password = password;
@@ -216,6 +221,19 @@ AccountResult LoginManager::resetSellerPassword(UserRole currentRole,
     }
 
     return {true, QStringLiteral("售票员密码已重置。")};
+}
+
+AccountResult LoginManager::resetSellerPasswordToDefault(UserRole currentRole,
+                                                         const QString &username) const
+{
+    const AccountResult result =
+        resetSellerPassword(currentRole, username, defaultSellerPassword());
+
+    if (!result.success) {
+        return result;
+    }
+
+    return {true, QStringLiteral("已重置为默认密码：123456")};
 }
 
 AccountResult LoginManager::setSellerEnabled(UserRole currentRole,
@@ -306,6 +324,27 @@ AccountResult LoginManager::changeOwnPassword(const QString &username,
     }
 
     return {true, QStringLiteral("密码修改成功。")};
+}
+
+QList<SellerAccountInfo> LoginManager::sellerAccounts(UserRole currentRole) const
+{
+    QList<SellerAccountInfo> sellers;
+
+    if (!databaseReady(m_databaseManager) || currentRole != UserRole::Admin) {
+        return sellers;
+    }
+
+    const QList<UserRecord> users =
+        m_databaseManager->findUsersByRole(static_cast<int>(UserRole::Seller));
+
+    for (const UserRecord &user : users) {
+        SellerAccountInfo info;
+        info.username = user.username;
+        info.enabled = user.enabled;
+        sellers.append(info);
+    }
+
+    return sellers;
 }
 
 bool LoginManager::canAccessGuestFunctions(UserRole role)

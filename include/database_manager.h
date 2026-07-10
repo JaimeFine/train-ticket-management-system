@@ -35,6 +35,7 @@ public:
     bool addUser(const UserRecord &user);
     std::optional<UserRecord> findUserById(int userId) const;
     std::optional<UserRecord> findUserByUsername(const QString &username) const;
+    QList<UserRecord> findUsersByRole(int role) const;
     bool updateUser(const UserRecord &user);
     bool setUserEnabled(int userId, bool enabled);
 

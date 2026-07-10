@@ -6,6 +6,7 @@
 
 class QLabel;
 class QLineEdit;
+class QTableWidget;
 
 class AccountManagementDialog : public QDialog
 {
@@ -18,9 +19,11 @@ public:
 private:
     void handleRegisterUser();
     void handleCreateSeller();
-    void handleResetSellerPassword();
-    void handleSetSellerEnabled(bool enabled);
+    void handleResetSelectedSellerPassword();
+    void handleSetSelectedSellerEnabled(bool enabled);
     void handleChangeOwnPassword();
+    void refreshSellerTable();
+    QString selectedSellerUsername() const;
     void showMessage(const AccountResult &result);
     void showPlainMessage(bool success, const QString &message);
 
@@ -36,9 +39,7 @@ private:
     QLineEdit *m_createPasswordEdit = nullptr;
     QLineEdit *m_createConfirmEdit = nullptr;
 
-    QLineEdit *m_manageUsernameEdit = nullptr;
-    QLineEdit *m_resetPasswordEdit = nullptr;
-    QLineEdit *m_resetConfirmEdit = nullptr;
+    QTableWidget *m_sellerTable = nullptr;
 
     QLineEdit *m_oldPasswordEdit = nullptr;
     QLineEdit *m_newPasswordEdit = nullptr;
