@@ -70,6 +70,10 @@ public:
     QList<TrainWithStations> searchTrainsByStation(
         const QString &dep,const QString &arr,const QString &date) const;
 
+    // ── Issue 10: 退票 + 改签 + 订单查询 ──────────────────
+    std::optional<OrderRecord> findOrderById(int orderId) const;
+    QList<OrderRecord> findOrdersByPassenger(const QString &name) const;
+
 private:
     // * This block connect helpers
     // openDatabase() only worries about creating & opening the SQLite file.
