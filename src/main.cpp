@@ -10,10 +10,10 @@
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
-    // 设置中文字体，让界面文字清楚一点。
+    // 中文字体单独设一下，界面看着清楚。
     app.setFont(QFont(QStringLiteral("Microsoft YaHei UI"), 10));
 
-    // 先准备数据库对象，再交给登录管理类使用。
+    // 先准备数据库，再交给登录模块用。
     DatabaseManager databaseManager;
     if (!databaseManager.initialize()) {
         QMessageBox::critical(nullptr,
@@ -23,14 +23,22 @@ int main(int argc, char *argv[])
     }
 
     LoginManager loginManager(&databaseManager);
-    LoginDialog loginDialog(loginManager);
 
-    if (loginDialog.exec() != QDialog::Accepted) {
-        return 0;
+    // 每次循环先显示登录窗口，再显示对应身份的主窗口。
+    // 用户点“退出登录”时主窗口会结束这一次事件循环，然后回到这里重新登录；
+    // 如果用户直接关闭主窗口，就正常结束程序。
+    while (true) {
+        LoginDialog loginDialog(loginManager);
+        if (loginDialog.exec() != QDialog::Accepted) {
+            return 0;
+        }
+
+        MainWindow window(loginDialog.loginResult(), loginManager);
+        window.show();
+
+        const int result = app.exec();
+        if (!window.logoutRequested()) {
+            return result;
+        }
     }
-
-    MainWindow window(loginDialog.loginResult());
-    window.show();
-
-    return app.exec();
 }

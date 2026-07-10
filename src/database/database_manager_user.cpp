@@ -36,7 +36,7 @@ std::optional<UserRecord> DatabaseManager::findUserById(int userId) const {
         "WHERE userId = :userId"
     ));
 
-    query.bindValue(":userId", userId); // This bind the parameter!
+    query.bindValue(":userId", userId);
 
     if (!query.exec()) {
         m_lastError = query.lastError().text();
@@ -90,6 +90,39 @@ std::optional<UserRecord> DatabaseManager::findUserByUsername(
     return record;
 }
 
+QList<UserRecord> DatabaseManager::findUsersByRole(int role) const {
+    m_lastError.clear();
+    QSqlQuery query(QSqlDatabase::database(m_connectionName));
+
+    query.prepare(QStringLiteral(
+        "SELECT userId, username, password, role, enabled "
+        "FROM User "
+        "WHERE role = :role "
+        "ORDER BY username"
+    ));
+
+    query.bindValue(":role", role);
+
+    QList<UserRecord> users;
+
+    if (!query.exec()) {
+        m_lastError = query.lastError().text();
+        return users;
+    }
+
+    while (query.next()) {
+        UserRecord record;
+        record.userId = query.value(0).toInt();
+        record.username = query.value(1).toString();
+        record.password = query.value(2).toString();
+        record.role = query.value(3).toInt();
+        record.enabled = query.value(4).toBool();
+        users.append(record);
+    }
+
+    return users;
+}
+
 bool DatabaseManager::updateUser(const UserRecord &user) {
     m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
@@ -114,9 +147,9 @@ bool DatabaseManager::updateUser(const UserRecord &user) {
         return false;
     }
 
-    // Check if any row was actually updated
+    // 没有改到行时，说明这个 userId 不存在。
     if (query.numRowsAffected() == 0) {
-        return false;   // userId did not exist
+        return false;
     }
 
     return true;
@@ -139,9 +172,9 @@ bool DatabaseManager::setUserEnabled(int userId, bool enabled) {
         return false;
     }
 
-    // Check if any row was actually updated
+    // 没有改到行时，说明这个 userId 不存在。
     if (query.numRowsAffected() == 0) {
-        return false;   // userId did not exist
+        return false;
     }
 
     return true;

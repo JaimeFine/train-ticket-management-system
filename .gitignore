@@ -78,3 +78,6 @@ database/*.db
 
 # temp folders
 temp/*
+
+# latex files
+*.tex
