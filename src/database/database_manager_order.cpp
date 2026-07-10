@@ -5,7 +5,7 @@
 #include <QSqlQuery>
 #include <QString>
 
-bool DatabaseManager::createOrder(const OrderRecord &order) {
+std::optional<int> DatabaseManager::createOrder(const OrderRecord &order) {
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     query.prepare(QStringLiteral(
@@ -23,10 +23,10 @@ bool DatabaseManager::createOrder(const OrderRecord &order) {
 
     if (!query.exec()) {
         m_lastError = query.lastError().text();
-        return false;
+        return std::nullopt;
     }
 
-    return true;
+    return query.lastInsertId().toInt();
 }
 
 QList<OrderRecord> DatabaseManager::findOrdersByUser(int userId) const {
