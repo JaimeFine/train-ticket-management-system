@@ -56,3 +56,111 @@ QVector<QVariantMap> TicketManager::searchByTrainNumber(const QString &num) cons
     return {m};
 }
 QString TicketManager::lastError() const { return m_lastError; }
+
+// ══════════════════════ Issue 10: 退票 + 改签 + 订单查询 ══════════════════════
+
+bool TicketManager::refundTicket(int orderId)
+{
+    auto order = m_db.findOrderById(orderId);
+    if (!order)           { m_lastError = "订单不存在";  return false; }
+    if (order->status != 0) {
+        m_lastError = "该订单无法退票（已退票或已改签）";
+        return false;
+    }
+
+    if (!m_db.beginTransaction()) { m_lastError = "无法开启事务"; return false; }
+
+    if (!m_db.updateOrderStatus(orderId, 1)) {
+        m_db.rollbackTransaction();
+        m_lastError = "退票失败";
+        return false;
+    }
+
+    if (!m_db.adjustTrainSeats(order->trainId, +1)) {
+        m_db.rollbackTransaction();
+        m_lastError = "恢复座位失败";
+        return false;
+    }
+
+    if (!m_db.commitTransaction()) {
+        m_db.rollbackTransaction();
+        m_lastError = "提交事务失败";
+        return false;
+    }
+    return true;
+}
+
+bool TicketManager::changeTicket(int orderId, int newTrainId)
+{
+    auto oldOrder = m_db.findOrderById(orderId);
+    if (!oldOrder)           { m_lastError = "订单不存在";               return false; }
+    if (oldOrder->status != 0) { m_lastError = "只能改签已预订的订单";  return false; }
+
+    auto newTrain = m_db.findTrainById(newTrainId);
+    if (!newTrain)               { m_lastError = "目标车次不存在";      return false; }
+    if (!newTrain->enabled)      { m_lastError = "目标车次已停运";      return false; }
+    if (newTrain->remainingSeats <= 0) { m_lastError = "目标车次已无余票"; return false; }
+
+    if (!m_db.beginTransaction()) { m_lastError = "无法开启事务"; return false; }
+
+    if (!m_db.updateOrderStatus(orderId, 2)) {
+        m_db.rollbackTransaction(); m_lastError = "更新旧订单失败"; return false;
+    }
+    if (!m_db.adjustTrainSeats(oldOrder->trainId, +1)) {
+        m_db.rollbackTransaction(); m_lastError = "恢复旧座位失败"; return false;
+    }
+    if (!m_db.adjustTrainSeats(newTrainId, -1)) {
+        m_db.rollbackTransaction(); m_lastError = "扣减新座位失败"; return false;
+    }
+
+    OrderRecord newOrder;
+    newOrder.userId        = oldOrder->userId;
+    newOrder.trainId       = newTrainId;
+    newOrder.passengerName = oldOrder->passengerName;
+    newOrder.purchaseTime  = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
+    newOrder.status        = 0;
+
+    if (!m_db.createOrder(newOrder)) {
+        m_db.rollbackTransaction(); m_lastError = "创建新订单失败"; return false;
+    }
+    if (!m_db.commitTransaction()) {
+        m_db.rollbackTransaction(); m_lastError = "提交事务失败"; return false;
+    }
+    return true;
+}
+
+static QVariantMap orderToMap(const OrderRecord &order)
+{
+    QVariantMap map;
+    map["orderId"]       = order.orderId;
+    map["userId"]        = order.userId;
+    map["trainId"]       = order.trainId;
+    map["passengerName"] = order.passengerName;
+    map["purchaseTime"]  = order.purchaseTime;
+    map["status"]        = order.status;
+    return map;
+}
+
+QVector<QVariantMap> TicketManager::queryOrdersByUser(int userId) const
+{
+    QVector<QVariantMap> result;
+    auto orders = m_db.findOrdersByUser(userId);
+    for (const auto &order : orders) result.append(orderToMap(order));
+    return result;
+}
+
+QVector<QVariantMap> TicketManager::queryOrdersByPassenger(const QString &name) const
+{
+    QVector<QVariantMap> result;
+    auto orders = m_db.findOrdersByPassenger(name);
+    for (const auto &order : orders) result.append(orderToMap(order));
+    return result;
+}
+
+QVector<QVariantMap> TicketManager::queryOrderByOrderId(int orderId) const
+{
+    QVector<QVariantMap> result;
+    auto order = m_db.findOrderById(orderId);
+    if (order) result.append(orderToMap(*order));
+    return result;
+}
