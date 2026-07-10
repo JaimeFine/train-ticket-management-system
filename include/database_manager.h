@@ -52,7 +52,7 @@ public:
     bool updateTrain(const TrainRecord &train);
 
     // >>> Order APIs
-    bool createOrder(const OrderRecord &order);
+    std::optional<int> createOrder(const OrderRecord &order);
     QList<OrderRecord> findOrdersByUser(int userId) const;
     bool updateOrderStatus(int orderId, int status);
 

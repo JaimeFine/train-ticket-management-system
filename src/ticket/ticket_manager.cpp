@@ -14,11 +14,21 @@ int TicketManager::bookTicket(int userId, int trainId, const QString &passengerN
     if(!m_db.adjustTrainSeats(trainId,-1)){m_db.rollbackTransaction();m_lastError="扣减座位失败";return -1;}
     OrderRecord o; o.userId=userId; o.trainId=trainId; o.passengerName=passengerName;
     o.purchaseTime=QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss"); o.status=0;
-    if(!m_db.createOrder(o)){m_db.rollbackTransaction();m_lastError="创建订单失败";return -1;}
-    if(!m_db.commitTransaction()){m_db.rollbackTransaction();m_lastError="提交事务失败";return -1;}
-    auto orders=m_db.findOrdersByUser(userId);
-    int id=orders.isEmpty()?0:orders.last().orderId;
-    return id>0?id:-1;
+    // >>> Jaime fix:
+    const auto orderId = m_db.createOrder(o);
+    if (!orderId.has_value()) {
+        m_db.rollbackTransaction();
+        m_lastError = "创建订单失败";
+        return -1;
+    }
+
+    if (!m_db.commitTransaction()) {
+        m_db.rollbackTransaction();
+        m_lastError = "提交事务失败";
+        return -1;
+    }
+
+    return *orderId;
 }
 int TicketManager::remainingSeats(int trainId) const {
     auto t=m_db.findTrainById(trainId); return t?t->remainingSeats:-1;
