@@ -1,4 +1,8 @@
 // src/train/train_manager.cpp
+// 待 DatabaseManager补充 API列表:QList<TrainRecord> getAllTrains(bool onlyEnabled = true) const
+//                              bool deleteTrain(int trainId)
+//                              QList<TrainRecord> searchTrains(const QString& keyword) const
+//                              QList<TrainRecord> searchByStation(int stationId, bool isDeparture) const
 #include "train_manager.h"
 #include "database_manager.h"
 #include "database/train_record.h"
@@ -79,10 +83,10 @@ QVector<Train> TrainManager::getAllTrains(bool onlyEnabled)
     // ============================================================
 
     // 实现代码（待 DatabaseManager 补充后取消注释）：
-    // auto records = m_dbManager->getAllTrains(onlyEnabled);
-    // for (const auto& record : records) {
-    //     result.append(convertToTrain(record));
-    // }
+    auto records = m_dbManager->getAllTrains(onlyEnabled);
+    for (const auto& record : records) {
+        result.append(convertToTrain(record));
+    }
 
     setStatus("查询成功，共 " + QString::number(result.size()) + " 条记录");
     return result;
@@ -249,7 +253,6 @@ bool TrainManager::updateTrain(const Train& train)
     //        enabled = ?
     //      WHERE trainId = ?;
     TrainRecord record = convertToRecord(train);
-    record.enabled = true;   // 新增行
     if (!m_dbManager->updateTrain(record)) {
         setStatus("更新车次失败: " + m_dbManager->lastError());
         return false;
@@ -287,11 +290,10 @@ bool TrainManager::deleteTrain(int trainId)
     // UPDATE Train SET enabled = 0 WHERE trainId = ?;
     // ============================================================
 
-    // 实现代码（待 DatabaseManager 补充后取消注释）：
-    // if (!m_dbManager->deleteTrain(trainId)) {
-    //     setStatus("停运车次失败: " + m_dbManager->lastError());
-    //     return false;
-    // }
+    if (!m_dbManager->deleteTrain(trainId)) {
+        setStatus("停运车次失败: " + m_dbManager->lastError());
+        return false;
+    }
 
     setStatus("车次已停运");
     return true;
@@ -331,11 +333,10 @@ QVector<Train> TrainManager::searchTrains(const QString& keyword)
     // 参数：'%' + keyword + '%'
     // ============================================================
 
-    // 实现代码（待 DatabaseManager 补充后取消注释）：
-    // auto records = m_dbManager->searchTrains(keyword);
-    // for (const auto& record : records) {
-    //     result.append(convertToTrain(record));
-    // }
+    auto records = m_dbManager->searchTrains(keyword);
+    for (const auto& record : records) {
+        result.append(convertToTrain(record));
+    }
 
     setStatus("搜索完成，找到 " + QString::number(result.size()) + " 条匹配记录");
     return result;
@@ -377,11 +378,10 @@ QVector<Train> TrainManager::searchByStation(int stationId, bool isDeparture)
     //   AND enabled = 1;
     // ============================================================
 
-    // 实现代码（待 DatabaseManager 补充后取消注释）：
-    // auto records = m_dbManager->searchByStation(stationId, isDeparture);
-    // for (const auto& record : records) {
-    //     result.append(convertToTrain(record));
-    // }
+    auto records = m_dbManager->searchByStation(stationId, isDeparture);
+    for (const auto& record : records) {
+        result.append(convertToTrain(record));
+    }
 
     QString direction = isDeparture ? "出发" : "到达";
     setStatus("按" + direction + "站查询完成，共 " + QString::number(result.size()) + " 条记录");
@@ -408,27 +408,10 @@ bool TrainManager::updateRemainingSeats(int trainId, int delta)
         return false;
     }
 
-    // ============================================================
-    // 待 DatabaseManager 补充 API: bool updateRemainingSeats(int trainId, int delta)
-    //
-    // SQL 语句（参考）：
-    // -- 查询当前余票和总座位数
-    // SELECT remainingSeats, totalSeats, trainNumber FROM Train WHERE trainId = ?;
-    //
-    // -- 计算新余票并校验
-    //    newRemaining = remainingSeats + delta
-    //    IF newRemaining < 0 → 余票不足
-    //    IF newRemaining > totalSeats → 超售
-    //
-    // -- 执行更新
-    // UPDATE Train SET remainingSeats = ? WHERE trainId = ?;
-    // ============================================================
-
-    // 实现代码（待 DatabaseManager 补充后取消注释）：
-    // if (!m_dbManager->updateRemainingSeats(trainId, delta)) {
-    //     setStatus("更新余票失败: " + m_dbManager->lastError());
-    //     return false;
-    // }
+    if (!m_dbManager->adjustTrainSeats(trainId, delta)) {
+        setStatus("更新余票失败: " + m_dbManager->lastError());
+        return false;
+    }
 
     setStatus("余票更新成功");
     return true;
