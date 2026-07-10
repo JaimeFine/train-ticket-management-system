@@ -12,12 +12,6 @@ public:
     int  remainingSeats(int trainId) const;
     QVector<QVariantMap> searchTrains(const QString &dep,const QString &arr,const QString &date="") const;
     QVector<QVariantMap> searchByTrainNumber(const QString &number) const;
-    // Issue 10
-    bool refundTicket(int orderId);
-    bool changeTicket(int orderId,int newTrainId);
-    QVector<QVariantMap> queryOrdersByUser(int userId) const;
-    QVector<QVariantMap> queryOrdersByPassenger(const QString &name) const;
-    QVector<QVariantMap> queryOrderByOrderId(int orderId) const;
     QString lastError() const;
 private:
     DatabaseManager &m_db; QString m_lastError;
