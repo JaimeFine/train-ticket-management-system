@@ -44,6 +44,20 @@ Here is the structure of the Train Ticket Management System:
             - Search Orders by Passenger Name
         - Refresh Real-time Ticket Availability
         - Save Ticket Operation Logs
+    - **Passenger Login**
+        - Ticket Inquiry
+            - Search Available Tickets by Travel Date
+            - Search Train by Departure / Arrival Station
+            - View Train Schedule
+        - Ticket Booking
+            - Book Ticket
+            - Refund Ticket
+            - Change Ticket
+        - Personal Order Management
+            - View Purchase History
+            - Search Orders by Order Number
+        - Personal Information
+            - Modify Password
     - **Guest Access Portal**
         - Remaining Ticket Inquiry
             - Search Remaining Tickets by Date
