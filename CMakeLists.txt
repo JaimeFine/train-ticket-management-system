@@ -28,6 +28,7 @@ set(SOURCES
     src/database/database_manager_order.cpp
     src/ui/account_management_dialog.cpp
     src/ui/main_window.cpp
+    src/database/database_manager_ticket.cpp
 )
 
 set(HEADERS
