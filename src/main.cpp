@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
             return 0;
         }
 
-        MainWindow window(loginDialog.loginResult(), loginManager);
+        MainWindow window(loginDialog.loginResult(), loginManager, databaseManager);
         window.show();
 
         const int result = app.exec();

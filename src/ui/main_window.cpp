@@ -1,5 +1,11 @@
 #include "account_management_dialog.h"
 #include "main_window.h"
+#include "database_manager.h"
+#include "order_history_dialog.h"
+#include "statistics_dialog.h"
+#include "ticket_manage_dialog.h"
+#include "ticket_query_dialog.h"
+#include "ticket_search_dialog.h"
 
 #include <QFrame>
 #include <QGridLayout>
@@ -64,10 +70,12 @@ QString workspaceTitle(UserRole role)
 
 MainWindow::MainWindow(const LoginResult &loginResult,
                        const LoginManager &loginManager,
+                       DatabaseManager &db,
                        QWidget *parent)
     : QMainWindow(parent)
     , m_loginResult(loginResult)
     , m_loginManager(&loginManager)
+    , m_db(db)
 {
     setWindowTitle(QStringLiteral("火车票务管理系统"));
     resize(980, 640);
@@ -241,40 +249,39 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     headerLayout->addLayout(titleBlock, 1);
     headerLayout->addLayout(accountBlock);
 
-    auto showQueryMessage = [this]() {
-        QMessageBox::information(this,
-                                 QStringLiteral("车票查询"),
-                                 QStringLiteral("车票查询接口已预留，等待车次查询模块接入。"));
+    auto showQuery = [this]() {
+        TicketSearchDialog dialog(m_db, this);
+        dialog.exec();
     };
 
-    auto showHistoryMessage = [this]() {
-        QMessageBox::information(this,
-                                 QStringLiteral("历史记录"),
-                                 QStringLiteral("历史订单查询接口已预留，等待订单模块接入。"));
+    auto showHistory = [this]() {
+        auto user = m_db.findUserByUsername(m_loginResult.username);
+        OrderHistoryDialog dialog(m_db, user ? user->userId : -1, this);
+        dialog.exec();
     };
 
-    auto showTicketManagementMessage = [this]() {
-        QMessageBox::information(this,
-                                 QStringLiteral("票务办理"),
-                                 QStringLiteral("订票、退票和改签接口已预留，等待票务模块接入。"));
+    auto showTicketManage = [this]() {
+        // Look up userId for the current user to pass to booking dialog
+        int uid = -1;
+        if (auto u = m_db.findUserByUsername(m_loginResult.username))
+            uid = u->userId;
+        TicketManageDialog dialog(m_db, uid, this);
+        dialog.exec();
     };
 
-    auto showSellerQueryMessage = [this]() {
-        QMessageBox::information(this,
-                                 QStringLiteral("票务查询"),
-                                 QStringLiteral("订单号和乘客姓名查询接口已预留，等待票务模块接入。"));
+    auto showSellerQuery = [this]() {
+        TicketQueryDialog dialog(m_db, this);
+        dialog.exec();
     };
 
-    auto showTicketLogMessage = [this]() {
-        QMessageBox::information(this,
-                                 QStringLiteral("票务操作日志"),
-                                 QStringLiteral("票务操作日志接口已预留，等待日志模块接入。"));
+    auto showTicketLog = [this]() {
+        OrderHistoryDialog dialog(m_db, -1, this);
+        dialog.exec();
     };
 
-    auto showStatisticsMessage = [this]() {
-        QMessageBox::information(this,
-                                 QStringLiteral("票务数据统计"),
-                                 QStringLiteral("销售统计、热门线路和客流统计接口已预留。"));
+    auto showStatistics = [this]() {
+        StatisticsDialog dialog(m_db, this);
+        dialog.exec();
     };
 
     auto showTrainStationMessage = [this]() {
@@ -339,7 +346,7 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       QStringLiteral("统计接口"),
                       QStringLiteral("查看统计"),
                       true,
-                      showStatisticsMessage);
+                      showStatistics);
 
         addModuleCard(QStringLiteral("员工权限管理"),
                       QStringLiteral("创建售票员账号，并管理现有售票员账号。"),
@@ -364,28 +371,28 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       QStringLiteral("查询开放"),
                       QStringLiteral("进入查询"),
                       true,
-                      showQueryMessage);
+                      showQuery);
 
         addModuleCard(QStringLiteral("票务查询"),
                       QStringLiteral("按订单号或乘客姓名查询票务记录。"),
                       QStringLiteral("业务查询"),
                       QStringLiteral("进入查询"),
                       true,
-                      showSellerQueryMessage);
+                      showSellerQuery);
 
         addModuleCard(QStringLiteral("票务管理"),
                       QStringLiteral("办理订票、退票和改签。"),
                       QStringLiteral("业务办理"),
                       QStringLiteral("进入办理"),
                       true,
-                      showTicketManagementMessage);
+                      showTicketManage);
 
         addModuleCard(QStringLiteral("票务操作日志"),
                       QStringLiteral("查看售票、退票和改签操作记录。"),
                       QStringLiteral("日志接口"),
                       QStringLiteral("查看日志"),
                       true,
-                      showTicketLogMessage);
+                      showTicketLog);
     }
 
     if (m_loginResult.role == UserRole::User || m_loginResult.role == UserRole::Guest) {
@@ -396,21 +403,21 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       QStringLiteral("查询开放"),
                       QStringLiteral("进入查询"),
                       true,
-                      showQueryMessage);
+                      showQuery);
 
         addModuleCard(QStringLiteral("历史记录"),
                       QStringLiteral("查找自己的历史订单。"),
                       userLoggedIn ? QStringLiteral("订单查询") : QStringLiteral("登录后开放"),
                       userLoggedIn ? QStringLiteral("查看记录") : QStringLiteral("请先登录"),
                       userLoggedIn,
-                      showHistoryMessage);
+                      showHistory);
 
         addModuleCard(QStringLiteral("票务管理"),
                       QStringLiteral("订票、退票和改签。"),
                       userLoggedIn ? QStringLiteral("票务操作") : QStringLiteral("登录后开放"),
                       userLoggedIn ? QStringLiteral("进入办理") : QStringLiteral("请先登录"),
                       userLoggedIn,
-                      showTicketManagementMessage);
+                      showTicketManage);
     }
 
     pageLayout->addWidget(headerPanel);

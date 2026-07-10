@@ -28,7 +28,13 @@ set(SOURCES
     src/database/database_manager_order.cpp
     src/ui/account_management_dialog.cpp
     src/ui/main_window.cpp
+    src/ui/statistics_dialog.cpp
+    src/ui/order_history_dialog.cpp
+    src/ui/ticket_search_dialog.cpp
+    src/ui/ticket_manage_dialog.cpp
+    src/ui/ticket_query_dialog.cpp
     src/database/database_manager_ticket.cpp
+    src/database/database_manager_statistics.cpp
 )
 
 set(HEADERS
@@ -40,6 +46,11 @@ set(HEADERS
     include/statistics_manager.h
     include/database_manager.h
     include/main_window.h
+    include/statistics_dialog.h
+    include/order_history_dialog.h
+    include/ticket_search_dialog.h
+    include/ticket_manage_dialog.h
+    include/ticket_query_dialog.h
 )
 
 # ── Resources ────────────────────────────────────────────────────────────────
