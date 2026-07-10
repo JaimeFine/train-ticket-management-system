@@ -23,14 +23,19 @@ int main(int argc, char *argv[])
     }
 
     LoginManager loginManager(&databaseManager);
-    LoginDialog loginDialog(loginManager);
 
-    if (loginDialog.exec() != QDialog::Accepted) {
-        return 0;
+    while (true) {
+        LoginDialog loginDialog(loginManager);
+        if (loginDialog.exec() != QDialog::Accepted) {
+            return 0;
+        }
+
+        MainWindow window(loginDialog.loginResult(), loginManager);
+        window.show();
+
+        const int result = app.exec();
+        if (!window.logoutRequested()) {
+            return result;
+        }
     }
-
-    MainWindow window(loginDialog.loginResult(), loginManager);
-    window.show();
-
-    return app.exec();
 }

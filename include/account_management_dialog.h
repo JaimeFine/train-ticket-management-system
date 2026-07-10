@@ -15,6 +15,7 @@ public:
                                      const LoginResult &loginResult,
                                      QWidget *parent = nullptr,
                                      bool accountOnly = false);
+    bool logoutRequested() const;
 
 private:
     void handleRegisterUser();
@@ -22,6 +23,7 @@ private:
     void handleResetSelectedSellerPassword();
     void handleSetSelectedSellerEnabled(bool enabled);
     void handleChangeOwnPassword();
+    void handleLogout();
     void refreshSellerTable();
     QString selectedSellerUsername() const;
     void showMessage(const AccountResult &result);
@@ -30,6 +32,7 @@ private:
     const LoginManager &m_loginManager;
     LoginResult m_loginResult;
     bool m_accountOnly = false;
+    bool m_logoutRequested = false;
 
     QLineEdit *m_registerUsernameEdit = nullptr;
     QLineEdit *m_registerPasswordEdit = nullptr;

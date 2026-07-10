@@ -189,6 +189,10 @@ MainWindow::MainWindow(const LoginResult &loginResult,
 
         AccountManagementDialog dialog(*m_loginManager, m_loginResult, this, accountOnly);
         dialog.exec();
+        if (dialog.logoutRequested()) {
+            m_logoutRequested = true;
+            close();
+        }
     };
 
     // 顶部显示当前用户和身份。
@@ -410,4 +414,9 @@ MainWindow::MainWindow(const LoginResult &loginResult,
 
     setCentralWidget(centralWidget);
     statusBar()->showMessage(QStringLiteral("当前登录身份：%1").arg(roleName(m_loginResult.role)));
+}
+
+bool MainWindow::logoutRequested() const
+{
+    return m_logoutRequested;
 }

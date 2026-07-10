@@ -151,6 +151,13 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
         QPushButton#dangerButton:hover {
             background: #991b1b;
         }
+        QPushButton#logoutButton {
+            color: #153832;
+            background: #e5ece8;
+        }
+        QPushButton#logoutButton:hover {
+            background: #d8e0dc;
+        }
     )QSS"));
 
     auto *rootLayout = new QVBoxLayout(this);
@@ -318,11 +325,29 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
 
     rootLayout->addStretch();
 
+    auto *bottomLayout = new QHBoxLayout;
+    if (m_accountOnly && m_loginResult.role != UserRole::Guest) {
+        auto *logoutButton = new QPushButton(QStringLiteral("退出登录"), this);
+        logoutButton->setObjectName(QStringLiteral("logoutButton"));
+        connect(logoutButton, &QPushButton::clicked, this, [this]() {
+            handleLogout();
+        });
+        bottomLayout->addWidget(logoutButton);
+    }
+
+    bottomLayout->addStretch();
+
     auto *closeButton = new QPushButton(QStringLiteral("关闭"), this);
     connect(closeButton, &QPushButton::clicked, this, [this]() {
         close();
     });
-    rootLayout->addWidget(closeButton, 0, Qt::AlignRight);
+    bottomLayout->addWidget(closeButton);
+    rootLayout->addLayout(bottomLayout);
+}
+
+bool AccountManagementDialog::logoutRequested() const
+{
+    return m_logoutRequested;
 }
 
 void AccountManagementDialog::handleRegisterUser()
@@ -418,6 +443,12 @@ void AccountManagementDialog::handleChangeOwnPassword()
         m_newPasswordEdit->clear();
         m_newConfirmEdit->clear();
     }
+}
+
+void AccountManagementDialog::handleLogout()
+{
+    m_logoutRequested = true;
+    accept();
 }
 
 void AccountManagementDialog::showMessage(const AccountResult &result)
