@@ -149,3 +149,167 @@ bool DatabaseManager::updateTrain(const TrainRecord &train) {
 
     return true;
 }
+
+QList<TrainRecord> DatabaseManager::getAllTrains(bool onlyEnabled) const {
+    m_lastError.clear();
+    QSqlQuery query(QSqlDatabase::database(m_connectionName));
+
+    QString sql = QStringLiteral(
+        "SELECT trainId, trainNumber, departureStationId, arrivalStationId, "
+        "departureTime, arrivalTime, totalSeats, remainingSeats, enabled "
+        "FROM Train"
+    );
+
+    if (onlyEnabled) {
+        sql += QStringLiteral(" WHERE enabled = 1");
+    }
+
+    sql += QStringLiteral(" ORDER BY trainId");
+
+    QList<TrainRecord> results;
+    if (!query.prepare(sql)) {
+        m_lastError = query.lastError().text();
+        return results;
+    }
+
+    if (!query.exec()) {
+        m_lastError = query.lastError().text();
+        return results;
+    }
+
+    while (query.next()) {
+        TrainRecord record;
+        record.trainId = query.value(0).toInt();
+        record.trainNumber = query.value(1).toString();
+        record.departureStationId = query.value(2).toInt();
+        record.arrivalStationId = query.value(3).toInt();
+        record.departureTime = query.value(4).toString();
+        record.arrivalTime = query.value(5).toString();
+        record.totalSeats = query.value(6).toInt();
+        record.remainingSeats = query.value(7).toInt();
+        record.enabled = query.value(8).toBool();
+        results.append(record);
+    }
+
+    return results;
+}
+
+bool DatabaseManager::deleteTrain(int trainId) {
+    m_lastError.clear();
+    QSqlQuery query(QSqlDatabase::database(m_connectionName));
+
+    query.prepare(QStringLiteral(
+        "UPDATE Train "
+        "SET enabled = 0 "
+        "WHERE trainId = :trainId AND enabled = 1"
+    ));
+
+    query.bindValue(":trainId", trainId);
+
+    if (!query.exec()) {
+        m_lastError = query.lastError().text();
+        return false;
+    }
+
+    if (query.numRowsAffected() == 0) {
+        m_lastError = QStringLiteral("No enabled train found for the given trainId.");
+        return false;
+    }
+
+    return true;
+}
+
+QList<TrainRecord> DatabaseManager::searchTrains(const QString &keyword) const {
+    m_lastError.clear();
+    QSqlQuery query(QSqlDatabase::database(m_connectionName));
+
+    query.prepare(QStringLiteral(
+        "SELECT t.trainId, t.trainNumber, t.departureStationId, "
+        "t.arrivalStationId, t.departureTime, t.arrivalTime, "
+        "t.totalSeats, t.remainingSeats, t.enabled "
+        "FROM Train t "
+        "LEFT JOIN Station s1 ON t.departureStationId = s1.stationId "
+        "LEFT JOIN Station s2 ON t.arrivalStationId = s2.stationId "
+        "WHERE t.enabled = 1 "
+        "  AND (t.trainNumber LIKE :keyword "
+        "       OR s1.stationName LIKE :keyword "
+        "       OR s2.stationName LIKE :keyword) "
+        "ORDER BY t.trainId"
+    ));
+
+    query.bindValue(
+        ":keyword", QStringLiteral("%") + keyword + QStringLiteral("%")
+    );
+
+    QList<TrainRecord> results;
+    if (!query.exec()) {
+        m_lastError = query.lastError().text();
+        return results;
+    }
+
+    while (query.next()) {
+        TrainRecord record;
+        record.trainId = query.value(0).toInt();
+        record.trainNumber = query.value(1).toString();
+        record.departureStationId = query.value(2).toInt();
+        record.arrivalStationId = query.value(3).toInt();
+        record.departureTime = query.value(4).toString();
+        record.arrivalTime = query.value(5).toString();
+        record.totalSeats = query.value(6).toInt();
+        record.remainingSeats = query.value(7).toInt();
+        record.enabled = query.value(8).toBool();
+        results.append(record);
+    }
+
+    return results;
+}
+
+QList<TrainRecord> DatabaseManager::searchByStation(
+    int stationId, bool isDeparture
+) const {
+    m_lastError.clear();
+    QSqlQuery query(QSqlDatabase::database(m_connectionName));
+
+    QString sql = QStringLiteral(
+        "SELECT trainId, trainNumber, departureStationId, arrivalStationId, "
+        "departureTime, arrivalTime, totalSeats, remainingSeats, enabled "
+        "FROM Train WHERE "
+    );
+
+    if (isDeparture) {
+        sql += QStringLiteral("departureStationId = :stationId");
+    } else {
+        sql += QStringLiteral("arrivalStationId = :stationId");
+    }
+
+    sql += QStringLiteral(" AND enabled = 1 ORDER BY trainId");
+
+    if (!query.prepare(sql)) {
+        m_lastError = query.lastError().text();
+        return {};
+    }
+
+    query.bindValue(":stationId", stationId);
+
+    QList<TrainRecord> results;
+    if (!query.exec()) {
+        m_lastError = query.lastError().text();
+        return results;
+    }
+
+    while (query.next()) {
+        TrainRecord record;
+        record.trainId = query.value(0).toInt();
+        record.trainNumber = query.value(1).toString();
+        record.departureStationId = query.value(2).toInt();
+        record.arrivalStationId = query.value(3).toInt();
+        record.departureTime = query.value(4).toString();
+        record.arrivalTime = query.value(5).toString();
+        record.totalSeats = query.value(6).toInt();
+        record.remainingSeats = query.value(7).toInt();
+        record.enabled = query.value(8).toBool();
+        results.append(record);
+    }
+
+    return results;
+}
