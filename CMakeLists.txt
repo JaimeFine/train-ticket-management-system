@@ -28,6 +28,7 @@ set(SOURCES
     src/database/database_manager_order.cpp
     src/ui/account_management_dialog.cpp
     src/ui/main_window.cpp
+    src/ui/statistics_dialog.cpp
     src/database/database_manager_ticket.cpp
     src/ui/train_management_dialog.cpp
     src/ui/station_management_dialog.cpp
@@ -43,6 +44,7 @@ set(HEADERS
     include/statistics_manager.h
     include/database_manager.h
     include/main_window.h
+    include/statistics_dialog.h
     include/train_management_dialog.h
     include/station_management_dialog.h
 )

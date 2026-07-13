@@ -1,4 +1,5 @@
 #include "account_management_dialog.h"
+#include "statistics_dialog.h"
 #include "train_management_dialog.h"
 #include "main_window.h"
 
@@ -67,11 +68,13 @@ QString workspaceTitle(UserRole role)
 MainWindow::MainWindow(const LoginResult &loginResult,
                        const LoginManager &loginManager,
                        TrainManager* trainManager,
+                       StatisticsManager *statisticsManager,
                        QWidget *parent)
     : QMainWindow(parent)
     , m_loginResult(loginResult)
     , m_loginManager(&loginManager)
     , m_trainManager(trainManager)
+    , m_statisticsManager(statisticsManager)
 {
     setWindowTitle(QStringLiteral("火车票务管理系统"));
     resize(980, 640);
@@ -102,7 +105,7 @@ MainWindow::MainWindow(const LoginResult &loginResult,
             font-weight: 700;
         }
         QLabel#mainSubtitle {
-            color: #d5e7df;
+            color: #e6f4ee;
             font-size: 13px;
         }
         QLabel#roleBadge {
@@ -134,7 +137,7 @@ MainWindow::MainWindow(const LoginResult &loginResult,
             font-weight: 700;
         }
         QLabel#cardDescription {
-            color: #65716c;
+            color: #42514b;
             font-size: 13px;
         }
         QLabel#openTag {
@@ -272,6 +275,18 @@ MainWindow::MainWindow(const LoginResult &loginResult,
         dialog.exec();
         qDebug() << "TrainManagementDialog closed.";
     };
+
+    auto showStatisticsDialog = [this]() {
+        if (m_statisticsManager == nullptr) {
+            QMessageBox::warning(this,
+                                 QStringLiteral("票务数据统计"),
+                                 QStringLiteral("统计服务尚未初始化。"));
+            return;
+        }
+
+        StatisticsDialog dialog(*m_statisticsManager, this);
+        dialog.exec();
+    };
     // 工作台卡片的排版都一样，所以集中在这里创建。点击后的函数由调用处传入，
     // 以后车次、票务模块接入时，只需要把现在的提示函数换成真正的窗口入口，
     // 不用重新改整套主界面布局。
@@ -323,6 +338,13 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     // 权限统一交给 LoginManager 判断。这里从高权限往低权限依次匹配，
     // 管理员命中后就不会再进入售票员工作台，主窗口只负责生成对应界面。
     if (LoginManager::canAccessAdminFunctions(m_loginResult.role)) {
+        addModuleCard(QStringLiteral("票务数据统计"),
+                      QStringLiteral("查看订单总览、热门路线和月度客流。"),
+                      QStringLiteral("统计中心"),
+                      QStringLiteral("查看统计"),
+                      true,
+                      showStatisticsDialog);
+
         addModuleCard(QStringLiteral("员工权限管理"),
                       QStringLiteral("创建售票员账号，并管理现有售票员账号。"),
                       QStringLiteral("员工账号"),

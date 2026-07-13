@@ -124,7 +124,7 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
             font-weight: 700;
         }
         QLabel#pageHint {
-            color: #65716c;
+            color: #42514b;
         }
         QLabel#messageLabel {
             border-radius: 8px;
@@ -142,7 +142,9 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
             padding: 3px 9px;
         }
         QTableWidget {
+            color: #1f2933;
             background: #ffffff;
+            alternate-background-color: #f6faf8;
             border: 1px solid #cbd8d2;
             border-radius: 8px;
             gridline-color: #e5ece8;
