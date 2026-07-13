@@ -186,3 +186,10 @@ QVector<QVariantMap> TicketManager::queryAllOrders() const
     }
     return result;
 }
+
+bool TicketManager::addOperationLog(const QString &operatorUsername,
+                                    const QString &action,
+                                    const QString &detail)
+{
+    return m_db.addOperationLog(operatorUsername, action, detail);
+}

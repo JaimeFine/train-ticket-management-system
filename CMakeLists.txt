@@ -26,9 +26,11 @@ set(SOURCES
     src/database/database_manager_station.cpp
     src/database/database_manager_train.cpp
     src/database/database_manager_order.cpp
+    src/database/database_manager_operation_log.cpp
     src/ui/account_management_dialog.cpp
     src/ui/main_window.cpp
     src/ui/order_history_dialog.cpp
+    src/ui/operation_log_dialog.cpp
     src/ui/ticket_service_dialog.cpp
     src/ui/statistics_dialog.cpp
     src/database/database_manager_ticket.cpp
@@ -47,6 +49,7 @@ set(HEADERS
     include/database_manager.h
     include/main_window.h
     include/order_history_dialog.h
+    include/operation_log_dialog.h
     include/ticket_service_dialog.h
     include/statistics_dialog.h
     include/train_management_dialog.h

@@ -96,6 +96,18 @@ public:
     struct MonthlyStat { QString month; int total=0,booked=0,refunded=0; };
     QList<MonthlyStat> monthlyPassengerFlow() const;
 
+    struct OperationLogRecord {
+        int logId = 0;
+        QString operatorUsername;
+        QString action;
+        QString detail;
+        QString createdAt;
+    };
+    bool addOperationLog(const QString &operatorUsername,
+                         const QString &action,
+                         const QString &detail);
+    QList<OperationLogRecord> findAllOperationLogs() const;
+
 private:
     // * This block connect helpers
     // openDatabase() only worries about creating & opening the SQLite file.

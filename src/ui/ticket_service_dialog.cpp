@@ -1,6 +1,7 @@
 #include "ticket_service_dialog.h"
 
 #include "ticket_manager.h"
+#include "database_manager.h"
 
 #include <QAbstractItemView>
 #include <QFormLayout>
@@ -405,6 +406,11 @@ void TicketServiceDialog::bookSelectedTrain()
     }
 
     showMessage(true, QStringLiteral("订票成功，订单号：%1").arg(orderId));
+    writeOperationLog(QStringLiteral("订票"),
+                      QStringLiteral("用户 %1 预订车次 %2，订单号 %3")
+                          .arg(m_loginResult.username)
+                          .arg(trainId)
+                          .arg(orderId));
     loadOwnOrders();
 }
 
@@ -422,6 +428,10 @@ void TicketServiceDialog::refundOrder()
     }
 
     showMessage(true, QStringLiteral("退票成功。"));
+    writeOperationLog(QStringLiteral("退票"),
+                      QStringLiteral("用户 %1 退票，订单号 %2")
+                          .arg(m_loginResult.username)
+                          .arg(orderId));
     loadOwnOrders();
 }
 
@@ -440,6 +450,11 @@ void TicketServiceDialog::changeOrder()
     }
 
     showMessage(true, QStringLiteral("改签成功。"));
+    writeOperationLog(QStringLiteral("改签"),
+                      QStringLiteral("用户 %1 改签，原订单 %2，新车次 %3")
+                          .arg(m_loginResult.username)
+                          .arg(orderId)
+                          .arg(newTrainId));
     loadOwnOrders();
 }
 
@@ -525,4 +540,12 @@ int TicketServiceDialog::selectedTrainId() const
 
     const QTableWidgetItem *item = m_searchResultsTable->item(row, 0);
     return item == nullptr ? 0 : item->text().toInt();
+}
+
+void TicketServiceDialog::writeOperationLog(const QString &action, const QString &detail)
+{
+    if (m_ticketManager == nullptr) {
+        return;
+    }
+    m_ticketManager->addOperationLog(m_loginResult.username, action, detail);
 }

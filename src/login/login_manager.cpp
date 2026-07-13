@@ -2,6 +2,7 @@
 
 #include "database_manager.h"
 
+#include <QDateTime>
 #include <optional>
 #include <QString>
 
@@ -39,6 +40,11 @@ QString defaultSellerPassword()
 LoginManager::LoginManager(DatabaseManager *databaseManager)
     : m_databaseManager(databaseManager)
 {
+}
+
+const DatabaseManager *LoginManager::databaseManager() const
+{
+    return m_databaseManager;
 }
 
 LoginResult LoginManager::authenticate(const QString &username, const QString &password) const
@@ -102,6 +108,10 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
                 QStringLiteral("账号已被禁用。")};
     }
 
+    m_databaseManager->addOperationLog(userAccount->username,
+                                       QStringLiteral("登录"),
+                                       QStringLiteral("用户成功登录系统"));
+
     return {true,
             *role,
             userAccount->userId,
@@ -155,6 +165,10 @@ AccountResult LoginManager::registerUser(const QString &username,
         return {false, QStringLiteral("用户注册失败。")};
     }
 
+    m_databaseManager->addOperationLog(trimmedUsername,
+                                       QStringLiteral("注册"),
+                                       QStringLiteral("普通用户注册新账号"));
+
     return {true, QStringLiteral("用户注册成功，请使用新账号登录。")};
 }
 
@@ -195,6 +209,10 @@ AccountResult LoginManager::createSellerAccount(int operatorUserId,
     if (!m_databaseManager->addUser(user)) {
         return {false, QStringLiteral("创建售票员账号失败。")};
     }
+
+    m_databaseManager->addOperationLog(QStringLiteral("admin:%1").arg(operatorUserId),
+                                       QStringLiteral("创建售票员"),
+                                       QStringLiteral("创建售票员账号：%1").arg(trimmedUsername));
 
     return {true, QStringLiteral("售票员账号创建成功。")};
 }
@@ -239,6 +257,10 @@ AccountResult LoginManager::resetSellerPassword(int operatorUserId,
     if (!m_databaseManager->updateUser(*user)) {
         return {false, QStringLiteral("重置密码失败。")};
     }
+
+    m_databaseManager->addOperationLog(QStringLiteral("admin:%1").arg(operatorUserId),
+                                       QStringLiteral("重置售票员密码"),
+                                       QStringLiteral("重置售票员密码：%1").arg(trimmedUsername));
 
     return {true, QStringLiteral("售票员密码已重置。")};
 }
@@ -293,6 +315,13 @@ AccountResult LoginManager::setSellerEnabled(int operatorUserId,
     if (!m_databaseManager->setUserEnabled(user->userId, enabled)) {
         return {false, QStringLiteral("账号状态修改失败。")};
     }
+
+    m_databaseManager->addOperationLog(QStringLiteral("admin:%1").arg(operatorUserId),
+                                       enabled ? QStringLiteral("启用售票员") : QStringLiteral("禁用售票员"),
+                                       QStringLiteral("%1：%2")
+                                           .arg(enabled ? QStringLiteral("启用账号")
+                                                        : QStringLiteral("禁用账号"),
+                                                trimmedUsername));
 
     if (enabled) {
         return {true, QStringLiteral("售票员账号已启用。")};
@@ -355,6 +384,10 @@ AccountResult LoginManager::changeOwnPassword(const QString &username,
     if (!m_databaseManager->updateUser(*user)) {
         return {false, QStringLiteral("修改密码失败。")};
     }
+
+    m_databaseManager->addOperationLog(trimmedUsername,
+                                       QStringLiteral("修改密码"),
+                                       QStringLiteral("用户修改了自己的密码"));
 
     return {true, QStringLiteral("密码修改成功。")};
 }

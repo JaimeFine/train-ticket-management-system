@@ -1,4 +1,5 @@
 #include "account_management_dialog.h"
+#include "operation_log_dialog.h"
 #include "order_history_dialog.h"
 #include "statistics_dialog.h"
 #include "ticket_manager.h"
@@ -313,6 +314,18 @@ MainWindow::MainWindow(const LoginResult &loginResult,
         dialog.exec();
     };
 
+    auto showOperationLogDialog = [this]() {
+        if (m_loginManager == nullptr || m_loginManager->databaseManager() == nullptr) {
+            QMessageBox::warning(this,
+                                 QStringLiteral("系统操作日志"),
+                                 QStringLiteral("日志服务尚未初始化。"));
+            return;
+        }
+
+        OperationLogDialog dialog(*m_loginManager->databaseManager(), this);
+        dialog.exec();
+    };
+
     auto openTicketServiceDialog = [this](int initialTabIndex) {
         if (m_ticketManager == nullptr) {
             QMessageBox::warning(this,
@@ -397,6 +410,13 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       QStringLiteral("进入管理"),
                       true,
                       showTrainStationMessage);
+
+        addModuleCard(QStringLiteral("系统操作日志"),
+                      QStringLiteral("查看登录、账号维护和票务办理的操作记录。"),
+                      QStringLiteral("日志中心"),
+                      QStringLiteral("查看日志"),
+                      true,
+                      showOperationLogDialog);
     } else if (m_loginResult.role == UserRole::User) {
         addModuleCard(QStringLiteral("车票查询"),
                       QStringLiteral("查询车次、余票，并可直接预订选中的车次。"),

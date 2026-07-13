@@ -49,6 +49,7 @@ class LoginManager
 {
 public:
     explicit LoginManager(DatabaseManager *databaseManager = nullptr);
+    const DatabaseManager *databaseManager() const;
 
     // 验证数据库账号；游客访问不需要数据库账号。
     LoginResult authenticate(const QString &username, const QString &password) const;

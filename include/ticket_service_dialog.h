@@ -32,6 +32,7 @@ private:
     void showMessage(bool success, const QString &message);
     QString statusText(int status) const;
     int selectedTrainId() const;
+    void writeOperationLog(const QString &action, const QString &detail);
 
     TicketManager *m_ticketManager = nullptr;
     LoginResult m_loginResult;
