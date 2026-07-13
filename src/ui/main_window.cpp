@@ -313,18 +313,6 @@ MainWindow::MainWindow(const LoginResult &loginResult,
         dialog.exec();
     };
 
-    auto showOrderHistoryDialog = [this]() {
-        if (m_ticketManager == nullptr) {
-            QMessageBox::warning(this,
-                                 QStringLiteral("我的订单"),
-                                 QStringLiteral("订单服务尚未初始化。"));
-            return;
-        }
-
-        OrderHistoryDialog dialog(*m_ticketManager, m_loginResult.userId, this);
-        dialog.exec();
-    };
-
     auto openTicketServiceDialog = [this](int initialTabIndex) {
         if (m_ticketManager == nullptr) {
             QMessageBox::warning(this,
@@ -428,15 +416,6 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                           openTicketServiceDialog(1);
                       });
 
-        addModuleCard(QStringLiteral("我的账户"),
-                      QStringLiteral("修改当前账号密码，或退出后重新登录。"),
-                      QStringLiteral("账户中心"),
-                      QStringLiteral("进入账户"),
-                      true,
-                      [openAccountDialog]() {
-                          openAccountDialog(true);
-                      });
-
         addModuleCard(QStringLiteral("我的订单"),
                       QStringLiteral("查看当前账号已经创建的订单记录。"),
                       QStringLiteral("订单历史"),
@@ -473,14 +452,6 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                           openTicketServiceDialog(2);
                       });
 
-        addModuleCard(QStringLiteral("我的账户"),
-                      QStringLiteral("修改当前账号密码，或退出后重新登录。"),
-                      QStringLiteral("账户中心"),
-                      QStringLiteral("进入账户"),
-                      true,
-                      [openAccountDialog]() {
-                          openAccountDialog(true);
-                      });
     } else if (m_loginResult.role == UserRole::Guest) {
         addModuleCard(QStringLiteral("车票查询"),
                       QStringLiteral("先查询车次和余票，决定是否注册后继续订票。"),
