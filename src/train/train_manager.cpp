@@ -1,8 +1,3 @@
-// src/train/train_manager.cpp
-// 待 DatabaseManager补充 API列表:QList<TrainRecord> getAllTrains(bool onlyEnabled = true) const
-//                              bool deleteTrain(int trainId)
-//                              QList<TrainRecord> searchTrains(const QString& keyword) const
-//                              QList<TrainRecord> searchByStation(int stationId, bool isDeparture) const
 #include "train_manager.h"
 #include "database_manager.h"
 #include "database/train_record.h"
@@ -24,6 +19,11 @@ TrainManager::TrainManager(DatabaseManager* dbManager)
 QString TrainManager::statusMessage() const
 {
     return m_lastStatus;
+}
+
+DatabaseManager* TrainManager::databaseManager() const
+{
+    return m_dbManager;
 }
 
 // ============================================================

@@ -29,6 +29,8 @@ set(SOURCES
     src/ui/account_management_dialog.cpp
     src/ui/main_window.cpp
     src/database/database_manager_ticket.cpp
+    src/ui/train_management_dialog.cpp
+    src/ui/station_management_dialog.cpp
     src/database/database_manager_statistics.cpp
 )
 
@@ -41,6 +43,8 @@ set(HEADERS
     include/statistics_manager.h
     include/database_manager.h
     include/main_window.h
+    include/train_management_dialog.h
+    include/station_management_dialog.h
 )
 
 # ── Resources ────────────────────────────────────────────────────────────────
@@ -53,6 +57,7 @@ add_executable(${PROJECT_NAME}
     ${SOURCES}
     ${HEADERS}
     ${RESOURCES}
+
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -78,3 +83,4 @@ if(BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
+

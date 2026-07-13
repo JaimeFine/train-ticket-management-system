@@ -31,6 +31,7 @@ public:
 
     // ---------- 状态信息 ----------
     QString statusMessage() const;
+    DatabaseManager* databaseManager() const;
 
     // ---------- 查询 ----------
     QVector<Train> getAllTrains(bool onlyEnabled = true);
