@@ -130,6 +130,17 @@ MainWindow::MainWindow(const LoginResult &loginResult,
         QPushButton#accountButton:hover {
             background: #d9f99d;
         }
+        QPushButton#logoutButton {
+            color: #ffffff;
+            background: #176b5b;
+            border: none;
+            border-radius: 10px;
+            padding: 6px 12px;
+            font-weight: 700;
+        }
+        QPushButton#logoutButton:hover {
+            background: #0f5749;
+        }
         QFrame#moduleCard {
             background: #fbfcfb;
             border: 1px solid #d8e0dc;
@@ -259,6 +270,15 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     accountBlock->setSpacing(8);
     accountBlock->addWidget(roleBadge);
     accountBlock->addWidget(accountButton);
+    if (m_loginResult.role != UserRole::Guest) {
+        auto *logoutButton = new QPushButton(QStringLiteral("退出登录"), headerPanel);
+        logoutButton->setObjectName(QStringLiteral("logoutButton"));
+        connect(logoutButton, &QPushButton::clicked, this, [this]() {
+            m_logoutRequested = true;
+            close();
+        });
+        accountBlock->addWidget(logoutButton);
+    }
 
     headerLayout->addWidget(logoLabel);
     headerLayout->addLayout(titleBlock, 1);

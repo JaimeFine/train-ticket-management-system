@@ -104,6 +104,7 @@ private:
     bool openDatabase();
     void closeDatabase();
     bool createTables();
+    bool seedDemoData();
     bool executeStatement(const QString &sql);
     QString resolveDatabasePath() const;
 

@@ -99,7 +99,7 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
             font-weight: 700;
         }
         QLabel#formSubtitle {
-            color: #65716c;
+            color: #42514b;
             font-size: 13px;
         }
         QLabel#messageLabel {
@@ -119,6 +119,7 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
             background: #ffffff;
             color: #1f2933;
             selection-background-color: #0f766e;
+            placeholder-text-color: #75857e;
         }
         QLineEdit:focus {
             border: 2px solid #0f766e;

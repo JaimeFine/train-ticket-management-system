@@ -105,8 +105,12 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
             font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI";
             font-size: 14px;
         }
+        QLabel {
+            color: #1f2933;
+        }
         QGroupBox {
             background: #fbfcfb;
+            color: #33433d;
             border: 1px solid #d8e0dc;
             border-radius: 10px;
             margin-top: 12px;
@@ -182,6 +186,7 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
         QPushButton#logoutButton {
             color: #153832;
             background: #e5ece8;
+            border: 1px solid #cbd8d2;
         }
         QPushButton#logoutButton:hover {
             background: #d8e0dc;

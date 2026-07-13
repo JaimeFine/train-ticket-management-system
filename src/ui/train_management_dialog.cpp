@@ -175,7 +175,7 @@ void TrainManagementDialog::setupUI()
     m_seatBtn->setEnabled(false);
 
     m_countLabel = new QLabel("共 0 条记录");
-    m_countLabel->setStyleSheet("color: #65716c; font-size: 13px;");
+    m_countLabel->setStyleSheet("color: #42514b; font-size: 13px;");
 
     m_messageLabel = new QLabel("就绪");
     m_messageLabel->setStyleSheet("color: #28a745; font-size: 13px;");
