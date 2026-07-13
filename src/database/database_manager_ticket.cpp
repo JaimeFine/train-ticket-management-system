@@ -56,3 +56,55 @@ QList<DatabaseManager::TrainWithStations> DatabaseManager::searchTrainsByStation
         rs.append(t);}
     return rs;
 }
+
+// ══════════════════════ Issue 10 ══════════════════════
+
+std::optional<OrderRecord> DatabaseManager::findOrderById(int orderId) const
+{
+    m_lastError.clear();
+    QSqlQuery query(QSqlDatabase::database(m_connectionName));
+
+    query.prepare(
+        "SELECT orderId, userId, trainId, passengerName, purchaseTime, status "
+        "FROM \"Order\" WHERE orderId = :id");
+    query.bindValue(":id", orderId);
+
+    if (!query.exec()) { m_lastError = query.lastError().text(); return std::nullopt; }
+    if (!query.next()) return std::nullopt;
+
+    OrderRecord record;
+    record.orderId       = query.value(0).toInt();
+    record.userId        = query.value(1).toInt();
+    record.trainId       = query.value(2).toInt();
+    record.passengerName = query.value(3).toString();
+    record.purchaseTime  = query.value(4).toString();
+    record.status        = query.value(5).toInt();
+    return record;
+}
+
+QList<OrderRecord> DatabaseManager::findOrdersByPassenger(const QString &name) const
+{
+    m_lastError.clear();
+    QSqlQuery query(QSqlDatabase::database(m_connectionName));
+
+    query.prepare(
+        "SELECT orderId, userId, trainId, passengerName, purchaseTime, status "
+        "FROM \"Order\" WHERE passengerName LIKE :name "
+        "ORDER BY purchaseTime DESC");
+    query.bindValue(":name", "%" + name + "%");
+
+    QList<OrderRecord> results;
+    if (!query.exec()) { m_lastError = query.lastError().text(); return results; }
+
+    while (query.next()) {
+        OrderRecord record;
+        record.orderId       = query.value(0).toInt();
+        record.userId        = query.value(1).toInt();
+        record.trainId       = query.value(2).toInt();
+        record.passengerName = query.value(3).toString();
+        record.purchaseTime  = query.value(4).toString();
+        record.status        = query.value(5).toInt();
+        results.append(record);
+    }
+    return results;
+}

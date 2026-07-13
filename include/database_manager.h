@@ -45,6 +45,8 @@ public:
     std::optional<StationRecord> findStationByName(
         const QString &stationName
     ) const;
+    QList<StationRecord> getAllStations() const;
+    bool deleteStation(int stationId);
 
     // >>> Train APIs
     bool addTrain(const TrainRecord &train);
@@ -69,6 +71,30 @@ public:
     };
     QList<TrainWithStations> searchTrainsByStation(
         const QString &dep,const QString &arr,const QString &date) const;
+
+    // ── Issue 10: 退票 + 改签 + 订单查询 ──────────────────
+    std::optional<OrderRecord> findOrderById(int orderId) const;
+    QList<OrderRecord> findOrdersByPassenger(const QString &name) const;
+
+    // >>> Jaime added for CharlesSmartWang, issue 7 & 8:
+    QList<TrainRecord> getAllTrains(bool onlyEnabled = true) const;
+    bool deleteTrain(int trainId);
+    QList<TrainRecord> searchTrains(const QString &keyword) const;
+    QList<TrainRecord> searchByStation(int stationId, bool isDeparture = true) const;
+
+    // ── Issue 11: 订单历史 + 统计 ──────────────────────────
+    struct OrderWithDetails {
+        int orderId=0,userId=0,trainId=0,status=0;
+        QString trainNumber,passengerName,purchaseTime;
+        QString departureStationName,arrivalStationName;
+    };
+    QList<OrderWithDetails> findAllOrdersWithDetails() const;
+    int countOrdersByStatus(int status) const;
+    int countAllOrders() const;
+    struct RouteStat { QString dep,arr; int count=0; };
+    QList<RouteStat> popularRoutes(int limit=10) const;
+    struct MonthlyStat { QString month; int total=0,booked=0,refunded=0; };
+    QList<MonthlyStat> monthlyPassengerFlow() const;
 
 private:
     // * This block connect helpers
