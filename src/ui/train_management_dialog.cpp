@@ -1,4 +1,5 @@
 #include "train_management_dialog.h"
+#include "station_management_dialog.h"
 
 #include <QComboBox>
 #include <QFormLayout>
@@ -16,9 +17,18 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 
-TrainManagementDialog::TrainManagementDialog(QWidget *parent)
+TrainManagementDialog::TrainManagementDialog(TrainManager* manager, QWidget *parent)
     : QDialog(parent)
+    , m_manager(manager)
 {
+    setStyleSheet(
+        "QDialog {"
+        "    background: #eef2f3;"
+        "    color: #1f2933;"
+        "    font-family: \"Microsoft YaHei UI\", \"Microsoft YaHei\", \"Segoe UI\";"
+        "    font-size: 14px;"
+        "}"
+        );
     setupUI();
     loadStations();
     loadData();
@@ -32,16 +42,72 @@ void TrainManagementDialog::setupUI()
 
     // -------- 搜索栏 --------
     QHBoxLayout *searchLayout = new QHBoxLayout();
+
     m_searchInput = new QLineEdit();
     m_searchInput->setPlaceholderText("输入车次号或站点名称...");
     m_searchInput->setMinimumWidth(250);
-
+    m_searchInput->setStyleSheet(
+        "QLineEdit {"
+        "    color: #1f2933;"
+        "    background-color: #ffffff;"
+        "    border: 1px solid #cbd8d2;"
+        "    border-radius: 6px;"
+        "    padding: 4px 8px;"
+        "    font-size: 13px;"
+        "}"
+        "QLineEdit:focus {"
+        "    border: 2px solid #0f766e;"
+        "}"
+        "QLineEdit::placeholder {"
+        "    color: #8b9490;"
+        "}"
+        );
     m_searchBtn = new QPushButton("搜索");
     m_refreshBtn = new QPushButton("刷新");
 
     m_stationCombo = new QComboBox();
     m_stationCombo->addItem("-- 选择出发站 --");
+    m_stationCombo->setStyleSheet(
+        "QComboBox {"
+        "    color: #1f2933;"
+        "    background-color: #ffffff;"
+        "    border: 1px solid #cbd8d2;"
+        "    border-radius: 6px;"
+        "    padding: 4px 8px;"
+        "    min-height: 26px;"
+        "}"
+        "QComboBox:hover {"
+        "    border: 1px solid #0f766e;"
+        "}"
+        "QComboBox::drop-down {"
+        "    border: none;"
+        "}"
+        "QComboBox QAbstractItemView {"
+        "    color: #1f2933;"
+        "    background-color: #ffffff;"
+        "    border: 1px solid #cbd8d2;"
+        "    border-radius: 6px;"
+        "    selection-background-color: #d9f99d;"
+        "    selection-color: #153832;"
+        "    outline: none;"
+        "}"
+        "QComboBox QAbstractItemView::item {"
+        "    padding: 6px 10px;"
+        "    min-height: 26px;"
+        "}"
+        "QComboBox QAbstractItemView::item:hover {"
+        "    background-color: #f0f5f3;"
+        "}"
+        );
     m_searchStationBtn = new QPushButton("按出发站查询");
+    m_searchStationBtn->setStyleSheet("background-color: #176b5b; color: white; border-radius: 6px; padding: 6px 12px;");
+    // 站点管理按钮 - 正确文本和功能
+    QPushButton *stationBtn = new QPushButton("站点管理");
+    stationBtn->setStyleSheet("background-color: #17a2b8; color: white; border-radius: 6px; padding: 6px 12px;");
+    connect(stationBtn, &QPushButton::clicked, [this]() {
+        StationManagementDialog dialog(this);
+        dialog.exec();
+    });
 
     searchLayout->addWidget(m_searchInput);
     searchLayout->addWidget(m_searchBtn);
@@ -49,6 +115,7 @@ void TrainManagementDialog::setupUI()
     searchLayout->addWidget(m_stationCombo);
     searchLayout->addWidget(m_searchStationBtn);
     searchLayout->addStretch();
+    searchLayout->addWidget(stationBtn);
     searchLayout->addWidget(m_refreshBtn);
     mainLayout->addLayout(searchLayout);
 
@@ -59,6 +126,30 @@ void TrainManagementDialog::setupUI()
         "ID", "车次号", "出发站", "到达站",
         "出发时间", "到达时间", "余票/总座"
     });
+    m_table->verticalHeader()->setVisible(false);
+
+    m_table->setStyleSheet(
+        "QTableWidget {"
+        "    background-color: #ffffff;"
+        "    alternate-background-color: #f5f8f7;"
+        "    color: #1f2933;"
+        "    border: 1px solid #d8e0dc;"
+        "    border-radius: 8px;"
+        "    gridline-color: #e5ece8;"
+        "}"
+        "QHeaderView::section {"
+        "    background-color: #eef5f1;"
+        "    color: #33433d;"
+        "    padding: 6px;"
+        "    border: none;"
+        "    font-weight: bold;"
+        "    font-size: 13px;"
+        "}"
+        "QTableWidget::item {"
+        "    color: #1f2933;"
+        "    padding: 4px;"
+        "}"
+        );
     m_table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -83,8 +174,10 @@ void TrainManagementDialog::setupUI()
     m_seatBtn->setEnabled(false);
 
     m_countLabel = new QLabel("共 0 条记录");
-    m_statusLabel = new QLabel("就绪");
-    m_statusLabel->setStyleSheet("color: #28a745;");
+    m_countLabel->setStyleSheet("color: #65716c; font-size: 13px;");
+
+    m_messageLabel = new QLabel("就绪");
+    m_messageLabel->setStyleSheet("color: #28a745; font-size: 13px;");
 
     actionLayout->addWidget(m_addBtn);
     actionLayout->addWidget(m_editBtn);
@@ -93,7 +186,7 @@ void TrainManagementDialog::setupUI()
     actionLayout->addStretch();
     actionLayout->addWidget(m_countLabel);
     actionLayout->addSpacing(20);
-    actionLayout->addWidget(m_statusLabel);
+    actionLayout->addWidget(m_messageLabel);
     mainLayout->addLayout(actionLayout);
 
     // -------- 信号连接 --------
@@ -110,29 +203,47 @@ void TrainManagementDialog::setupUI()
 
 void TrainManagementDialog::loadStations()
 {
+    if (m_manager == nullptr) {
+        showMessage("车次管理服务未初始化", false);
+        return;
+    }
+
+    m_stationNameMap.clear();
+
     QSqlDatabase db = QSqlDatabase::database("train_ticket_connection");
     if (!db.isOpen()) return;
 
     QSqlQuery query(db);
     query.exec("SELECT stationId, stationName FROM Station ORDER BY stationName");
     while (query.next()) {
-        QString name = query.value("stationName").toString();
         int id = query.value("stationId").toInt();
+        QString name = query.value("stationName").toString();
         m_stationCombo->addItem(name, id);
+        m_stationNameMap[id] = name;
     }
 }
 
+
 void TrainManagementDialog::loadData()
 {
-    auto trains = m_manager.getAllTrains(false);
+    if (m_manager == nullptr) {
+        showMessage("车次管理服务未初始化", false);
+        return;
+    }
+
+    auto trains = m_manager->getAllTrains(false);
     m_table->setRowCount(trains.size());
 
     for (int i = 0; i < trains.size(); ++i) {
         const Train& t = trains[i];
         m_table->setItem(i, 0, new QTableWidgetItem(QString::number(t.trainId)));
         m_table->setItem(i, 1, new QTableWidgetItem(t.trainNumber));
-        m_table->setItem(i, 2, new QTableWidgetItem(QString::number(t.departureStationId)));
-        m_table->setItem(i, 3, new QTableWidgetItem(QString::number(t.arrivalStationId)));
+        m_table->setItem(i, 2, new QTableWidgetItem(
+                                   m_stationNameMap.value(t.departureStationId, QString::number(t.departureStationId))
+                                   ));
+        m_table->setItem(i, 3, new QTableWidgetItem(
+                                   m_stationNameMap.value(t.arrivalStationId, QString::number(t.arrivalStationId))
+                                   ));
         m_table->setItem(i, 4, new QTableWidgetItem(t.departureTime));
         m_table->setItem(i, 5, new QTableWidgetItem(t.arrivalTime));
         m_table->setItem(i, 6, new QTableWidgetItem(
@@ -142,7 +253,7 @@ void TrainManagementDialog::loadData()
 
     m_countLabel->setText("共 " + QString::number(trains.size()) + " 条记录");
     clearSelection();
-    showStatus("列表已刷新", true);
+    showMessage("列表已刷新", true);
 }
 
 void TrainManagementDialog::refreshList()
@@ -154,11 +265,11 @@ void TrainManagementDialog::searchTrain()
 {
     QString keyword = m_searchInput->text().trimmed();
     if (keyword.isEmpty()) {
-        showStatus("请输入搜索关键字", false);
+        showMessage("请输入搜索关键字", false);
         return;
     }
 
-    auto results = m_manager.searchTrains(keyword);
+    auto results = m_manager->searchTrains(keyword);
     m_table->setRowCount(results.size());
 
     for (int i = 0; i < results.size(); ++i) {
@@ -176,19 +287,19 @@ void TrainManagementDialog::searchTrain()
 
     m_countLabel->setText("找到 " + QString::number(results.size()) + " 条记录");
     clearSelection();
-    showStatus("搜索完成", true);
+    showMessage("搜索完成", true);
 }
 
 void TrainManagementDialog::searchByStation()
 {
     int index = m_stationCombo->currentIndex();
     if (index <= 0) {
-        showStatus("请先选择出发站", false);
+        showMessage("请先选择出发站", false);
         return;
     }
 
     int stationId = m_stationCombo->currentData().toInt();
-    auto results = m_manager.searchByStation(stationId, true);
+    auto results = m_manager->searchByStation(stationId, true);
 
     m_table->setRowCount(results.size());
     for (int i = 0; i < results.size(); ++i) {
@@ -206,7 +317,7 @@ void TrainManagementDialog::searchByStation()
 
     m_countLabel->setText("从该站出发共 " + QString::number(results.size()) + " 条记录");
     clearSelection();
-    showStatus("按站查询完成", true);
+    showMessage("按站查询完成", true);
 }
 
 void TrainManagementDialog::addTrain()
@@ -271,15 +382,15 @@ void TrainManagementDialog::addTrain()
         train.enabled = true;
 
         if (train.trainNumber.isEmpty()) {
-            showStatus("车次号不能为空", false);
+            showMessage("车次号不能为空", false);
             return;
         }
 
-        if (m_manager.addTrain(train)) {
-            showStatus(m_manager.statusMessage(), true);
+        if (m_manager->addTrain(train)) {
+            showMessage(m_manager->statusMessage(), true);
             loadData();
         } else {
-            showStatus(m_manager.statusMessage(), false);
+            showMessage(m_manager->statusMessage(), false);
         }
     }
 }
@@ -289,7 +400,7 @@ void TrainManagementDialog::editTrain()
     int trainId = getSelectedTrainId();
     if (trainId == 0) return;
 
-    auto all = m_manager.getAllTrains(false);
+    auto all = m_manager->getAllTrains(false);
     Train current;
     for (const auto& t : all) {
         if (t.trainId == trainId) {
@@ -298,7 +409,7 @@ void TrainManagementDialog::editTrain()
         }
     }
     if (current.trainId == 0) {
-        showStatus("未找到该车次", false);
+        showMessage("未找到该车次", false);
         return;
     }
 
@@ -371,19 +482,19 @@ void TrainManagementDialog::editTrain()
         train.enabled = current.enabled;
 
         if (train.trainNumber.isEmpty()) {
-            showStatus("车次号不能为空", false);
+            showMessage("车次号不能为空", false);
             return;
         }
         if (train.remainingSeats > train.totalSeats) {
-            showStatus("剩余座位不能超过总座位", false);
+            showMessage("剩余座位不能超过总座位", false);
             return;
         }
 
-        if (m_manager.updateTrain(train)) {
-            showStatus(m_manager.statusMessage(), true);
+        if (m_manager->updateTrain(train)) {
+            showMessage(m_manager->statusMessage(), true);
             loadData();
         } else {
-            showStatus(m_manager.statusMessage(), false);
+            showMessage(m_manager->statusMessage(), false);
         }
     }
 }
@@ -393,7 +504,7 @@ void TrainManagementDialog::deleteTrain()
     int trainId = getSelectedTrainId();
     if (trainId == 0) return;
 
-    auto all = m_manager.getAllTrains(false);
+    auto all = m_manager->getAllTrains(false);
     QString trainNumber;
     for (const auto& t : all) {
         if (t.trainId == trainId) {
@@ -409,11 +520,11 @@ void TrainManagementDialog::deleteTrain()
         );
 
     if (reply == QMessageBox::Yes) {
-        if (m_manager.deleteTrain(trainId)) {
-            showStatus(m_manager.statusMessage(), true);
+        if (m_manager->deleteTrain(trainId)) {
+            showMessage(m_manager->statusMessage(), true);
             loadData();
         } else {
-            showStatus(m_manager.statusMessage(), false);
+            showMessage(m_manager->statusMessage(), false);
         }
     }
 }
@@ -423,7 +534,7 @@ void TrainManagementDialog::updateSeats()
     int trainId = getSelectedTrainId();
     if (trainId == 0) return;
 
-    auto all = m_manager.getAllTrains(false);
+    auto all = m_manager->getAllTrains(false);
     int currentSeats = 0;
     QString trainNumber;
     for (const auto& t : all) {
@@ -443,11 +554,11 @@ void TrainManagementDialog::updateSeats()
         );
 
     if (ok && delta != 0) {
-        if (m_manager.updateRemainingSeats(trainId, delta)) {
-            showStatus(m_manager.statusMessage(), true);
+        if (m_manager->updateRemainingSeats(trainId, delta)) {
+            showMessage(m_manager->statusMessage(), true);
             loadData();
         } else {
-            showStatus(m_manager.statusMessage(), false);
+            showMessage(m_manager->statusMessage(), false);
         }
     }
 }
@@ -465,7 +576,7 @@ int TrainManagementDialog::getSelectedTrainId()
 {
     int row = m_table->currentRow();
     if (row < 0 || row >= m_table->rowCount()) {
-        showStatus("请先选择一辆车次", false);
+        showMessage("请先选择一辆车次", false);
         return 0;
     }
     QTableWidgetItem *idItem = m_table->item(row, 0);
@@ -481,8 +592,8 @@ void TrainManagementDialog::clearSelection()
     m_table->clearSelection();
 }
 
-void TrainManagementDialog::showStatus(const QString& msg, bool success)
+void TrainManagementDialog::showMessage(const QString &msg, bool success)
 {
-    m_statusLabel->setStyleSheet(success ? "color: #28a745;" : "color: #dc3545;");
-    m_statusLabel->setText(msg);
+    m_messageLabel->setText(msg);
+    m_messageLabel->setStyleSheet(success ? "color: #28a745;" : "color: #dc3545;");
 }

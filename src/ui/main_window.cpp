@@ -1,4 +1,5 @@
 #include "account_management_dialog.h"
+#include "train_management_dialog.h"
 #include "main_window.h"
 
 #include <QFrame>
@@ -64,10 +65,12 @@ QString workspaceTitle(UserRole role)
 
 MainWindow::MainWindow(const LoginResult &loginResult,
                        const LoginManager &loginManager,
+                       TrainManager* trainManager,
                        QWidget *parent)
     : QMainWindow(parent)
     , m_loginResult(loginResult)
     , m_loginManager(&loginManager)
+    , m_trainManager(trainManager)
 {
     setWindowTitle(QStringLiteral("火车票务管理系统"));
     resize(980, 640);
@@ -278,11 +281,20 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     };
 
     auto showTrainStationMessage = [this]() {
-        QMessageBox::information(this,
-                                 QStringLiteral("车次站点管理"),
-                                 QStringLiteral("车次和站点管理接口已预留，等待车次模块接入。"));
+        qDebug() << "=== showTrainStationMessage called ===";
+        if (m_trainManager == nullptr) {
+            qDebug() << "m_trainManager is NULL!";
+            QMessageBox::warning(this,
+                                 QStringLiteral("车次管理"),
+                                 QStringLiteral("车次管理服务尚未初始化。"));
+            return;
+        }
+        qDebug() << "Creating TrainManagementDialog...";
+        TrainManagementDialog dialog(m_trainManager, this);
+        qDebug() << "Executing TrainManagementDialog...";
+        dialog.exec();
+        qDebug() << "TrainManagementDialog closed.";
     };
-
     // 工作台卡片的排版都一样，所以集中在这里创建。点击后的函数由调用处传入，
     // 以后车次、票务模块接入时，只需要把现在的提示函数换成真正的窗口入口，
     // 不用重新改整套主界面布局。

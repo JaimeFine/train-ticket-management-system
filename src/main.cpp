@@ -6,7 +6,7 @@
 #include "login_dialog.h"
 #include "login_manager.h"
 #include "main_window.h"
-#include "train_management_dialog.h"
+#include "train_manager.h"
 
 int main(int argc, char *argv[])
 {
@@ -25,6 +25,8 @@ int main(int argc, char *argv[])
 
     LoginManager loginManager(&databaseManager);
 
+    TrainManager trainManager(&databaseManager);
+
     // 每次循环先显示登录窗口，再显示对应身份的主窗口。
     // 用户点“退出登录”时主窗口会结束这一次事件循环，然后回到这里重新登录；
     // 如果用户直接关闭主窗口，就正常结束程序。
@@ -34,7 +36,7 @@ int main(int argc, char *argv[])
             return 0;
         }
 
-        MainWindow window(loginDialog.loginResult(), loginManager);
+        MainWindow window(loginDialog.loginResult(), loginManager, &trainManager);
         window.show();
 
         const int result = app.exec();
