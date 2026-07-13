@@ -71,17 +71,6 @@ QVector<Train> TrainManager::getAllTrains(bool onlyEnabled)
         return result;
     }
 
-    // ============================================================
-    // 待 DatabaseManager 补充 API: QList<TrainRecord> getAllTrains(bool onlyEnabled = true) const
-    //
-    // SQL 语句（参考）：
-    // SELECT trainId, trainNumber, departureStationId, arrivalStationId,
-    //        departureTime, arrivalTime, totalSeats, remainingSeats, enabled
-    // FROM Train
-    // [WHERE enabled = 1]   -- 当 onlyEnabled == true 时添加
-    // ORDER BY trainId;
-    // ============================================================
-
     // 实现代码（待 DatabaseManager 补充后取消注释）：
     auto records = m_dbManager->getAllTrains(onlyEnabled);
     for (const auto& record : records) {
@@ -277,19 +266,6 @@ bool TrainManager::deleteTrain(int trainId)
         return false;
     }
 
-    // ============================================================
-    // 待 DatabaseManager 补充 API: bool deleteTrain(int trainId)
-    //
-    // SQL 语句（参考）：
-    // -- 检查车次是否存在
-    // SELECT trainNumber, enabled FROM Train WHERE trainId = ?;
-    //
-    // -- 检查是否已停运（如果 enabled == 0，返回失败）
-    //
-    // -- 执行逻辑删除
-    // UPDATE Train SET enabled = 0 WHERE trainId = ?;
-    // ============================================================
-
     if (!m_dbManager->deleteTrain(trainId)) {
         setStatus("停运车次失败: " + m_dbManager->lastError());
         return false;
@@ -316,23 +292,6 @@ QVector<Train> TrainManager::searchTrains(const QString& keyword)
         return result;
     }
 
-    // ============================================================
-    // 待 DatabaseManager 补充 API: QList<TrainRecord> searchTrains(const QString& keyword) const
-    //
-    // SQL 语句（参考）：
-    // SELECT t.trainId, t.trainNumber, t.departureStationId, t.arrivalStationId,
-    //        t.departureTime, t.arrivalTime, t.totalSeats, t.remainingSeats, t.enabled
-    // FROM Train t
-    // LEFT JOIN Station s1 ON t.departureStationId = s1.stationId
-    // LEFT JOIN Station s2 ON t.arrivalStationId = s2.stationId
-    // WHERE (t.trainNumber LIKE ?
-    //        OR s1.stationName LIKE ?
-    //        OR s2.stationName LIKE ?)
-    //   AND t.enabled = 1;
-    //
-    // 参数：'%' + keyword + '%'
-    // ============================================================
-
     auto records = m_dbManager->searchTrains(keyword);
     for (const auto& record : records) {
         result.append(convertToTrain(record));
@@ -358,25 +317,6 @@ QVector<Train> TrainManager::searchByStation(int stationId, bool isDeparture)
         setStatus("无效的车站ID");
         return result;
     }
-
-    // ============================================================
-    // 待 DatabaseManager 补充 API: QList<TrainRecord> searchByStation(int stationId, bool isDeparture) const
-    //
-    // SQL 语句（参考）：
-    // -- 按出发站搜索：
-    // SELECT trainId, trainNumber, departureStationId, arrivalStationId,
-    //        departureTime, arrivalTime, totalSeats, remainingSeats, enabled
-    // FROM Train
-    // WHERE departureStationId = ?
-    //   AND enabled = 1;
-    //
-    // -- 按到达站搜索：
-    // SELECT trainId, trainNumber, departureStationId, arrivalStationId,
-    //        departureTime, arrivalTime, totalSeats, remainingSeats, enabled
-    // FROM Train
-    // WHERE arrivalStationId = ?
-    //   AND enabled = 1;
-    // ============================================================
 
     auto records = m_dbManager->searchByStation(stationId, isDeparture);
     for (const auto& record : records) {
