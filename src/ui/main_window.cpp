@@ -1,5 +1,7 @@
 #include "account_management_dialog.h"
+#include "order_history_dialog.h"
 #include "statistics_dialog.h"
+#include "ticket_manager.h"
 #include "train_management_dialog.h"
 #include "main_window.h"
 
@@ -68,12 +70,14 @@ QString workspaceTitle(UserRole role)
 MainWindow::MainWindow(const LoginResult &loginResult,
                        const LoginManager &loginManager,
                        TrainManager* trainManager,
+                       TicketManager *ticketManager,
                        StatisticsManager *statisticsManager,
                        QWidget *parent)
     : QMainWindow(parent)
     , m_loginResult(loginResult)
     , m_loginManager(&loginManager)
     , m_trainManager(trainManager)
+    , m_ticketManager(ticketManager)
     , m_statisticsManager(statisticsManager)
 {
     setWindowTitle(QStringLiteral("火车票务管理系统"));
@@ -287,6 +291,18 @@ MainWindow::MainWindow(const LoginResult &loginResult,
         StatisticsDialog dialog(*m_statisticsManager, this);
         dialog.exec();
     };
+
+    auto showOrderHistoryDialog = [this]() {
+        if (m_ticketManager == nullptr) {
+            QMessageBox::warning(this,
+                                 QStringLiteral("我的订单"),
+                                 QStringLiteral("订单服务尚未初始化。"));
+            return;
+        }
+
+        OrderHistoryDialog dialog(*m_ticketManager, m_loginResult.userId, this);
+        dialog.exec();
+    };
     // 工作台卡片的排版都一样，所以集中在这里创建。点击后的函数由调用处传入，
     // 以后车次、票务模块接入时，只需要把现在的提示函数换成真正的窗口入口，
     // 不用重新改整套主界面布局。
@@ -360,10 +376,40 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       QStringLiteral("进入管理"),
                       true,
                       showTrainStationMessage);
-    } else if (LoginManager::canAccessSellerFunctions(m_loginResult.role)
-               || LoginManager::canAccessGuestFunctions(m_loginResult.role)) {
-        // 这些角色的其他入口还在独立模块里继续收尾，主界面先不展示
-        // 仅有占位提示的卡片，避免演示时出现“点开后只有提示框”的体验。
+    } else if (m_loginResult.role == UserRole::User) {
+        addModuleCard(QStringLiteral("我的账户"),
+                      QStringLiteral("修改当前账号密码，或退出后重新登录。"),
+                      QStringLiteral("账户中心"),
+                      QStringLiteral("进入账户"),
+                      true,
+                      [openAccountDialog]() {
+                          openAccountDialog(true);
+                      });
+
+        addModuleCard(QStringLiteral("我的订单"),
+                      QStringLiteral("查看当前账号已经创建的订单记录。"),
+                      QStringLiteral("订单历史"),
+                      QStringLiteral("查看订单"),
+                      true,
+                      showOrderHistoryDialog);
+    } else if (m_loginResult.role == UserRole::Seller) {
+        addModuleCard(QStringLiteral("我的账户"),
+                      QStringLiteral("修改当前账号密码，或退出后重新登录。"),
+                      QStringLiteral("账户中心"),
+                      QStringLiteral("进入账户"),
+                      true,
+                      [openAccountDialog]() {
+                          openAccountDialog(true);
+                      });
+    } else if (m_loginResult.role == UserRole::Guest) {
+        addModuleCard(QStringLiteral("注册普通用户账号"),
+                      QStringLiteral("注册后即可使用完整用户功能。"),
+                      QStringLiteral("注册入口"),
+                      QStringLiteral("立即注册"),
+                      true,
+                      [openAccountDialog]() {
+                          openAccountDialog(true);
+                      });
     }
 
     pageLayout->addWidget(headerPanel);

@@ -8,6 +8,7 @@
 #include "login_manager.h"
 #include "main_window.h"
 #include "statistics_manager.h"
+#include "ticket_manager.h"
 #include "train_manager.h"
 
 int main(int argc, char *argv[])
@@ -29,6 +30,7 @@ int main(int argc, char *argv[])
     LoginManager loginManager(&databaseManager);
 
     TrainManager trainManager(&databaseManager);
+    TicketManager ticketManager(databaseManager);
     StatisticsManager statisticsManager(databaseManager);
 
     // 每次循环先显示登录窗口，再显示对应身份的主窗口。
@@ -43,6 +45,7 @@ int main(int argc, char *argv[])
         MainWindow window(loginDialog.loginResult(),
                           loginManager,
                           &trainManager,
+                          &ticketManager,
                           &statisticsManager);
         window.show();
 
