@@ -221,6 +221,13 @@ void TrainManagementDialog::loadStations()
         m_stationCombo->addItem(name, id);
         m_stationNameMap[id] = name;
     }
+    int count = 0;
+    while (query.next()) {
+        // ...
+        count++;
+    }
+     qDebug() << "加载了" << count << "个站点";
+
 }
 
 

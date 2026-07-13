@@ -29,6 +29,8 @@ set(SOURCES
     src/ui/account_management_dialog.cpp
     src/ui/main_window.cpp
     src/database/database_manager_ticket.cpp
+    src/ui/train_management_dialog.cpp
+    src/ui/station_management_dialog.cpp
 )
 
 set(HEADERS
@@ -41,6 +43,7 @@ set(HEADERS
     include/database_manager.h
     include/main_window.h
     include/train_management_dialog.h
+    include/station_management_dialog.h
 )
 
 # ── Resources ────────────────────────────────────────────────────────────────
@@ -53,7 +56,6 @@ add_executable(${PROJECT_NAME}
     ${SOURCES}
     ${HEADERS}
     ${RESOURCES}
-    src/ui/train_management_dialog.cpp
 
 )
 
