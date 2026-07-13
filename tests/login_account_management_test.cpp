@@ -65,8 +65,10 @@ int main(int argc, char *argv[])
                      "Normal user should register.") && ok;
     const LoginResult userLogin =
         loginManager.authenticate(userUsername, QStringLiteral("user_old"));
-    ok = checkResult(userLogin.success && userLogin.role == UserRole::User,
-                     "Registered normal user should login as user.") && ok;
+    ok = checkResult(userLogin.success
+                         && userLogin.role == UserRole::User
+                         && userLogin.userId > 0,
+                     "Registered normal user should login with user ID.") && ok;
 
     const AccountResult duplicateRegister =
         loginManager.registerUser(userUsername, QStringLiteral("user_other"));
@@ -85,16 +87,27 @@ int main(int argc, char *argv[])
     ok = checkResult(newSellerLogin.success && newSellerLogin.role == UserRole::Seller,
                      "Created seller should login as seller.") && ok;
 
-    const QList<SellerAccountInfo> sellerAccounts =
+    const SellerAccountListResult sellerList =
         loginManager.sellerAccounts(UserRole::Admin);
     bool foundCreatedSeller = false;
-    for (const SellerAccountInfo &seller : sellerAccounts) {
+    for (const SellerAccountInfo &seller : sellerList.accounts) {
         if (seller.username == newSellerUsername && seller.enabled) {
             foundCreatedSeller = true;
         }
     }
-    ok = checkResult(foundCreatedSeller,
+    ok = checkResult(sellerList.success && foundCreatedSeller,
                      "Admin should see created seller account.") && ok;
+
+    const SellerAccountListResult sellerView =
+        loginManager.sellerAccounts(UserRole::Seller);
+    ok = checkResult(!sellerView.success,
+                     "Seller should not read seller account list.") && ok;
+
+    LoginManager unavailableLoginManager;
+    const SellerAccountListResult unavailableList =
+        unavailableLoginManager.sellerAccounts(UserRole::Admin);
+    ok = checkResult(!unavailableList.success,
+                     "Unavailable database should return list failure.") && ok;
 
     const AccountResult duplicateCreate =
         loginManager.createSellerAccount(UserRole::Admin,

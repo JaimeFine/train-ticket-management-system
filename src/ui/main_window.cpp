@@ -343,8 +343,8 @@ MainWindow::MainWindow(const LoginResult &loginResult,
         ++cardCount;
     };
 
-    // 每种身份只创建自己该看到的卡片。游客和普通用户共用一套布局，
-    // 但游客的历史记录和票务管理按钮会被禁用。
+    // 这里的角色判断只决定显示哪套工作台。真正接入业务窗口时，
+    // 还要在对应 Manager 里检查权限，不能只靠隐藏按钮。
     if (m_loginResult.role == UserRole::Admin) {
         addModuleCard(QStringLiteral("票务数据统计"),
                       QStringLiteral("查看售票、退款、客流和热门线路统计。"),

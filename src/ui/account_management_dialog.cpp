@@ -347,8 +347,11 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
     rootLayout->addStretch();
 
     auto *bottomLayout = new QHBoxLayout;
-    if (m_accountOnly && m_loginResult.role != UserRole::Guest) {
-        auto *logoutButton = new QPushButton(QStringLiteral("退出登录"), this);
+    if (m_accountOnly) {
+        const QString buttonText = m_loginResult.role == UserRole::Guest
+                                       ? QStringLiteral("返回登录")
+                                       : QStringLiteral("退出登录");
+        auto *logoutButton = new QPushButton(buttonText, this);
         logoutButton->setObjectName(QStringLiteral("logoutButton"));
         connect(logoutButton, &QPushButton::clicked, this, [this]() {
             handleLogout();
@@ -506,8 +509,22 @@ void AccountManagementDialog::refreshSellerTable()
 
     // 列表数据每次都重新向 LoginManager 获取，这样创建、启用或禁用账号后，
     // 页面显示的就是数据库里的最新状态。界面只负责把结果逐行放进表格。
-    const QList<SellerAccountInfo> sellers =
+    const SellerAccountListResult result =
         m_loginManager.sellerAccounts(m_loginResult.role);
+
+    m_sellerTable->setRowCount(0);
+
+    if (!result.success) {
+        showPlainMessage(false, result.message);
+        return;
+    }
+
+    const QList<SellerAccountInfo> &sellers = result.accounts;
+
+    if (sellers.isEmpty()) {
+        showPlainMessage(true, result.message);
+        return;
+    }
 
     m_sellerTable->setRowCount(sellers.size());
 

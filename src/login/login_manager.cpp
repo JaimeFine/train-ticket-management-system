@@ -47,16 +47,17 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
     const QString trimmedUsername = username.trimmed();
 
     if (trimmedUsername.isEmpty()) {
-        return {false, UserRole::Guest, QString(), QStringLiteral("请输入用户名。")};
+        return {false, UserRole::Guest, 0, QString(), QStringLiteral("请输入用户名。")};
     }
 
     if (password.isEmpty()) {
-        return {false, UserRole::Guest, trimmedUsername, QStringLiteral("请输入密码。")};
+        return {false, UserRole::Guest, 0, trimmedUsername, QStringLiteral("请输入密码。")};
     }
 
     if (m_databaseManager == nullptr) {
         return {false,
                 UserRole::Guest,
+                0,
                 trimmedUsername,
                 QStringLiteral("登录服务尚未连接。")};
     }
@@ -64,6 +65,7 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
     if (!m_databaseManager->isOpen()) {
         return {false,
                 UserRole::Guest,
+                0,
                 trimmedUsername,
                 QStringLiteral("登录服务不可用，请检查数据库。")};
     }
@@ -74,6 +76,7 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
     if (!userAccount.has_value() || userAccount->password != password) {
         return {false,
                 UserRole::Guest,
+                0,
                 trimmedUsername,
                 QStringLiteral("用户名或密码无效。")};
     }
@@ -83,6 +86,7 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
     if (!role.has_value()) {
         return {false,
                 UserRole::Guest,
+                0,
                 userAccount->username,
                 QStringLiteral("账号角色无效。")};
     }
@@ -90,12 +94,14 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
     if (!userAccount->enabled) {
         return {false,
                 *role,
+                0,
                 userAccount->username,
                 QStringLiteral("账号已被禁用。")};
     }
 
     return {true,
             *role,
+            userAccount->userId,
             userAccount->username,
             QStringLiteral("登录成功。")};
 }
@@ -104,6 +110,7 @@ LoginResult LoginManager::loginAsGuest() const
 {
     return {true,
             UserRole::Guest,
+            0,
             QStringLiteral("游客"),
             QStringLiteral("游客访问已开启。")};
 }
@@ -334,12 +341,14 @@ AccountResult LoginManager::changeOwnPassword(const QString &username,
     return {true, QStringLiteral("密码修改成功。")};
 }
 
-QList<SellerAccountInfo> LoginManager::sellerAccounts(UserRole currentRole) const
+SellerAccountListResult LoginManager::sellerAccounts(UserRole currentRole) const
 {
-    QList<SellerAccountInfo> sellers;
+    if (!databaseReady(m_databaseManager)) {
+        return {false, {}, QStringLiteral("账号列表服务不可用。")};
+    }
 
-    if (!databaseReady(m_databaseManager) || currentRole != UserRole::Admin) {
-        return sellers;
+    if (currentRole != UserRole::Admin) {
+        return {false, {}, QStringLiteral("只有管理员可以查看售票员账号。")};
     }
 
     // DatabaseManager 返回完整的 UserRecord，但列表页面只需要用户名和启用状态。
@@ -347,14 +356,25 @@ QList<SellerAccountInfo> LoginManager::sellerAccounts(UserRole currentRole) cons
     const QList<UserRecord> users =
         m_databaseManager->findUsersByRole(static_cast<int>(UserRole::Seller));
 
+    if (!m_databaseManager->lastError().isEmpty()) {
+        return {false, {}, QStringLiteral("读取售票员账号失败。")};
+    }
+
+    SellerAccountListResult result;
+    result.success = true;
+
     for (const UserRecord &user : users) {
         SellerAccountInfo info;
         info.username = user.username;
         info.enabled = user.enabled;
-        sellers.append(info);
+        result.accounts.append(info);
     }
 
-    return sellers;
+    if (result.accounts.isEmpty()) {
+        result.message = QStringLiteral("暂无售票员账号。");
+    }
+
+    return result;
 }
 
 bool LoginManager::canAccessGuestFunctions(UserRole role)

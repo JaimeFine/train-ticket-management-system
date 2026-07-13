@@ -19,6 +19,7 @@ struct LoginResult
 {
     bool success = false;
     UserRole role = UserRole::Guest;
+    int userId = 0;    // 游客和登录失败时没有数据库用户 ID。
     QString username;
     QString message;
 };
@@ -33,6 +34,14 @@ struct SellerAccountInfo
 {
     QString username;
     bool enabled = true;
+};
+
+struct SellerAccountListResult
+{
+    // 列表为空不一定是报错，所以把状态和数据一起返回。
+    bool success = false;
+    QList<SellerAccountInfo> accounts;
+    QString message;
 };
 
 class LoginManager
@@ -60,9 +69,9 @@ public:
                                     UserRole currentRole,
                                     const QString &oldPassword,
                                     const QString &newPassword) const;
-    QList<SellerAccountInfo> sellerAccounts(UserRole currentRole) const;
+    SellerAccountListResult sellerAccounts(UserRole currentRole) const;
 
-    // 其他模块接入主窗口后，可以先用这三个函数判断当前身份能不能进入。
+    // 这三个函数判断业务权限，主窗口里的角色分支只负责显示哪套工作台。
     static bool canAccessGuestFunctions(UserRole role);
     static bool canAccessSellerFunctions(UserRole role);
     static bool canAccessAdminFunctions(UserRole role);
