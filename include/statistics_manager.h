@@ -14,7 +14,6 @@ public:
     int totalChanged() const;
     QVector<QVariantMap> popularRoutes(int limit=10) const;
     QVector<QVariantMap> monthlyPassengerFlow() const;
-    QString lastError() const;
 private:
-    DatabaseManager &m_db; QString m_lastError;
+    DatabaseManager &m_db;
 };

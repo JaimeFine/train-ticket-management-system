@@ -36,5 +36,3 @@ QVector<QVariantMap> StatisticsManager::monthlyPassengerFlow() const
     }
     return result;
 }
-
-QString StatisticsManager::lastError() const { return m_lastError; }
