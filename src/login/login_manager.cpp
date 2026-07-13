@@ -158,7 +158,7 @@ AccountResult LoginManager::registerUser(const QString &username,
     return {true, QStringLiteral("用户注册成功，请使用新账号登录。")};
 }
 
-AccountResult LoginManager::createSellerAccount(UserRole currentRole,
+AccountResult LoginManager::createSellerAccount(int operatorUserId,
                                                 const QString &username,
                                                 const QString &password) const
 {
@@ -168,7 +168,7 @@ AccountResult LoginManager::createSellerAccount(UserRole currentRole,
         return {false, QStringLiteral("账号管理服务不可用。")};
     }
 
-    if (currentRole != UserRole::Admin) {
+    if (!isActiveAdmin(operatorUserId)) {
         return {false, QStringLiteral("只有管理员可以创建售票员账号。")};
     }
 
@@ -186,7 +186,6 @@ AccountResult LoginManager::createSellerAccount(UserRole currentRole,
         return {false, QStringLiteral("用户名已存在。")};
     }
 
-    // 管理员新增售票员走这里。
     UserRecord user;
     user.username = trimmedUsername;
     user.password = password;
@@ -200,7 +199,7 @@ AccountResult LoginManager::createSellerAccount(UserRole currentRole,
     return {true, QStringLiteral("售票员账号创建成功。")};
 }
 
-AccountResult LoginManager::resetSellerPassword(UserRole currentRole,
+AccountResult LoginManager::resetSellerPassword(int operatorUserId,
                                                 const QString &username,
                                                 const QString &newPassword) const
 {
@@ -210,7 +209,7 @@ AccountResult LoginManager::resetSellerPassword(UserRole currentRole,
         return {false, QStringLiteral("账号管理服务不可用。")};
     }
 
-    if (currentRole != UserRole::Admin) {
+    if (!isActiveAdmin(operatorUserId)) {
         return {false, QStringLiteral("只有管理员可以重置售票员密码。")};
     }
 
@@ -244,13 +243,13 @@ AccountResult LoginManager::resetSellerPassword(UserRole currentRole,
     return {true, QStringLiteral("售票员密码已重置。")};
 }
 
-AccountResult LoginManager::resetSellerPasswordToDefault(UserRole currentRole,
+AccountResult LoginManager::resetSellerPasswordToDefault(int operatorUserId,
                                                          const QString &username) const
 {
     // 默认密码重置仍然调用普通重置函数，这样管理员权限、账号存在和角色检查
     // 只维护一套，不会因为以后修改其中一条规则而漏掉这个入口。
     const AccountResult result =
-        resetSellerPassword(currentRole, username, defaultSellerPassword());
+        resetSellerPassword(operatorUserId, username, defaultSellerPassword());
 
     if (!result.success) {
         return result;
@@ -260,7 +259,7 @@ AccountResult LoginManager::resetSellerPasswordToDefault(UserRole currentRole,
             QStringLiteral("已重置为默认密码：%1").arg(defaultSellerPassword())};
 }
 
-AccountResult LoginManager::setSellerEnabled(UserRole currentRole,
+AccountResult LoginManager::setSellerEnabled(int operatorUserId,
                                              const QString &username,
                                              bool enabled) const
 {
@@ -270,7 +269,7 @@ AccountResult LoginManager::setSellerEnabled(UserRole currentRole,
         return {false, QStringLiteral("账号管理服务不可用。")};
     }
 
-    if (currentRole != UserRole::Admin) {
+    if (!isActiveAdmin(operatorUserId)) {
         return {false, QStringLiteral("只有管理员可以启用或禁用售票员账号。")};
     }
 
@@ -360,7 +359,7 @@ AccountResult LoginManager::changeOwnPassword(const QString &username,
     return {true, QStringLiteral("密码修改成功。")};
 }
 
-SellerAccountListResult LoginManager::sellerAccounts(UserRole currentRole) const
+SellerAccountListResult LoginManager::sellerAccounts(int operatorUserId) const
 {
     // 员工权限管理页面用这个函数读取全部售票员账号。
     // 返回值只保留用户名和启用状态，不把密码交给 UI。
@@ -368,12 +367,10 @@ SellerAccountListResult LoginManager::sellerAccounts(UserRole currentRole) const
         return {false, {}, QStringLiteral("账号列表服务不可用。")};
     }
 
-    if (currentRole != UserRole::Admin) {
+    if (!isActiveAdmin(operatorUserId)) {
         return {false, {}, QStringLiteral("只有管理员可以查看售票员账号。")};
     }
 
-    // DatabaseManager 返回完整的 UserRecord，但列表页面只需要用户名和启用状态。
-    // 这里换成较小的 SellerAccountInfo，密码不会被带到界面层。
     const QList<UserRecord> users =
         m_databaseManager->findUsersByRole(static_cast<int>(UserRole::Seller));
 
@@ -398,6 +395,20 @@ SellerAccountListResult LoginManager::sellerAccounts(UserRole currentRole) const
     }
 
     return result;
+}
+
+bool LoginManager::isActiveAdmin(int userId) const
+{
+    if (!databaseReady(m_databaseManager) || userId <= 0) {
+        return false;
+    }
+
+    // 不能只相信界面传来的角色。每次管理员操作前都按登录用户 ID 重查数据库，
+    // 账号仍然存在、没有被禁用并且 role=2 时，才允许继续执行。
+    const auto user = m_databaseManager->findUserById(userId);
+    return user.has_value()
+           && user->enabled
+           && user->role == static_cast<int>(UserRole::Admin);
 }
 
 bool LoginManager::canAccessGuestFunctions(UserRole role)

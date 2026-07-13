@@ -412,7 +412,7 @@ void AccountManagementDialog::handleCreateSeller()
     }
 
     const AccountResult result =
-        m_loginManager.createSellerAccount(m_loginResult.role,
+        m_loginManager.createSellerAccount(m_loginResult.userId,
                                            m_createUsernameEdit->text(),
                                            m_createPasswordEdit->text());
     showMessage(result);
@@ -444,7 +444,7 @@ void AccountManagementDialog::handleResetSelectedSellerPassword()
     }
 
     const AccountResult result =
-        m_loginManager.resetSellerPasswordToDefault(m_loginResult.role, username);
+        m_loginManager.resetSellerPasswordToDefault(m_loginResult.userId, username);
     showMessage(result);
 }
 
@@ -470,7 +470,7 @@ void AccountManagementDialog::handleSetSelectedSellerEnabled(bool enabled)
     }
 
     const AccountResult result =
-        m_loginManager.setSellerEnabled(m_loginResult.role,
+        m_loginManager.setSellerEnabled(m_loginResult.userId,
                                         username,
                                         enabled);
     showMessage(result);
@@ -505,6 +505,21 @@ void AccountManagementDialog::handleChangeOwnPassword()
 
 void AccountManagementDialog::handleLogout()
 {
+    const bool guestMode = m_loginResult.role == UserRole::Guest;
+    const QString title = guestMode
+                              ? QStringLiteral("确认返回登录")
+                              : QStringLiteral("确认退出登录");
+    const QString message = guestMode
+                                ? QStringLiteral("确定返回登录界面吗？当前注册信息不会自动保存。")
+                                : QStringLiteral("确定退出当前账号并返回登录界面吗？");
+    const QString confirmText = guestMode
+                                    ? QStringLiteral("返回登录")
+                                    : QStringLiteral("退出登录");
+
+    if (!confirmAction(this, title, message, confirmText)) {
+        return;
+    }
+
     // 对话框只记录退出请求并关闭自己。MainWindow 读到这个标志后再关闭工作台，
     // main.cpp 中的登录循环随后会重新显示登录窗口。
     m_logoutRequested = true;
@@ -525,7 +540,7 @@ void AccountManagementDialog::refreshSellerTable()
     // 列表数据每次都重新向 LoginManager 获取，这样创建、启用或禁用账号后，
     // 页面显示的就是数据库里的最新状态。界面只负责把结果逐行放进表格。
     const SellerAccountListResult result =
-        m_loginManager.sellerAccounts(m_loginResult.role);
+        m_loginManager.sellerAccounts(m_loginResult.userId);
 
     m_sellerTable->setRowCount(0);
 

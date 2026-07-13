@@ -58,16 +58,16 @@ public:
     AccountResult registerUser(const QString &username,
                                const QString &password) const;
 
-    // 以下接口供管理员创建和维护售票员账号。
-    AccountResult createSellerAccount(UserRole currentRole,
+    // 以下接口会用当前登录用户 ID 重新核对管理员身份，再维护售票员账号。
+    AccountResult createSellerAccount(int operatorUserId,
                                       const QString &username,
                                       const QString &password) const;
-    AccountResult resetSellerPassword(UserRole currentRole,
+    AccountResult resetSellerPassword(int operatorUserId,
                                       const QString &username,
                                       const QString &newPassword) const;
-    AccountResult resetSellerPasswordToDefault(UserRole currentRole,
+    AccountResult resetSellerPasswordToDefault(int operatorUserId,
                                                const QString &username) const;
-    AccountResult setSellerEnabled(UserRole currentRole,
+    AccountResult setSellerEnabled(int operatorUserId,
                                    const QString &username,
                                    bool enabled) const;
 
@@ -78,7 +78,7 @@ public:
                                     const QString &newPassword) const;
 
     // 管理员读取现有售票员账号和启用状态。
-    SellerAccountListResult sellerAccounts(UserRole currentRole) const;
+    SellerAccountListResult sellerAccounts(int operatorUserId) const;
 
     // 基础查询允许四种身份访问；售票员功能允许售票员和管理员访问；
     // 管理员功能只允许管理员访问。
@@ -87,5 +87,7 @@ public:
     static bool canAccessAdminFunctions(UserRole role);
 
 private:
+    bool isActiveAdmin(int userId) const;
+
     DatabaseManager *m_databaseManager = nullptr;
 };
