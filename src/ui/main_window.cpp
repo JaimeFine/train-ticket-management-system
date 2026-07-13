@@ -244,6 +244,8 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     headerLayout->addLayout(titleBlock, 1);
     headerLayout->addLayout(accountBlock);
 
+    // 下面这些提示函数是其他模块尚未接入时的临时入口。
+    // 合作者接入真实窗口时，只替换对应回调，不需要改角色分支和卡片布局。
     auto showQueryMessage = [this]() {
         QMessageBox::information(this,
                                  QStringLiteral("车票查询"),
@@ -343,8 +345,9 @@ MainWindow::MainWindow(const LoginResult &loginResult,
         ++cardCount;
     };
 
-    // 这里的角色判断只决定显示哪套工作台。真正接入业务窗口时，
-    // 还要在对应 Manager 里检查权限，不能只靠隐藏按钮。
+    // 这里按四种身份显示不同工作台：管理员负责管理，售票员负责票务办理，
+    // 普通用户可以查询和办理自己的车票，游客只能使用开放的查询入口。
+    // 真正接入业务窗口时还要在对应 Manager 里检查权限，不能只靠隐藏按钮。
     if (m_loginResult.role == UserRole::Admin) {
         addModuleCard(QStringLiteral("票务数据统计"),
                       QStringLiteral("查看售票、退款、客流和热门线路统计。"),

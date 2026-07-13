@@ -5,7 +5,7 @@
 
 class DatabaseManager;
 
-// 这里的数字和 User.role 一一对应，不能自己改顺序。
+// 与开发规范中的 User.role 保持一致：0=游客，1=售票员，2=管理员，3=普通用户。
 enum class UserRole
 {
     Guest = 0,
@@ -30,6 +30,7 @@ struct AccountResult
     QString message;
 };
 
+// 售票员列表只需要显示用户名和账号状态，不向界面提供密码。
 struct SellerAccountInfo
 {
     QString username;
@@ -49,11 +50,15 @@ class LoginManager
 public:
     explicit LoginManager(DatabaseManager *databaseManager = nullptr);
 
+    // 验证数据库账号；游客访问不需要数据库账号。
     LoginResult authenticate(const QString &username, const QString &password) const;
     LoginResult loginAsGuest() const;
 
+    // 注册普通用户。
     AccountResult registerUser(const QString &username,
                                const QString &password) const;
+
+    // 以下接口供管理员创建和维护售票员账号。
     AccountResult createSellerAccount(UserRole currentRole,
                                       const QString &username,
                                       const QString &password) const;
@@ -65,13 +70,18 @@ public:
     AccountResult setSellerEnabled(UserRole currentRole,
                                    const QString &username,
                                    bool enabled) const;
+
+    // 已登录的管理员、售票员和普通用户可以修改自己的密码。
     AccountResult changeOwnPassword(const QString &username,
                                     UserRole currentRole,
                                     const QString &oldPassword,
                                     const QString &newPassword) const;
+
+    // 管理员读取现有售票员账号和启用状态。
     SellerAccountListResult sellerAccounts(UserRole currentRole) const;
 
-    // 这三个函数判断业务权限，主窗口里的角色分支只负责显示哪套工作台。
+    // 基础查询允许四种身份访问；售票员功能允许售票员和管理员访问；
+    // 管理员功能只允许管理员访问。
     static bool canAccessGuestFunctions(UserRole role);
     static bool canAccessSellerFunctions(UserRole role);
     static bool canAccessAdminFunctions(UserRole role);

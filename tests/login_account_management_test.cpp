@@ -59,6 +59,7 @@ int main(int argc, char *argv[])
     ok = checkResult(addLoginUser(manager, sellerUsername, QStringLiteral("seller_old"), 1),
                      "Seller user should be created.") && ok;
 
+    // 第一组：验证普通用户可以公开注册、取得数据库用户 ID，重复用户名会被拒绝。
     const AccountResult registerResult =
         loginManager.registerUser(userUsername, QStringLiteral("user_old"));
     ok = checkResult(registerResult.success,
@@ -75,6 +76,8 @@ int main(int argc, char *argv[])
     ok = checkResult(!duplicateRegister.success,
                      "Duplicate normal username should be rejected.") && ok;
 
+    // 第二组：验证只有管理员能创建售票员，并能在售票员列表里看到新账号。
+    // 列表接口还要区分“没有数据”和“读取失败”，所以同时测试权限和数据库不可用情况。
     const AccountResult createResult =
         loginManager.createSellerAccount(UserRole::Admin,
                                          newSellerUsername,
@@ -123,6 +126,8 @@ int main(int argc, char *argv[])
     ok = checkResult(!sellerCreate.success,
                      "Seller should not create seller account.") && ok;
 
+    // 第三组：重置密码后旧密码必须立即失效，新密码才能登录。
+    // 默认密码入口复用同一套重置规则，同时检查售票员不能越权操作其他账号。
     const AccountResult resetResult =
         loginManager.resetSellerPassword(UserRole::Admin,
                                          newSellerUsername,
@@ -151,6 +156,7 @@ int main(int argc, char *argv[])
     ok = checkResult(!sellerReset.success,
                      "Seller should not reset seller password.") && ok;
 
+    // 第四组：禁用账号后即使密码正确也不能登录，重新启用后才能恢复。
     const AccountResult disableResult =
         loginManager.setSellerEnabled(UserRole::Admin, newSellerUsername, false);
     ok = checkResult(disableResult.success,
@@ -167,6 +173,8 @@ int main(int argc, char *argv[])
                                                QStringLiteral("123456")).success,
                      "Enabled seller should login again.") && ok;
 
+    // 第五组：修改自己的密码必须提供正确原密码，且新旧密码不能相同。
+    // 售票员、普通用户和管理员都使用同一个接口，游客因为没有账号必须失败。
     const AccountResult wrongOldPassword =
         loginManager.changeOwnPassword(sellerUsername,
                                        UserRole::Seller,
