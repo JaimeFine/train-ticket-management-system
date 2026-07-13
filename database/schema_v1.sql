@@ -40,3 +40,11 @@ CREATE TABLE IF NOT EXISTS "Order" (
     FOREIGN KEY (userId) REFERENCES User(userId),
     FOREIGN KEY (trainId) REFERENCES Train(trainId)
 );
+
+CREATE TABLE IF NOT EXISTS OperationLog (
+    logId INTEGER PRIMARY KEY AUTOINCREMENT,
+    operatorUsername TEXT NOT NULL,
+    action TEXT NOT NULL,
+    detail TEXT NOT NULL,
+    createdAt TEXT NOT NULL
+);

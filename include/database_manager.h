@@ -79,6 +79,8 @@ public:
     // >>> Jaime added for CharlesSmartWang, issue 7 & 8:
     QList<TrainRecord> getAllTrains(bool onlyEnabled = true) const;
     bool deleteTrain(int trainId);
+    bool setTrainEnabled(int trainId, bool enabled);
+    bool deleteTrainPermanently(int trainId);
     QList<TrainRecord> searchTrains(const QString &keyword) const;
     QList<TrainRecord> searchByStation(int stationId, bool isDeparture = true) const;
 
@@ -96,6 +98,18 @@ public:
     struct MonthlyStat { QString month; int total=0,booked=0,refunded=0; };
     QList<MonthlyStat> monthlyPassengerFlow() const;
 
+    struct OperationLogRecord {
+        int logId = 0;
+        QString operatorUsername;
+        QString action;
+        QString detail;
+        QString createdAt;
+    };
+    bool addOperationLog(const QString &operatorUsername,
+                         const QString &action,
+                         const QString &detail);
+    QList<OperationLogRecord> findAllOperationLogs() const;
+
 private:
     // * This block connect helpers
     // openDatabase() only worries about creating & opening the SQLite file.
@@ -104,6 +118,7 @@ private:
     bool openDatabase();
     void closeDatabase();
     bool createTables();
+    bool seedDemoData();
     bool executeStatement(const QString &sql);
     QString resolveDatabasePath() const;
 

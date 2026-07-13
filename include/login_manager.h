@@ -5,7 +5,7 @@
 
 class DatabaseManager;
 
-// 这里的数字和 User.role 一一对应，不能自己改顺序。
+// 与开发规范中的 User.role 保持一致：0=游客，1=售票员，2=管理员，3=普通用户。
 enum class UserRole
 {
     Guest = 0,
@@ -19,6 +19,7 @@ struct LoginResult
 {
     bool success = false;
     UserRole role = UserRole::Guest;
+    int userId = 0;    // 游客和登录失败时没有数据库用户 ID。
     QString username;
     QString message;
 };
@@ -29,44 +30,65 @@ struct AccountResult
     QString message;
 };
 
+// 售票员列表只需要显示用户名和账号状态，不向界面提供密码。
 struct SellerAccountInfo
 {
     QString username;
     bool enabled = true;
 };
 
+struct SellerAccountListResult
+{
+    // 列表为空不一定是报错，所以把状态和数据一起返回。
+    bool success = false;
+    QList<SellerAccountInfo> accounts;
+    QString message;
+};
+
 class LoginManager
 {
 public:
     explicit LoginManager(DatabaseManager *databaseManager = nullptr);
+    const DatabaseManager *databaseManager() const;
 
+    // 验证数据库账号；游客访问不需要数据库账号。
     LoginResult authenticate(const QString &username, const QString &password) const;
     LoginResult loginAsGuest() const;
 
+    // 注册普通用户。
     AccountResult registerUser(const QString &username,
                                const QString &password) const;
-    AccountResult createSellerAccount(UserRole currentRole,
+
+    // 以下接口会用当前登录用户 ID 重新核对管理员身份，再维护售票员账号。
+    AccountResult createSellerAccount(int operatorUserId,
                                       const QString &username,
                                       const QString &password) const;
-    AccountResult resetSellerPassword(UserRole currentRole,
+    AccountResult resetSellerPassword(int operatorUserId,
                                       const QString &username,
                                       const QString &newPassword) const;
-    AccountResult resetSellerPasswordToDefault(UserRole currentRole,
+    AccountResult resetSellerPasswordToDefault(int operatorUserId,
                                                const QString &username) const;
-    AccountResult setSellerEnabled(UserRole currentRole,
+    AccountResult setSellerEnabled(int operatorUserId,
                                    const QString &username,
                                    bool enabled) const;
+
+    // 已登录的管理员、售票员和普通用户可以修改自己的密码。
     AccountResult changeOwnPassword(const QString &username,
                                     UserRole currentRole,
                                     const QString &oldPassword,
                                     const QString &newPassword) const;
-    QList<SellerAccountInfo> sellerAccounts(UserRole currentRole) const;
 
-    // 其他模块接入主窗口后，可以先用这三个函数判断当前身份能不能进入。
+    // 管理员读取现有售票员账号和启用状态。
+    SellerAccountListResult sellerAccounts(int operatorUserId) const;
+
+    // 基础查询允许四种身份访问；售票员功能允许售票员和管理员访问；
+    // 管理员功能只允许管理员访问。
     static bool canAccessGuestFunctions(UserRole role);
     static bool canAccessSellerFunctions(UserRole role);
     static bool canAccessAdminFunctions(UserRole role);
 
 private:
+    bool isActiveAdmin(int userId) const;
+
     DatabaseManager *m_databaseManager = nullptr;
 };

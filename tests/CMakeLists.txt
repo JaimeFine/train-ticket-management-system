@@ -76,6 +76,7 @@ add_executable(login_role_permission_test
     ../src/login/login_manager.cpp
     ../src/database/database_manager.cpp
     ../src/database/database_manager_user.cpp
+    ../src/database/database_manager_operation_log.cpp
 )
 
 target_include_directories(login_role_permission_test PRIVATE
@@ -102,6 +103,7 @@ add_executable(login_account_management_test
     ../src/login/login_manager.cpp
     ../src/database/database_manager.cpp
     ../src/database/database_manager_user.cpp
+    ../src/database/database_manager_operation_log.cpp
 )
 
 target_include_directories(login_account_management_test PRIVATE

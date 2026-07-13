@@ -1,9 +1,5 @@
+/*
 #include "account_management_dialog.h"
-#include "operation_log_dialog.h"
-#include "order_history_dialog.h"
-#include "statistics_dialog.h"
-#include "ticket_manager.h"
-#include "ticket_service_dialog.h"
 #include "train_management_dialog.h"
 #include "main_window.h"
 
@@ -12,7 +8,6 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMessageBox>
-#include <QPixmap>
 #include <QPushButton>
 #include <QStatusBar>
 #include <QVBoxLayout>
@@ -72,15 +67,11 @@ QString workspaceTitle(UserRole role)
 MainWindow::MainWindow(const LoginResult &loginResult,
                        const LoginManager &loginManager,
                        TrainManager* trainManager,
-                       TicketManager *ticketManager,
-                       StatisticsManager *statisticsManager,
                        QWidget *parent)
     : QMainWindow(parent)
     , m_loginResult(loginResult)
     , m_loginManager(&loginManager)
     , m_trainManager(trainManager)
-    , m_ticketManager(ticketManager)
-    , m_statisticsManager(statisticsManager)
 {
     setWindowTitle(QStringLiteral("火车票务管理系统"));
     resize(980, 640);
@@ -111,7 +102,7 @@ MainWindow::MainWindow(const LoginResult &loginResult,
             font-weight: 700;
         }
         QLabel#mainSubtitle {
-            color: #e6f4ee;
+            color: #d5e7df;
             font-size: 13px;
         }
         QLabel#roleBadge {
@@ -132,17 +123,6 @@ MainWindow::MainWindow(const LoginResult &loginResult,
         QPushButton#accountButton:hover {
             background: #d9f99d;
         }
-        QPushButton#logoutButton {
-            color: #ffffff;
-            background: #176b5b;
-            border: none;
-            border-radius: 10px;
-            padding: 6px 12px;
-            font-weight: 700;
-        }
-        QPushButton#logoutButton:hover {
-            background: #0f5749;
-        }
         QFrame#moduleCard {
             background: #fbfcfb;
             border: 1px solid #d8e0dc;
@@ -154,7 +134,7 @@ MainWindow::MainWindow(const LoginResult &loginResult,
             font-weight: 700;
         }
         QLabel#cardDescription {
-            color: #42514b;
+            color: #65716c;
             font-size: 13px;
         }
         QLabel#openTag {
@@ -231,17 +211,6 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     auto *titleBlock = new QVBoxLayout;
     titleBlock->setSpacing(6);
 
-    auto *logoLabel = new QLabel(headerPanel);
-    logoLabel->setFixedSize(96, 96);
-    logoLabel->setAlignment(Qt::AlignCenter);
-    const QPixmap logoPixmap(QStringLiteral(":/train.jpg"));
-    if (!logoPixmap.isNull()) {
-        logoLabel->setPixmap(logoPixmap.scaled(96,
-                                               96,
-                                               Qt::KeepAspectRatio,
-                                               Qt::SmoothTransformation));
-    }
-
     auto *eyebrow = new QLabel(QStringLiteral("火车票务管理系统"), headerPanel);
     eyebrow->setObjectName(QStringLiteral("eyebrow"));
 
@@ -272,19 +241,47 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     accountBlock->setSpacing(8);
     accountBlock->addWidget(roleBadge);
     accountBlock->addWidget(accountButton);
-    if (m_loginResult.role != UserRole::Guest) {
-        auto *logoutButton = new QPushButton(QStringLiteral("退出登录"), headerPanel);
-        logoutButton->setObjectName(QStringLiteral("logoutButton"));
-        connect(logoutButton, &QPushButton::clicked, this, [this]() {
-            m_logoutRequested = true;
-            close();
-        });
-        accountBlock->addWidget(logoutButton);
-    }
 
-    headerLayout->addWidget(logoLabel);
     headerLayout->addLayout(titleBlock, 1);
     headerLayout->addLayout(accountBlock);
+
+    // 下面这些提示函数是其他模块尚未接入时的临时入口。
+    // 合作者接入真实窗口时，只替换对应回调，不需要改角色分支和卡片布局。
+    auto showQueryMessage = [this]() {
+        QMessageBox::information(this,
+                                 QStringLiteral("车票查询"),
+                                 QStringLiteral("车票查询接口已预留，等待车次查询模块接入。"));
+    };
+
+    auto showHistoryMessage = [this]() {
+        QMessageBox::information(this,
+                                 QStringLiteral("历史记录"),
+                                 QStringLiteral("历史订单查询接口已预留，等待订单模块接入。"));
+    };
+
+    auto showTicketManagementMessage = [this]() {
+        QMessageBox::information(this,
+                                 QStringLiteral("票务办理"),
+                                 QStringLiteral("订票、退票和改签接口已预留，等待票务模块接入。"));
+    };
+
+    auto showSellerQueryMessage = [this]() {
+        QMessageBox::information(this,
+                                 QStringLiteral("票务查询"),
+                                 QStringLiteral("订单号和乘客姓名查询接口已预留，等待票务模块接入。"));
+    };
+
+    auto showTicketLogMessage = [this]() {
+        QMessageBox::information(this,
+                                 QStringLiteral("票务操作日志"),
+                                 QStringLiteral("票务操作日志接口已预留，等待日志模块接入。"));
+    };
+
+    auto showStatisticsMessage = [this]() {
+        QMessageBox::information(this,
+                                 QStringLiteral("票务数据统计"),
+                                 QStringLiteral("销售统计、热门线路和客流统计接口已预留。"));
+    };
 
     auto showTrainStationMessage = [this]() {
         qDebug() << "=== showTrainStationMessage called ===";
@@ -300,42 +297,6 @@ MainWindow::MainWindow(const LoginResult &loginResult,
         qDebug() << "Executing TrainManagementDialog...";
         dialog.exec();
         qDebug() << "TrainManagementDialog closed.";
-    };
-
-    auto showStatisticsDialog = [this]() {
-        if (m_statisticsManager == nullptr) {
-            QMessageBox::warning(this,
-                                 QStringLiteral("票务数据统计"),
-                                 QStringLiteral("统计服务尚未初始化。"));
-            return;
-        }
-
-        StatisticsDialog dialog(*m_statisticsManager, this);
-        dialog.exec();
-    };
-
-    auto showOperationLogDialog = [this]() {
-        if (m_loginManager == nullptr || m_loginManager->databaseManager() == nullptr) {
-            QMessageBox::warning(this,
-                                 QStringLiteral("系统操作日志"),
-                                 QStringLiteral("日志服务尚未初始化。"));
-            return;
-        }
-
-        OperationLogDialog dialog(*m_loginManager->databaseManager(), this);
-        dialog.exec();
-    };
-
-    auto openTicketServiceDialog = [this](int initialTabIndex) {
-        if (m_ticketManager == nullptr) {
-            QMessageBox::warning(this,
-                                 QStringLiteral("票务服务中心"),
-                                 QStringLiteral("票务服务尚未初始化。"));
-            return;
-        }
-
-        TicketServiceDialog dialog(*m_ticketManager, m_loginResult, initialTabIndex, this);
-        dialog.exec();
     };
     // 工作台卡片的排版都一样，所以集中在这里创建。点击后的函数由调用处传入，
     // 以后车次、票务模块接入时，只需要把现在的提示函数换成真正的窗口入口，
@@ -389,11 +350,11 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     // 管理员命中后就不会再进入售票员工作台，主窗口只负责生成对应界面。
     if (LoginManager::canAccessAdminFunctions(m_loginResult.role)) {
         addModuleCard(QStringLiteral("票务数据统计"),
-                      QStringLiteral("查看订单总览、热门路线和月度客流。"),
-                      QStringLiteral("统计中心"),
+                      QStringLiteral("查看售票、退款、客流和热门线路统计。"),
+                      QStringLiteral("统计接口"),
                       QStringLiteral("查看统计"),
                       true,
-                      showStatisticsDialog);
+                      showStatisticsMessage);
 
         addModuleCard(QStringLiteral("员工权限管理"),
                       QStringLiteral("创建售票员账号，并管理现有售票员账号。"),
@@ -410,105 +371,63 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       QStringLiteral("进入管理"),
                       true,
                       showTrainStationMessage);
-
-        addModuleCard(QStringLiteral("系统操作日志"),
-                      QStringLiteral("查看登录、账号维护和票务办理的操作记录。"),
-                      QStringLiteral("日志中心"),
-                      QStringLiteral("查看日志"),
-                      true,
-                      showOperationLogDialog);
-    } else if (m_loginResult.role == UserRole::User) {
+    } else if (LoginManager::canAccessSellerFunctions(m_loginResult.role)) {
         addModuleCard(QStringLiteral("车票查询"),
-                      QStringLiteral("查询车次、余票，并可直接预订选中的车次。"),
+                      QStringLiteral("查询车次、站点、日期和余票信息。"),
                       QStringLiteral("查询开放"),
                       QStringLiteral("进入查询"),
                       true,
-                      [openTicketServiceDialog]() {
-                          openTicketServiceDialog(0);
-                      });
+                      showQueryMessage);
 
-        addModuleCard(QStringLiteral("票务管理"),
-                      QStringLiteral("办理退票和改签。"),
-                      QStringLiteral("票务操作"),
-                      QStringLiteral("进入办理"),
-                      true,
-                      [openTicketServiceDialog]() {
-                          openTicketServiceDialog(1);
-                      });
-
-        addModuleCard(QStringLiteral("我的订单"),
-                      QStringLiteral("查看当前账号已经创建的订单记录。"),
-                      QStringLiteral("订单历史"),
-                      QStringLiteral("查看订单"),
-                      true,
-                      [openTicketServiceDialog]() {
-                          openTicketServiceDialog(2);
-                      });
-    } else if (m_loginResult.role == UserRole::Seller) {
-        addModuleCard(QStringLiteral("车票查询"),
-                      QStringLiteral("查询车次、余票，并可协助乘客订票。"),
-                      QStringLiteral("查询开放"),
+        addModuleCard(QStringLiteral("票务查询"),
+                      QStringLiteral("按订单号或乘客姓名查询票务记录。"),
+                      QStringLiteral("业务查询"),
                       QStringLiteral("进入查询"),
                       true,
-                      [openTicketServiceDialog]() {
-                          openTicketServiceDialog(0);
-                      });
+                      showSellerQueryMessage);
 
         addModuleCard(QStringLiteral("票务管理"),
                       QStringLiteral("办理订票、退票和改签。"),
                       QStringLiteral("业务办理"),
                       QStringLiteral("进入办理"),
                       true,
-                      [openTicketServiceDialog]() {
-                          openTicketServiceDialog(1);
-                      });
+                      showTicketManagementMessage);
 
-        addModuleCard(QStringLiteral("票务查询"),
-                      QStringLiteral("按订单号、乘客姓名或全部记录查询票务信息。"),
-                      QStringLiteral("业务查询"),
-                      QStringLiteral("进入查询"),
+        addModuleCard(QStringLiteral("票务操作日志"),
+                      QStringLiteral("查看售票、退票和改签操作记录。"),
+                      QStringLiteral("日志接口"),
+                      QStringLiteral("查看日志"),
                       true,
-                      [openTicketServiceDialog]() {
-                          openTicketServiceDialog(2);
-                      });
+                      showTicketLogMessage);
+    } else if (LoginManager::canAccessGuestFunctions(m_loginResult.role)) {
+        // 进入基础工作台后再区分普通用户和游客：两者都能查询车票，
+        // 只有已经登录的普通用户能查看订单和办理票务。
+        const bool userLoggedIn = m_loginResult.role == UserRole::User;
 
-    } else if (m_loginResult.role == UserRole::Guest) {
         addModuleCard(QStringLiteral("车票查询"),
-                      QStringLiteral("先查询车次和余票，决定是否注册后继续订票。"),
+                      QStringLiteral("查询车次、站点和余票信息。"),
                       QStringLiteral("查询开放"),
                       QStringLiteral("进入查询"),
                       true,
-                      [openTicketServiceDialog]() {
-                          openTicketServiceDialog(0);
-                      });
+                      showQueryMessage);
 
-        addModuleCard(QStringLiteral("注册普通用户账号"),
-                      QStringLiteral("注册后即可使用完整用户功能。"),
-                      QStringLiteral("注册入口"),
-                      QStringLiteral("立即注册"),
-                      true,
-                      [openAccountDialog]() {
-                          openAccountDialog(true);
-                      });
+        addModuleCard(QStringLiteral("历史记录"),
+                      QStringLiteral("查找自己的历史订单。"),
+                      userLoggedIn ? QStringLiteral("订单查询") : QStringLiteral("登录后开放"),
+                      userLoggedIn ? QStringLiteral("查看记录") : QStringLiteral("请先登录"),
+                      userLoggedIn,
+                      showHistoryMessage);
+
+        addModuleCard(QStringLiteral("票务管理"),
+                      QStringLiteral("订票、退票和改签。"),
+                      userLoggedIn ? QStringLiteral("票务操作") : QStringLiteral("登录后开放"),
+                      userLoggedIn ? QStringLiteral("进入办理") : QStringLiteral("请先登录"),
+                      userLoggedIn,
+                      showTicketManagementMessage);
     }
 
     pageLayout->addWidget(headerPanel);
-    if (cardCount > 0) {
-        pageLayout->addLayout(gridLayout);
-    } else {
-        auto *emptyStateLabel = new QLabel(QStringLiteral("当前账号可用的工作台入口将随对应模块完成后接入。"),
-                                           centralWidget);
-        emptyStateLabel->setWordWrap(true);
-        emptyStateLabel->setAlignment(Qt::AlignCenter);
-        emptyStateLabel->setStyleSheet(QStringLiteral(
-            "color: #52615b;"
-            "background: #fbfcfb;"
-            "border: 1px solid #d8e0dc;"
-            "border-radius: 12px;"
-            "padding: 24px;"
-            "font-size: 14px;"));
-        pageLayout->addWidget(emptyStateLabel);
-    }
+    pageLayout->addLayout(gridLayout);
     pageLayout->addStretch();
 
     setCentralWidget(centralWidget);
@@ -519,3 +438,4 @@ bool MainWindow::logoutRequested() const
 {
     return m_logoutRequested;
 }
+*/

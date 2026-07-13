@@ -1,2 +1,5 @@
 <RCC>
+    <qresource prefix="/">
+        <file>train.jpg</file>
+    </qresource>
 </RCC>

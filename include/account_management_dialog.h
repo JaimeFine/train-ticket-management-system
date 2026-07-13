@@ -7,6 +7,7 @@
 class QLabel;
 class QLineEdit;
 class QTableWidget;
+class QPushButton;
 
 class AccountManagementDialog : public QDialog
 {
@@ -49,4 +50,5 @@ private:
     QLineEdit *m_newConfirmEdit = nullptr;
 
     QLabel *m_messageLabel = nullptr;
+    QPushButton *m_viewLogsButton = nullptr;
 };

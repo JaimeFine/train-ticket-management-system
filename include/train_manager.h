@@ -40,6 +40,8 @@ public:
     bool addTrain(const Train& train);
     bool updateTrain(const Train& train);
     bool deleteTrain(int trainId);          // 逻辑删除（停运）
+    bool resumeTrain(int trainId);          // 恢复运营
+    bool deleteTrainPermanently(int trainId);   // 物理删除
 
     // ---------- 搜索 ----------
     QVector<Train> searchTrains(const QString& keyword);

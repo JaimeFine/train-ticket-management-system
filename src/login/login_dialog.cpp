@@ -8,7 +8,38 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QToolButton>
 #include <QVBoxLayout>
+
+namespace {
+// 登录页把密码框和显示按钮放在同一行。
+QWidget *makePasswordField(QLineEdit *lineEdit,
+                           QToolButton *&toggleButton,
+                           QWidget *parent)
+{
+    auto *field = new QWidget(parent);
+    auto *layout = new QHBoxLayout(field);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(8);
+
+    toggleButton = new QToolButton(field);
+    toggleButton->setObjectName(QStringLiteral("passwordToggleButton"));
+    toggleButton->setText(QStringLiteral("显示"));
+    toggleButton->setCheckable(true);
+    toggleButton->setToolTip(QStringLiteral("显示或隐藏密码"));
+
+    QObject::connect(toggleButton, &QToolButton::toggled, lineEdit,
+                     [lineEdit, toggleButton](bool checked) {
+        lineEdit->setEchoMode(checked ? QLineEdit::Normal : QLineEdit::Password);
+        toggleButton->setText(checked ? QStringLiteral("隐藏")
+                                      : QStringLiteral("显示"));
+    });
+
+    layout->addWidget(lineEdit, 1);
+    layout->addWidget(toggleButton);
+    return field;
+}
+}
 
 LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     : QDialog(parent)
@@ -68,7 +99,7 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
             font-weight: 700;
         }
         QLabel#formSubtitle {
-            color: #65716c;
+            color: #42514b;
             font-size: 13px;
         }
         QLabel#messageLabel {
@@ -88,10 +119,24 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
             background: #ffffff;
             color: #1f2933;
             selection-background-color: #0f766e;
+            placeholder-text-color: #75857e;
         }
         QLineEdit:focus {
             border: 2px solid #0f766e;
             padding: 3px 11px;
+        }
+        QToolButton#passwordToggleButton {
+            min-width: 48px;
+            min-height: 38px;
+            color: #24584f;
+            background: #eef5f1;
+            border: 1px solid #cbd8d2;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        QToolButton#passwordToggleButton:hover {
+            background: #e1eee8;
+            border-color: #9fb5aa;
         }
         QPushButton {
             min-height: 38px;
@@ -216,7 +261,10 @@ LoginDialog::LoginDialog(const LoginManager &loginManager, QWidget *parent)
     m_confirmPasswordEdit->setClearButtonEnabled(true);
 
     inputLayout->addRow(usernameLabel, m_usernameEdit);
-    inputLayout->addRow(passwordLabel, m_passwordEdit);
+    inputLayout->addRow(passwordLabel,
+                        makePasswordField(m_passwordEdit,
+                                          m_passwordToggleButton,
+                                          formPanel));
     inputLayout->addRow(m_confirmPasswordLabel, m_confirmPasswordEdit);
 
     m_messageLabel = new QLabel(QStringLiteral(" "), formPanel);
@@ -304,6 +352,7 @@ void LoginDialog::showLoginForm()
 
     // 登录和注册共用同一组输入框。切回登录时把确认密码藏起来，
     // 再把对应按钮显示出来，不需要另外做一个重复的窗口。
+    m_passwordToggleButton->setVisible(true);
     m_confirmPasswordLabel->setVisible(false);
     m_confirmPasswordEdit->setVisible(false);
     m_confirmPasswordEdit->clear();
@@ -327,6 +376,9 @@ void LoginDialog::showRegisterForm()
     m_formTitleLabel->setText(QStringLiteral("注册普通用户"));
     m_formSubtitleLabel->setText(QStringLiteral("创建普通用户账号，注册后可以用账号密码登录。"));
 
+    // 注册时不提供密码查看功能，并确保从登录页切换过来后重新隐藏密码。
+    m_passwordToggleButton->setChecked(false);
+    m_passwordToggleButton->setVisible(false);
     m_confirmPasswordLabel->setVisible(true);
     m_confirmPasswordEdit->setVisible(true);
     m_passwordEdit->clear();
