@@ -2,6 +2,7 @@
 #include "order_history_dialog.h"
 #include "statistics_dialog.h"
 #include "ticket_manager.h"
+#include "ticket_service_dialog.h"
 #include "train_management_dialog.h"
 #include "main_window.h"
 
@@ -323,6 +324,18 @@ MainWindow::MainWindow(const LoginResult &loginResult,
         OrderHistoryDialog dialog(*m_ticketManager, m_loginResult.userId, this);
         dialog.exec();
     };
+
+    auto openTicketServiceDialog = [this](int initialTabIndex) {
+        if (m_ticketManager == nullptr) {
+            QMessageBox::warning(this,
+                                 QStringLiteral("票务服务中心"),
+                                 QStringLiteral("票务服务尚未初始化。"));
+            return;
+        }
+
+        TicketServiceDialog dialog(*m_ticketManager, m_loginResult, initialTabIndex, this);
+        dialog.exec();
+    };
     // 工作台卡片的排版都一样，所以集中在这里创建。点击后的函数由调用处传入，
     // 以后车次、票务模块接入时，只需要把现在的提示函数换成真正的窗口入口，
     // 不用重新改整套主界面布局。
@@ -397,6 +410,24 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       true,
                       showTrainStationMessage);
     } else if (m_loginResult.role == UserRole::User) {
+        addModuleCard(QStringLiteral("车票查询"),
+                      QStringLiteral("查询车次、余票，并可直接预订选中的车次。"),
+                      QStringLiteral("查询开放"),
+                      QStringLiteral("进入查询"),
+                      true,
+                      [openTicketServiceDialog]() {
+                          openTicketServiceDialog(0);
+                      });
+
+        addModuleCard(QStringLiteral("票务管理"),
+                      QStringLiteral("办理退票和改签。"),
+                      QStringLiteral("票务操作"),
+                      QStringLiteral("进入办理"),
+                      true,
+                      [openTicketServiceDialog]() {
+                          openTicketServiceDialog(1);
+                      });
+
         addModuleCard(QStringLiteral("我的账户"),
                       QStringLiteral("修改当前账号密码，或退出后重新登录。"),
                       QStringLiteral("账户中心"),
@@ -411,8 +442,37 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       QStringLiteral("订单历史"),
                       QStringLiteral("查看订单"),
                       true,
-                      showOrderHistoryDialog);
+                      [openTicketServiceDialog]() {
+                          openTicketServiceDialog(2);
+                      });
     } else if (m_loginResult.role == UserRole::Seller) {
+        addModuleCard(QStringLiteral("车票查询"),
+                      QStringLiteral("查询车次、余票，并可协助乘客订票。"),
+                      QStringLiteral("查询开放"),
+                      QStringLiteral("进入查询"),
+                      true,
+                      [openTicketServiceDialog]() {
+                          openTicketServiceDialog(0);
+                      });
+
+        addModuleCard(QStringLiteral("票务管理"),
+                      QStringLiteral("办理订票、退票和改签。"),
+                      QStringLiteral("业务办理"),
+                      QStringLiteral("进入办理"),
+                      true,
+                      [openTicketServiceDialog]() {
+                          openTicketServiceDialog(1);
+                      });
+
+        addModuleCard(QStringLiteral("票务查询"),
+                      QStringLiteral("按订单号、乘客姓名或全部记录查询票务信息。"),
+                      QStringLiteral("业务查询"),
+                      QStringLiteral("进入查询"),
+                      true,
+                      [openTicketServiceDialog]() {
+                          openTicketServiceDialog(2);
+                      });
+
         addModuleCard(QStringLiteral("我的账户"),
                       QStringLiteral("修改当前账号密码，或退出后重新登录。"),
                       QStringLiteral("账户中心"),
@@ -422,6 +482,15 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                           openAccountDialog(true);
                       });
     } else if (m_loginResult.role == UserRole::Guest) {
+        addModuleCard(QStringLiteral("车票查询"),
+                      QStringLiteral("先查询车次和余票，决定是否注册后继续订票。"),
+                      QStringLiteral("查询开放"),
+                      QStringLiteral("进入查询"),
+                      true,
+                      [openTicketServiceDialog]() {
+                          openTicketServiceDialog(0);
+                      });
+
         addModuleCard(QStringLiteral("注册普通用户账号"),
                       QStringLiteral("注册后即可使用完整用户功能。"),
                       QStringLiteral("注册入口"),
