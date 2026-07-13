@@ -8,6 +8,7 @@ class QTableWidget;
 class QLineEdit;
 class QPushButton;
 class QLabel;
+class DatabaseManager;
 
 struct StationItem {
     int id;
@@ -19,7 +20,9 @@ class StationManagementDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit StationManagementDialog(QWidget *parent = nullptr);
+    explicit StationManagementDialog(
+        DatabaseManager *dbManager, QWidget *parent = nullptr
+    );
 
 private slots:
     void refreshList();
@@ -37,6 +40,7 @@ private:
     QPushButton *m_deleteBtn;
     QPushButton *m_refreshBtn;
     QLabel *m_messageLabel;
+    DatabaseManager *m_dbManager = nullptr;
 };
 
 #endif // STATION_MANAGEMENT_DIALOG_H

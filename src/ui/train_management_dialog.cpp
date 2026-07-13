@@ -1,4 +1,5 @@
 #include "train_management_dialog.h"
+#include "database_manager.h"
 #include "station_management_dialog.h"
 
 #include <QComboBox>
@@ -14,8 +15,6 @@
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QVBoxLayout>
-#include <QSqlDatabase>
-#include <QSqlQuery>
 
 TrainManagementDialog::TrainManagementDialog(TrainManager* manager, QWidget *parent)
     : QDialog(parent)
@@ -105,8 +104,10 @@ void TrainManagementDialog::setupUI()
     QPushButton *stationBtn = new QPushButton("站点管理");
     stationBtn->setStyleSheet("background-color: #17a2b8; color: white; border-radius: 6px; padding: 6px 12px;");
     connect(stationBtn, &QPushButton::clicked, [this]() {
-        StationManagementDialog dialog(this);
+        StationManagementDialog dialog(m_manager->databaseManager(), this);
         dialog.exec();
+        loadStations();
+        loadData();
     });
 
     searchLayout->addWidget(m_searchInput);
@@ -208,26 +209,21 @@ void TrainManagementDialog::loadStations()
         return;
     }
 
+    DatabaseManager *dbManager = m_manager->databaseManager();
+    if (dbManager == nullptr) {
+        showMessage("数据库管理器未初始化", false);
+        return;
+    }
+
     m_stationNameMap.clear();
+    m_stationCombo->clear();
+    m_stationCombo->addItem("-- 选择出发站 --");
 
-    QSqlDatabase db = QSqlDatabase::database("train_ticket_connection");
-    if (!db.isOpen()) return;
-
-    QSqlQuery query(db);
-    query.exec("SELECT stationId, stationName FROM Station ORDER BY stationName");
-    while (query.next()) {
-        int id = query.value("stationId").toInt();
-        QString name = query.value("stationName").toString();
-        m_stationCombo->addItem(name, id);
-        m_stationNameMap[id] = name;
+    const QList<StationRecord> stations = dbManager->getAllStations();
+    for (const StationRecord &station : stations) {
+        m_stationCombo->addItem(station.stationName, station.stationId);
+        m_stationNameMap[station.stationId] = station.stationName;
     }
-    int count = 0;
-    while (query.next()) {
-        // ...
-        count++;
-    }
-     qDebug() << "加载了" << count << "个站点";
-
 }
 
 
@@ -283,8 +279,12 @@ void TrainManagementDialog::searchTrain()
         const Train& t = results[i];
         m_table->setItem(i, 0, new QTableWidgetItem(QString::number(t.trainId)));
         m_table->setItem(i, 1, new QTableWidgetItem(t.trainNumber));
-        m_table->setItem(i, 2, new QTableWidgetItem(QString::number(t.departureStationId)));
-        m_table->setItem(i, 3, new QTableWidgetItem(QString::number(t.arrivalStationId)));
+        m_table->setItem(i, 2, new QTableWidgetItem(
+                                   m_stationNameMap.value(t.departureStationId, QString::number(t.departureStationId))
+                                   ));
+        m_table->setItem(i, 3, new QTableWidgetItem(
+                                   m_stationNameMap.value(t.arrivalStationId, QString::number(t.arrivalStationId))
+                                   ));
         m_table->setItem(i, 4, new QTableWidgetItem(t.departureTime));
         m_table->setItem(i, 5, new QTableWidgetItem(t.arrivalTime));
         m_table->setItem(i, 6, new QTableWidgetItem(
@@ -313,8 +313,12 @@ void TrainManagementDialog::searchByStation()
         const Train& t = results[i];
         m_table->setItem(i, 0, new QTableWidgetItem(QString::number(t.trainId)));
         m_table->setItem(i, 1, new QTableWidgetItem(t.trainNumber));
-        m_table->setItem(i, 2, new QTableWidgetItem(QString::number(t.departureStationId)));
-        m_table->setItem(i, 3, new QTableWidgetItem(QString::number(t.arrivalStationId)));
+        m_table->setItem(i, 2, new QTableWidgetItem(
+                                   m_stationNameMap.value(t.departureStationId, QString::number(t.departureStationId))
+                                   ));
+        m_table->setItem(i, 3, new QTableWidgetItem(
+                                   m_stationNameMap.value(t.arrivalStationId, QString::number(t.arrivalStationId))
+                                   ));
         m_table->setItem(i, 4, new QTableWidgetItem(t.departureTime));
         m_table->setItem(i, 5, new QTableWidgetItem(t.arrivalTime));
         m_table->setItem(i, 6, new QTableWidgetItem(
@@ -347,15 +351,12 @@ void TrainManagementDialog::addTrain()
     totalSeatsSpin->setRange(1, 999);
     totalSeatsSpin->setValue(100);
 
-    QSqlDatabase db = QSqlDatabase::database("train_ticket_connection");
-    if (db.isOpen()) {
-        QSqlQuery query(db);
-        query.exec("SELECT stationId, stationName FROM Station ORDER BY stationName");
-        while (query.next()) {
-            QString name = query.value("stationName").toString();
-            int id = query.value("stationId").toInt();
-            departCombo->addItem(name, id);
-            arriveCombo->addItem(name, id);
+    DatabaseManager *dbManager = m_manager->databaseManager();
+    if (dbManager != nullptr) {
+        const QList<StationRecord> stations = dbManager->getAllStations();
+        for (const StationRecord &station : stations) {
+            departCombo->addItem(station.stationName, station.stationId);
+            arriveCombo->addItem(station.stationName, station.stationId);
         }
     }
 
@@ -438,20 +439,17 @@ void TrainManagementDialog::editTrain()
     remainingSeatsSpin->setRange(0, 999);
     remainingSeatsSpin->setValue(current.remainingSeats);
 
-    QSqlDatabase db = QSqlDatabase::database("train_ticket_connection");
-    if (db.isOpen()) {
-        QSqlQuery query(db);
-        query.exec("SELECT stationId, stationName FROM Station ORDER BY stationName");
-        int departIndex = 0, arriveIndex = 0;
-        int idx = 0;
-        while (query.next()) {
-            QString name = query.value("stationName").toString();
-            int id = query.value("stationId").toInt();
-            departCombo->addItem(name, id);
-            arriveCombo->addItem(name, id);
-            if (id == current.departureStationId) departIndex = idx;
-            if (id == current.arrivalStationId) arriveIndex = idx;
-            idx++;
+    DatabaseManager *dbManager = m_manager->databaseManager();
+    if (dbManager != nullptr) {
+        const QList<StationRecord> stations = dbManager->getAllStations();
+        int departIndex = 0;
+        int arriveIndex = 0;
+        for (int idx = 0; idx < stations.size(); ++idx) {
+            const StationRecord &station = stations[idx];
+            departCombo->addItem(station.stationName, station.stationId);
+            arriveCombo->addItem(station.stationName, station.stationId);
+            if (station.stationId == current.departureStationId) departIndex = idx;
+            if (station.stationId == current.arrivalStationId) arriveIndex = idx;
         }
         departCombo->setCurrentIndex(departIndex);
         arriveCombo->setCurrentIndex(arriveIndex);

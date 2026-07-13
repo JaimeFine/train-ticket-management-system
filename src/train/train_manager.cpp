@@ -21,6 +21,11 @@ QString TrainManager::statusMessage() const
     return m_lastStatus;
 }
 
+DatabaseManager* TrainManager::databaseManager() const
+{
+    return m_dbManager;
+}
+
 // ============================================================
 // 辅助：Train ↔ TrainRecord 转换
 // ============================================================

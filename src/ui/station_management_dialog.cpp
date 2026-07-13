@@ -1,4 +1,5 @@
 #include "station_management_dialog.h"
+#include "database_manager.h"
 
 #include <QHBoxLayout>
 #include <QVBoxLayout>
@@ -9,12 +10,12 @@
 #include <QTableWidgetItem>
 #include <QHeaderView>
 #include <QMessageBox>
-#include <QSqlDatabase>
-#include <QSqlQuery>
-#include <QSqlError>
 
-StationManagementDialog::StationManagementDialog(QWidget *parent)
+StationManagementDialog::StationManagementDialog(
+    DatabaseManager *dbManager, QWidget *parent
+)
     : QDialog(parent)
+    , m_dbManager(dbManager)
 {
     setStyleSheet(
         "QDialog {"
@@ -124,24 +125,21 @@ void StationManagementDialog::setupUI()
 
 void StationManagementDialog::loadData()
 {
-    QSqlDatabase db = QSqlDatabase::database("train_ticket_connection");
-    if (!db.isOpen()) {
+    if (m_dbManager == nullptr || !m_dbManager->isOpen()) {
         showMessage("数据库未连接", false);
         return;
     }
 
-    QSqlQuery query(db);
-    if (!query.exec("SELECT stationId, stationName FROM Station ORDER BY stationId")) {
-        showMessage("查询失败: " + query.lastError().text(), false);
-        return;
-    }
+    const QList<StationRecord> stations = m_dbManager->getAllStations();
 
     m_table->setRowCount(0);
     int row = 0;
-    while (query.next()) {
+    for (const StationRecord &station : stations) {
         m_table->insertRow(row);
-        m_table->setItem(row, 0, new QTableWidgetItem(query.value(0).toString()));
-        m_table->setItem(row, 1, new QTableWidgetItem(query.value(1).toString()));
+        m_table->setItem(
+            row, 0, new QTableWidgetItem(QString::number(station.stationId))
+        );
+        m_table->setItem(row, 1, new QTableWidgetItem(station.stationName));
         row++;
     }
 
@@ -161,26 +159,20 @@ void StationManagementDialog::addStation()
         return;
     }
 
-    QSqlDatabase db = QSqlDatabase::database("train_ticket_connection");
-    if (!db.isOpen()) {
+    if (m_dbManager == nullptr || !m_dbManager->isOpen()) {
         showMessage("数据库未连接", false);
         return;
     }
 
-    // 检查是否已存在
-    QSqlQuery checkQuery(db);
-    checkQuery.prepare("SELECT stationId FROM Station WHERE stationName = ?");
-    checkQuery.addBindValue(name);
-    if (checkQuery.exec() && checkQuery.next()) {
+    if (m_dbManager->findStationByName(name).has_value()) {
         showMessage("站点 '" + name + "' 已存在", false);
         return;
     }
 
-    QSqlQuery query(db);
-    query.prepare("INSERT INTO Station (stationName) VALUES (?)");
-    query.addBindValue(name);
-    if (!query.exec()) {
-        showMessage("添加失败: " + query.lastError().text(), false);
+    StationRecord station;
+    station.stationName = name;
+    if (!m_dbManager->addStation(station)) {
+        showMessage("添加失败: " + m_dbManager->lastError(), false);
         return;
     }
 
@@ -200,19 +192,8 @@ void StationManagementDialog::deleteStation()
     int stationId = m_table->item(row, 0)->text().toInt();
     QString stationName = m_table->item(row, 1)->text();
 
-    // 检查是否有车次引用该站点
-    QSqlDatabase db = QSqlDatabase::database("train_ticket_connection");
-    if (!db.isOpen()) {
+    if (m_dbManager == nullptr || !m_dbManager->isOpen()) {
         showMessage("数据库未连接", false);
-        return;
-    }
-
-    QSqlQuery checkQuery(db);
-    checkQuery.prepare("SELECT trainId FROM Train WHERE departureStationId = ? OR arrivalStationId = ?");
-    checkQuery.addBindValue(stationId);
-    checkQuery.addBindValue(stationId);
-    if (checkQuery.exec() && checkQuery.next()) {
-        showMessage("站点 '" + stationName + "' 被车次引用，不能删除", false);
         return;
     }
 
@@ -224,11 +205,8 @@ void StationManagementDialog::deleteStation()
 
     if (reply != QMessageBox::Yes) return;
 
-    QSqlQuery query(db);
-    query.prepare("DELETE FROM Station WHERE stationId = ?");
-    query.addBindValue(stationId);
-    if (!query.exec()) {
-        showMessage("删除失败: " + query.lastError().text(), false);
+    if (!m_dbManager->deleteStation(stationId)) {
+        showMessage("删除失败: " + m_dbManager->lastError(), false);
         return;
     }
 

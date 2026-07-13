@@ -45,6 +45,8 @@ public:
     std::optional<StationRecord> findStationByName(
         const QString &stationName
     ) const;
+    QList<StationRecord> getAllStations() const;
+    bool deleteStation(int stationId);
 
     // >>> Train APIs
     bool addTrain(const TrainRecord &train);
