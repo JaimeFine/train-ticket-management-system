@@ -59,22 +59,36 @@ int main(int argc, char *argv[])
     ok = checkResult(addLoginUser(manager, sellerUsername, QStringLiteral("seller_old"), 1),
                      "Seller user should be created.") && ok;
 
+    // 第一组：验证普通用户可以公开注册、取得数据库用户 ID，重复用户名会被拒绝。
     const AccountResult registerResult =
         loginManager.registerUser(userUsername, QStringLiteral("user_old"));
     ok = checkResult(registerResult.success,
                      "Normal user should register.") && ok;
     const LoginResult userLogin =
         loginManager.authenticate(userUsername, QStringLiteral("user_old"));
-    ok = checkResult(userLogin.success && userLogin.role == UserRole::User,
-                     "Registered normal user should login as user.") && ok;
+    ok = checkResult(userLogin.success
+                         && userLogin.role == UserRole::User
+                         && userLogin.userId > 0,
+                     "Registered normal user should login with user ID.") && ok;
+
+    const LoginResult adminLogin =
+        loginManager.authenticate(adminUsername, QStringLiteral("admin_old"));
+    const LoginResult sellerLogin =
+        loginManager.authenticate(sellerUsername, QStringLiteral("seller_old"));
+    ok = checkResult(adminLogin.success && adminLogin.userId > 0,
+                     "Admin login should provide user ID.") && ok;
+    ok = checkResult(sellerLogin.success && sellerLogin.userId > 0,
+                     "Seller login should provide user ID.") && ok;
 
     const AccountResult duplicateRegister =
         loginManager.registerUser(userUsername, QStringLiteral("user_other"));
     ok = checkResult(!duplicateRegister.success,
                      "Duplicate normal username should be rejected.") && ok;
 
+    // 第二组：验证只有管理员能创建售票员，并能在售票员列表里看到新账号。
+    // 列表接口还要区分“没有数据”和“读取失败”，所以同时测试权限和数据库不可用情况。
     const AccountResult createResult =
-        loginManager.createSellerAccount(UserRole::Admin,
+        loginManager.createSellerAccount(adminLogin.userId,
                                          newSellerUsername,
                                          QStringLiteral("new_seller_pass"));
     ok = checkResult(createResult.success,
@@ -85,33 +99,51 @@ int main(int argc, char *argv[])
     ok = checkResult(newSellerLogin.success && newSellerLogin.role == UserRole::Seller,
                      "Created seller should login as seller.") && ok;
 
-    const QList<SellerAccountInfo> sellerAccounts =
-        loginManager.sellerAccounts(UserRole::Admin);
+    const SellerAccountListResult sellerList =
+        loginManager.sellerAccounts(adminLogin.userId);
     bool foundCreatedSeller = false;
-    for (const SellerAccountInfo &seller : sellerAccounts) {
+    for (const SellerAccountInfo &seller : sellerList.accounts) {
         if (seller.username == newSellerUsername && seller.enabled) {
             foundCreatedSeller = true;
         }
     }
-    ok = checkResult(foundCreatedSeller,
+    ok = checkResult(sellerList.success && foundCreatedSeller,
                      "Admin should see created seller account.") && ok;
 
+    const SellerAccountListResult sellerView =
+        loginManager.sellerAccounts(sellerLogin.userId);
+    ok = checkResult(!sellerView.success,
+                     "Seller should not read seller account list.") && ok;
+
+    const SellerAccountListResult missingOperatorView =
+        loginManager.sellerAccounts(0);
+    ok = checkResult(!missingOperatorView.success,
+                     "Missing operator ID should not read seller account list.") && ok;
+
+    LoginManager unavailableLoginManager;
+    const SellerAccountListResult unavailableList =
+        unavailableLoginManager.sellerAccounts(adminLogin.userId);
+    ok = checkResult(!unavailableList.success,
+                     "Unavailable database should return list failure.") && ok;
+
     const AccountResult duplicateCreate =
-        loginManager.createSellerAccount(UserRole::Admin,
+        loginManager.createSellerAccount(adminLogin.userId,
                                          newSellerUsername,
                                          QStringLiteral("other_pass"));
     ok = checkResult(!duplicateCreate.success,
                      "Duplicate seller username should be rejected.") && ok;
 
     const AccountResult sellerCreate =
-        loginManager.createSellerAccount(UserRole::Seller,
+        loginManager.createSellerAccount(sellerLogin.userId,
                                          makeUsername(QStringLiteral("bad_create")),
                                          QStringLiteral("bad_pass"));
     ok = checkResult(!sellerCreate.success,
                      "Seller should not create seller account.") && ok;
 
+    // 第三组：重置密码后旧密码必须立即失效，新密码才能登录。
+    // 默认密码入口复用同一套重置规则，同时检查售票员不能越权操作其他账号。
     const AccountResult resetResult =
-        loginManager.resetSellerPassword(UserRole::Admin,
+        loginManager.resetSellerPassword(adminLogin.userId,
                                          newSellerUsername,
                                          QStringLiteral("reset_pass"));
     ok = checkResult(resetResult.success,
@@ -124,7 +156,7 @@ int main(int argc, char *argv[])
                      "Reset seller password should login.") && ok;
 
     const AccountResult defaultResetResult =
-        loginManager.resetSellerPasswordToDefault(UserRole::Admin, newSellerUsername);
+        loginManager.resetSellerPasswordToDefault(adminLogin.userId, newSellerUsername);
     ok = checkResult(defaultResetResult.success,
                      "Admin should reset seller password to default.") && ok;
     ok = checkResult(loginManager.authenticate(newSellerUsername,
@@ -132,14 +164,15 @@ int main(int argc, char *argv[])
                      "Default seller password should login.") && ok;
 
     const AccountResult sellerReset =
-        loginManager.resetSellerPassword(UserRole::Seller,
+        loginManager.resetSellerPassword(sellerLogin.userId,
                                          newSellerUsername,
                                          QStringLiteral("seller_try"));
     ok = checkResult(!sellerReset.success,
                      "Seller should not reset seller password.") && ok;
 
+    // 第四组：禁用账号后即使密码正确也不能登录，重新启用后才能恢复。
     const AccountResult disableResult =
-        loginManager.setSellerEnabled(UserRole::Admin, newSellerUsername, false);
+        loginManager.setSellerEnabled(adminLogin.userId, newSellerUsername, false);
     ok = checkResult(disableResult.success,
                      "Admin should disable seller.") && ok;
     ok = checkResult(!loginManager.authenticate(newSellerUsername,
@@ -147,13 +180,24 @@ int main(int argc, char *argv[])
                      "Disabled seller should not login.") && ok;
 
     const AccountResult enableResult =
-        loginManager.setSellerEnabled(UserRole::Admin, newSellerUsername, true);
+        loginManager.setSellerEnabled(adminLogin.userId, newSellerUsername, true);
     ok = checkResult(enableResult.success,
                      "Admin should enable seller.") && ok;
     ok = checkResult(loginManager.authenticate(newSellerUsername,
                                                QStringLiteral("123456")).success,
                      "Enabled seller should login again.") && ok;
 
+    ok = checkResult(manager.setUserEnabled(adminLogin.userId, false),
+                     "Admin should be disabled for verification.") && ok;
+    const SellerAccountListResult disabledAdminView =
+        loginManager.sellerAccounts(adminLogin.userId);
+    ok = checkResult(!disabledAdminView.success,
+                     "Disabled admin should not manage seller accounts.") && ok;
+    ok = checkResult(manager.setUserEnabled(adminLogin.userId, true),
+                     "Admin should be re-enabled after verification.") && ok;
+
+    // 第五组：修改自己的密码必须提供正确原密码，且新旧密码不能相同。
+    // 售票员、普通用户和管理员都使用同一个接口，游客因为没有账号必须失败。
     const AccountResult wrongOldPassword =
         loginManager.changeOwnPassword(sellerUsername,
                                        UserRole::Seller,

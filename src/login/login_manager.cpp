@@ -6,7 +6,7 @@
 #include <QString>
 
 namespace {
-// 数据库存的是数字，这里转成代码里用的身份。
+// 数据库存的是数字，这里分别转成游客、售票员、管理员和普通用户四种身份。
 std::optional<UserRole> roleFromDatabaseValue(int role)
 {
     switch (role) {
@@ -25,11 +25,13 @@ std::optional<UserRole> roleFromDatabaseValue(int role)
 
 bool databaseReady(const DatabaseManager *databaseManager)
 {
+    // 账号操作都会先走这项检查，避免每个函数重复写空指针和连接状态判断。
     return databaseManager != nullptr && databaseManager->isOpen();
 }
 
 QString defaultSellerPassword()
 {
+    // 默认密码只在这里保存一份，重置逻辑和成功提示就不会出现两个不同的值。
     return QStringLiteral("123456");
 }
 }
@@ -47,16 +49,17 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
     const QString trimmedUsername = username.trimmed();
 
     if (trimmedUsername.isEmpty()) {
-        return {false, UserRole::Guest, QString(), QStringLiteral("请输入用户名。")};
+        return {false, UserRole::Guest, 0, QString(), QStringLiteral("请输入用户名。")};
     }
 
     if (password.isEmpty()) {
-        return {false, UserRole::Guest, trimmedUsername, QStringLiteral("请输入密码。")};
+        return {false, UserRole::Guest, 0, trimmedUsername, QStringLiteral("请输入密码。")};
     }
 
     if (m_databaseManager == nullptr) {
         return {false,
                 UserRole::Guest,
+                0,
                 trimmedUsername,
                 QStringLiteral("登录服务尚未连接。")};
     }
@@ -64,6 +67,7 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
     if (!m_databaseManager->isOpen()) {
         return {false,
                 UserRole::Guest,
+                0,
                 trimmedUsername,
                 QStringLiteral("登录服务不可用，请检查数据库。")};
     }
@@ -71,9 +75,11 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
     // 查账号只能走 DatabaseManager，LoginManager 拿到记录后再做密码和身份判断。
     const auto userAccount = m_databaseManager->findUserByUsername(trimmedUsername);
 
+    // 账号不存在和密码错误使用同一条提示，界面不会向外暴露某个用户名是否存在。
     if (!userAccount.has_value() || userAccount->password != password) {
         return {false,
                 UserRole::Guest,
+                0,
                 trimmedUsername,
                 QStringLiteral("用户名或密码无效。")};
     }
@@ -83,6 +89,7 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
     if (!role.has_value()) {
         return {false,
                 UserRole::Guest,
+                0,
                 userAccount->username,
                 QStringLiteral("账号角色无效。")};
     }
@@ -90,20 +97,25 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
     if (!userAccount->enabled) {
         return {false,
                 *role,
+                0,
                 userAccount->username,
                 QStringLiteral("账号已被禁用。")};
     }
 
     return {true,
             *role,
+            userAccount->userId,
             userAccount->username,
             QStringLiteral("登录成功。")};
 }
 
 LoginResult LoginManager::loginAsGuest() const
 {
+    // 游客没有数据库账号，不查询 User 表，直接返回 role=0 的临时身份。
+    // 主窗口根据这个身份只开放游客能够使用的功能。
     return {true,
             UserRole::Guest,
+            0,
             QStringLiteral("游客"),
             QStringLiteral("游客访问已开启。")};
 }
@@ -111,6 +123,8 @@ LoginResult LoginManager::loginAsGuest() const
 AccountResult LoginManager::registerUser(const QString &username,
                                          const QString &password) const
 {
+    // 普通用户注册：检查数据库和输入，确认用户名没有被使用，
+    // 然后以 role=3、enabled=true 写入一条新的 User 记录。
     if (!databaseReady(m_databaseManager)) {
         return {false, QStringLiteral("注册服务不可用。")};
     }
@@ -144,15 +158,17 @@ AccountResult LoginManager::registerUser(const QString &username,
     return {true, QStringLiteral("用户注册成功，请使用新账号登录。")};
 }
 
-AccountResult LoginManager::createSellerAccount(UserRole currentRole,
+AccountResult LoginManager::createSellerAccount(int operatorUserId,
                                                 const QString &username,
                                                 const QString &password) const
 {
+    // 创建售票员：先确认操作者是管理员，再检查用户名，最后写入 role=1 的账号。
+    // 这个函数是员工权限管理页面创建售票员时使用的业务入口。
     if (!databaseReady(m_databaseManager)) {
         return {false, QStringLiteral("账号管理服务不可用。")};
     }
 
-    if (currentRole != UserRole::Admin) {
+    if (!isActiveAdmin(operatorUserId)) {
         return {false, QStringLiteral("只有管理员可以创建售票员账号。")};
     }
 
@@ -170,7 +186,6 @@ AccountResult LoginManager::createSellerAccount(UserRole currentRole,
         return {false, QStringLiteral("用户名已存在。")};
     }
 
-    // 管理员新增售票员走这里。
     UserRecord user;
     user.username = trimmedUsername;
     user.password = password;
@@ -184,15 +199,17 @@ AccountResult LoginManager::createSellerAccount(UserRole currentRole,
     return {true, QStringLiteral("售票员账号创建成功。")};
 }
 
-AccountResult LoginManager::resetSellerPassword(UserRole currentRole,
+AccountResult LoginManager::resetSellerPassword(int operatorUserId,
                                                 const QString &username,
                                                 const QString &newPassword) const
 {
+    // 管理员重置售票员密码：查出目标账号并确认它确实是售票员，
+    // 再保存新密码，避免管理员在这个入口误改其他类型的账号。
     if (!databaseReady(m_databaseManager)) {
         return {false, QStringLiteral("账号管理服务不可用。")};
     }
 
-    if (currentRole != UserRole::Admin) {
+    if (!isActiveAdmin(operatorUserId)) {
         return {false, QStringLiteral("只有管理员可以重置售票员密码。")};
     }
 
@@ -226,11 +243,13 @@ AccountResult LoginManager::resetSellerPassword(UserRole currentRole,
     return {true, QStringLiteral("售票员密码已重置。")};
 }
 
-AccountResult LoginManager::resetSellerPasswordToDefault(UserRole currentRole,
+AccountResult LoginManager::resetSellerPasswordToDefault(int operatorUserId,
                                                          const QString &username) const
 {
+    // 默认密码重置仍然调用普通重置函数，这样管理员权限、账号存在和角色检查
+    // 只维护一套，不会因为以后修改其中一条规则而漏掉这个入口。
     const AccountResult result =
-        resetSellerPassword(currentRole, username, defaultSellerPassword());
+        resetSellerPassword(operatorUserId, username, defaultSellerPassword());
 
     if (!result.success) {
         return result;
@@ -240,15 +259,17 @@ AccountResult LoginManager::resetSellerPasswordToDefault(UserRole currentRole,
             QStringLiteral("已重置为默认密码：%1").arg(defaultSellerPassword())};
 }
 
-AccountResult LoginManager::setSellerEnabled(UserRole currentRole,
+AccountResult LoginManager::setSellerEnabled(int operatorUserId,
                                              const QString &username,
                                              bool enabled) const
 {
+    // 管理员通过 enabled 控制售票员能否登录。禁用只改变账号状态，
+    // 不删除账号和原有信息，之后重新启用仍可以继续使用。
     if (!databaseReady(m_databaseManager)) {
         return {false, QStringLiteral("账号管理服务不可用。")};
     }
 
-    if (currentRole != UserRole::Admin) {
+    if (!isActiveAdmin(operatorUserId)) {
         return {false, QStringLiteral("只有管理员可以启用或禁用售票员账号。")};
     }
 
@@ -268,6 +289,7 @@ AccountResult LoginManager::setSellerEnabled(UserRole currentRole,
         return {false, QStringLiteral("只能修改售票员账号状态。")};
     }
 
+    // 状态修改只更新 enabled 字段，不重写密码和角色等无关数据。
     if (!m_databaseManager->setUserEnabled(user->userId, enabled)) {
         return {false, QStringLiteral("账号状态修改失败。")};
     }
@@ -284,6 +306,8 @@ AccountResult LoginManager::changeOwnPassword(const QString &username,
                                               const QString &oldPassword,
                                               const QString &newPassword) const
 {
+    // 当前登录用户修改自己的密码：重新读取账号，核对登录身份和原密码，
+    // 全部一致后才保存新密码。游客没有 User 记录，因此不能进入这条流程。
     if (!databaseReady(m_databaseManager)) {
         return {false, QStringLiteral("账号管理服务不可用。")};
     }
@@ -312,7 +336,8 @@ AccountResult LoginManager::changeOwnPassword(const QString &username,
         return {false, QStringLiteral("未找到当前账号。")};
     }
 
-    // 身份对得上，才允许改自己的密码。
+    // 用户名来自当前登录结果，但 Manager 仍要重新核对数据库角色和原密码。
+    // 这样以后即使换了别的界面入口，也不能只传一个用户名就修改密码。
     if (user->role != static_cast<int>(currentRole)) {
         return {false, QStringLiteral("当前身份与账号信息不一致。")};
     }
@@ -334,27 +359,56 @@ AccountResult LoginManager::changeOwnPassword(const QString &username,
     return {true, QStringLiteral("密码修改成功。")};
 }
 
-QList<SellerAccountInfo> LoginManager::sellerAccounts(UserRole currentRole) const
+SellerAccountListResult LoginManager::sellerAccounts(int operatorUserId) const
 {
-    QList<SellerAccountInfo> sellers;
-
-    if (!databaseReady(m_databaseManager) || currentRole != UserRole::Admin) {
-        return sellers;
+    // 员工权限管理页面用这个函数读取全部售票员账号。
+    // 返回值只保留用户名和启用状态，不把密码交给 UI。
+    if (!databaseReady(m_databaseManager)) {
+        return {false, {}, QStringLiteral("账号列表服务不可用。")};
     }
 
-    // DatabaseManager 返回完整的 UserRecord，但列表页面只需要用户名和启用状态。
-    // 这里换成较小的 SellerAccountInfo，密码不会被带到界面层。
+    if (!isActiveAdmin(operatorUserId)) {
+        return {false, {}, QStringLiteral("只有管理员可以查看售票员账号。")};
+    }
+
     const QList<UserRecord> users =
         m_databaseManager->findUsersByRole(static_cast<int>(UserRole::Seller));
+
+    // 查询结果为空可能只是还没有售票员，不能直接当成失败；
+    // 只有 DatabaseManager 给出了错误信息时，才向界面返回读取失败。
+    if (!m_databaseManager->lastError().isEmpty()) {
+        return {false, {}, QStringLiteral("读取售票员账号失败。")};
+    }
+
+    SellerAccountListResult result;
+    result.success = true;
 
     for (const UserRecord &user : users) {
         SellerAccountInfo info;
         info.username = user.username;
         info.enabled = user.enabled;
-        sellers.append(info);
+        result.accounts.append(info);
     }
 
-    return sellers;
+    if (result.accounts.isEmpty()) {
+        result.message = QStringLiteral("暂无售票员账号。");
+    }
+
+    return result;
+}
+
+bool LoginManager::isActiveAdmin(int userId) const
+{
+    if (!databaseReady(m_databaseManager) || userId <= 0) {
+        return false;
+    }
+
+    // 不能只相信界面传来的角色。每次管理员操作前都按登录用户 ID 重查数据库，
+    // 账号仍然存在、没有被禁用并且 role=2 时，才允许继续执行。
+    const auto user = m_databaseManager->findUserById(userId);
+    return user.has_value()
+           && user->enabled
+           && user->role == static_cast<int>(UserRole::Admin);
 }
 
 bool LoginManager::canAccessGuestFunctions(UserRole role)

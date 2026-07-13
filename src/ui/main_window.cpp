@@ -244,6 +244,8 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     headerLayout->addLayout(titleBlock, 1);
     headerLayout->addLayout(accountBlock);
 
+    // 下面这些提示函数是其他模块尚未接入时的临时入口。
+    // 合作者接入真实窗口时，只替换对应回调，不需要改角色分支和卡片布局。
     auto showQueryMessage = [this]() {
         QMessageBox::information(this,
                                  QStringLiteral("车票查询"),
@@ -343,9 +345,9 @@ MainWindow::MainWindow(const LoginResult &loginResult,
         ++cardCount;
     };
 
-    // 每种身份只创建自己该看到的卡片。游客和普通用户共用一套布局，
-    // 但游客的历史记录和票务管理按钮会被禁用。
-    if (m_loginResult.role == UserRole::Admin) {
+    // 权限统一交给 LoginManager 判断。这里从高权限往低权限依次匹配，
+    // 管理员命中后就不会再进入售票员工作台，主窗口只负责生成对应界面。
+    if (LoginManager::canAccessAdminFunctions(m_loginResult.role)) {
         addModuleCard(QStringLiteral("票务数据统计"),
                       QStringLiteral("查看售票、退款、客流和热门线路统计。"),
                       QStringLiteral("统计接口"),
@@ -368,9 +370,7 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       QStringLiteral("进入管理"),
                       true,
                       showTrainStationMessage);
-    }
-
-    if (m_loginResult.role == UserRole::Seller) {
+    } else if (LoginManager::canAccessSellerFunctions(m_loginResult.role)) {
         addModuleCard(QStringLiteral("车票查询"),
                       QStringLiteral("查询车次、站点、日期和余票信息。"),
                       QStringLiteral("查询开放"),
@@ -398,9 +398,9 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       QStringLiteral("查看日志"),
                       true,
                       showTicketLogMessage);
-    }
-
-    if (m_loginResult.role == UserRole::User || m_loginResult.role == UserRole::Guest) {
+    } else if (LoginManager::canAccessGuestFunctions(m_loginResult.role)) {
+        // 进入基础工作台后再区分普通用户和游客：两者都能查询车票，
+        // 只有已经登录的普通用户能查看订单和办理票务。
         const bool userLoggedIn = m_loginResult.role == UserRole::User;
 
         addModuleCard(QStringLiteral("车票查询"),

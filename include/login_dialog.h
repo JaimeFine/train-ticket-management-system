@@ -7,6 +7,7 @@
 class QLabel;
 class QLineEdit;
 class QPushButton;
+class QToolButton;
 
 class LoginDialog : public QDialog
 {
@@ -30,6 +31,7 @@ private:
     QLineEdit *m_usernameEdit = nullptr;
     QLineEdit *m_passwordEdit = nullptr;
     QLineEdit *m_confirmPasswordEdit = nullptr;
+    QToolButton *m_passwordToggleButton = nullptr;
     QLabel *m_formTitleLabel = nullptr;
     QLabel *m_formSubtitleLabel = nullptr;
     QLabel *m_confirmPasswordLabel = nullptr;

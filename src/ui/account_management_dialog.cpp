@@ -67,6 +67,8 @@ bool confirmAction(QWidget *parent,
                    const QString &message,
                    const QString &confirmText)
 {
+    // 重置密码、禁用账号都会立刻修改数据库，因此使用同一个确认框。
+    // 默认焦点放在“取消”上，误按回车时不会直接执行危险操作。
     QMessageBox messageBox(parent);
     messageBox.setWindowTitle(title);
     messageBox.setIcon(QMessageBox::Warning);
@@ -200,8 +202,11 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
     rootLayout->addWidget(hintLabel);
     rootLayout->addWidget(m_messageLabel);
 
+    // 这个窗口有两种管理员入口：
+    // 1. 从“员工权限管理”进入时 accountOnly=false，显示售票员管理；
+    // 2. 从右上角“我的账户”进入时 accountOnly=true，只允许管理员改自己的密码。
+    // 售票员和普通用户没有员工管理权限，所以也不会创建下面这组控件。
     if (m_loginResult.role == UserRole::Admin && !m_accountOnly) {
-        // 只有管理员能看到这一块。
         auto *createGroup = new QGroupBox(QStringLiteral("创建售票员账号"), this);
         auto *createLayout = new QVBoxLayout(createGroup);
         auto *createForm = new QFormLayout;
@@ -276,10 +281,11 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
         refreshSellerTable();
     }
 
+    // 管理员、售票员和普通用户都是数据库里的真实账号，可以修改自己的密码。
+    // 管理员只有从“我的账户”进入时才显示这一块，避免员工管理页面内容过多。
     if ((m_loginResult.role == UserRole::Admin && m_accountOnly)
         || m_loginResult.role == UserRole::Seller
         || m_loginResult.role == UserRole::User) {
-        // 真实账号可以改自己的密码。
         auto *ownGroup = new QGroupBox(QStringLiteral("修改当前账号密码"), this);
         auto *ownLayout = new QVBoxLayout(ownGroup);
         auto *ownForm = new QFormLayout;
@@ -313,6 +319,8 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
     }
 
     if (m_loginResult.role == UserRole::Guest) {
+        // 游客没有 User 表记录，因此“我的账户”对游客来说就是注册入口。
+        // 注册成功后仍留在当前页面，由用户返回登录窗口使用新账号登录。
         auto *registerGroup = new QGroupBox(QStringLiteral("注册普通用户账号"), this);
         auto *registerLayout = new QVBoxLayout(registerGroup);
         auto *registerForm = new QFormLayout;
@@ -347,8 +355,11 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
     rootLayout->addStretch();
 
     auto *bottomLayout = new QHBoxLayout;
-    if (m_accountOnly && m_loginResult.role != UserRole::Guest) {
-        auto *logoutButton = new QPushButton(QStringLiteral("退出登录"), this);
+    if (m_accountOnly) {
+        const QString buttonText = m_loginResult.role == UserRole::Guest
+                                       ? QStringLiteral("返回登录")
+                                       : QStringLiteral("退出登录");
+        auto *logoutButton = new QPushButton(buttonText, this);
         logoutButton->setObjectName(QStringLiteral("logoutButton"));
         connect(logoutButton, &QPushButton::clicked, this, [this]() {
             handleLogout();
@@ -373,6 +384,7 @@ bool AccountManagementDialog::logoutRequested() const
 
 void AccountManagementDialog::handleRegisterUser()
 {
+    // 确认密码只用于界面输入检查，不需要传入业务层或写入数据库。
     if (m_registerPasswordEdit->text() != m_registerConfirmEdit->text()) {
         showPlainMessage(false, QStringLiteral("两次输入的密码不一致。"));
         return;
@@ -392,13 +404,15 @@ void AccountManagementDialog::handleRegisterUser()
 
 void AccountManagementDialog::handleCreateSeller()
 {
+    // UI 先检查两次密码是否一致，LoginManager 还会再次检查管理员身份、
+    // 用户名重复和数据库状态，不能把权限安全只放在界面按钮上。
     if (m_createPasswordEdit->text() != m_createConfirmEdit->text()) {
         showPlainMessage(false, QStringLiteral("两次输入的密码不一致。"));
         return;
     }
 
     const AccountResult result =
-        m_loginManager.createSellerAccount(m_loginResult.role,
+        m_loginManager.createSellerAccount(m_loginResult.userId,
                                            m_createUsernameEdit->text(),
                                            m_createPasswordEdit->text());
     showMessage(result);
@@ -430,7 +444,7 @@ void AccountManagementDialog::handleResetSelectedSellerPassword()
     }
 
     const AccountResult result =
-        m_loginManager.resetSellerPasswordToDefault(m_loginResult.role, username);
+        m_loginManager.resetSellerPasswordToDefault(m_loginResult.userId, username);
     showMessage(result);
 }
 
@@ -456,7 +470,7 @@ void AccountManagementDialog::handleSetSelectedSellerEnabled(bool enabled)
     }
 
     const AccountResult result =
-        m_loginManager.setSellerEnabled(m_loginResult.role,
+        m_loginManager.setSellerEnabled(m_loginResult.userId,
                                         username,
                                         enabled);
     showMessage(result);
@@ -468,6 +482,8 @@ void AccountManagementDialog::handleSetSelectedSellerEnabled(bool enabled)
 
 void AccountManagementDialog::handleChangeOwnPassword()
 {
+    // 当前用户名和身份取自登录结果，原密码和新密码取自本页输入框。
+    // LoginManager 会重新读取账号并核对角色，防止界面状态和数据库记录不一致。
     if (m_newPasswordEdit->text() != m_newConfirmEdit->text()) {
         showPlainMessage(false, QStringLiteral("两次输入的新密码不一致。"));
         return;
@@ -489,6 +505,23 @@ void AccountManagementDialog::handleChangeOwnPassword()
 
 void AccountManagementDialog::handleLogout()
 {
+    const bool guestMode = m_loginResult.role == UserRole::Guest;
+    const QString title = guestMode
+                              ? QStringLiteral("确认返回登录")
+                              : QStringLiteral("确认退出登录");
+    const QString message = guestMode
+                                ? QStringLiteral("确定返回登录界面吗？当前注册信息不会自动保存。")
+                                : QStringLiteral("确定退出当前账号并返回登录界面吗？");
+    const QString confirmText = guestMode
+                                    ? QStringLiteral("返回登录")
+                                    : QStringLiteral("退出登录");
+
+    if (!confirmAction(this, title, message, confirmText)) {
+        return;
+    }
+
+    // 对话框只记录退出请求并关闭自己。MainWindow 读到这个标志后再关闭工作台，
+    // main.cpp 中的登录循环随后会重新显示登录窗口。
     m_logoutRequested = true;
     accept();
 }
@@ -506,8 +539,22 @@ void AccountManagementDialog::refreshSellerTable()
 
     // 列表数据每次都重新向 LoginManager 获取，这样创建、启用或禁用账号后，
     // 页面显示的就是数据库里的最新状态。界面只负责把结果逐行放进表格。
-    const QList<SellerAccountInfo> sellers =
-        m_loginManager.sellerAccounts(m_loginResult.role);
+    const SellerAccountListResult result =
+        m_loginManager.sellerAccounts(m_loginResult.userId);
+
+    m_sellerTable->setRowCount(0);
+
+    if (!result.success) {
+        showPlainMessage(false, result.message);
+        return;
+    }
+
+    const QList<SellerAccountInfo> &sellers = result.accounts;
+
+    if (sellers.isEmpty()) {
+        showPlainMessage(true, result.message);
+        return;
+    }
 
     m_sellerTable->setRowCount(sellers.size());
 
