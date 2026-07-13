@@ -31,6 +31,7 @@ set(SOURCES
     src/database/database_manager_ticket.cpp
     src/ui/train_management_dialog.cpp
     src/ui/station_management_dialog.cpp
+    src/database/database_manager_statistics.cpp
 )
 
 set(HEADERS

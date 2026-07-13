@@ -132,6 +132,7 @@ add_executable(ticket_issue9_smoke_test
     ../src/database/database_manager_train.cpp
     ../src/database/database_manager_order.cpp
     ../src/database/database_manager_ticket.cpp
+    ../src/database/database_manager_statistics.cpp
 )
 
 target_include_directories(ticket_issue9_smoke_test PRIVATE
@@ -240,6 +241,7 @@ add_executable(ticket_issue10_smoke_test
     ../src/database/database_manager_train.cpp
     ../src/database/database_manager_order.cpp
     ../src/database/database_manager_ticket.cpp
+    ../src/database/database_manager_statistics.cpp
     ../src/ticket/ticket_manager.cpp
 )
 
@@ -261,3 +263,18 @@ add_custom_command(TARGET ticket_issue10_smoke_test POST_BUILD
         ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql
         $<TARGET_FILE_DIR:ticket_issue10_smoke_test>/database/schema_v1.sql
 )
+
+add_executable(statistics_smoke_test
+    statistics_smoke_test.cpp
+    ../src/database/database_manager.cpp ../src/database/database_manager_user.cpp
+    ../src/database/database_manager_station.cpp ../src/database/database_manager_train.cpp
+    ../src/database/database_manager_order.cpp ../src/database/database_manager_ticket.cpp
+    ../src/database/database_manager_statistics.cpp
+    ../src/ticket/ticket_manager.cpp ../src/statistics/statistics_manager.cpp
+)
+target_include_directories(statistics_smoke_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+target_link_libraries(statistics_smoke_test PRIVATE Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Sql)
+add_qt_smoke_test(statistics_smoke_test)
+add_custom_command(TARGET statistics_smoke_test POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:statistics_smoke_test>/database
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql $<TARGET_FILE_DIR:statistics_smoke_test>/database/schema_v1.sql)
