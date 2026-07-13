@@ -122,10 +122,10 @@ void TrainManagementDialog::setupUI()
 
     // -------- 车次列表 --------
     m_table = new QTableWidget();
-    m_table->setColumnCount(7);
+    m_table->setColumnCount(8);
     m_table->setHorizontalHeaderLabels({
         "ID", "车次号", "出发站", "到达站",
-        "出发时间", "到达时间", "余票/总座"
+        "出发时间", "到达时间", "余票/总座", "状态"
     });
     m_table->verticalHeader()->setVisible(false);
 
@@ -171,6 +171,13 @@ void TrainManagementDialog::setupUI()
     m_deleteBtn->setEnabled(false);
     m_deleteBtn->setStyleSheet("background-color: #dc3545; color: white;");
 
+    m_resumeBtn = new QPushButton("恢复运营");
+    m_resumeBtn->setEnabled(false);
+
+    m_purgeBtn = new QPushButton("物理删除");
+    m_purgeBtn->setEnabled(false);
+    m_purgeBtn->setStyleSheet("background-color: #7f1d1d; color: white;");
+
     m_seatBtn = new QPushButton("座位管理");
     m_seatBtn->setEnabled(false);
 
@@ -183,6 +190,8 @@ void TrainManagementDialog::setupUI()
     actionLayout->addWidget(m_addBtn);
     actionLayout->addWidget(m_editBtn);
     actionLayout->addWidget(m_deleteBtn);
+    actionLayout->addWidget(m_resumeBtn);
+    actionLayout->addWidget(m_purgeBtn);
     actionLayout->addWidget(m_seatBtn);
     actionLayout->addStretch();
     actionLayout->addWidget(m_countLabel);
@@ -197,6 +206,8 @@ void TrainManagementDialog::setupUI()
     connect(m_addBtn, &QPushButton::clicked, this, &TrainManagementDialog::addTrain);
     connect(m_editBtn, &QPushButton::clicked, this, &TrainManagementDialog::editTrain);
     connect(m_deleteBtn, &QPushButton::clicked, this, &TrainManagementDialog::deleteTrain);
+    connect(m_resumeBtn, &QPushButton::clicked, this, &TrainManagementDialog::resumeTrain);
+    connect(m_purgeBtn, &QPushButton::clicked, this, &TrainManagementDialog::deleteTrainPermanently);
     connect(m_seatBtn, &QPushButton::clicked, this, &TrainManagementDialog::updateSeats);
     connect(m_searchInput, &QLineEdit::returnPressed, this, &TrainManagementDialog::searchTrain);
     connect(m_table, &QTableWidget::itemSelectionChanged, this, &TrainManagementDialog::onTableRowClicked);
@@ -252,6 +263,7 @@ void TrainManagementDialog::loadData()
         m_table->setItem(i, 6, new QTableWidgetItem(
                                    QString::number(t.remainingSeats) + "/" + QString::number(t.totalSeats)
                                    ));
+        m_table->setItem(i, 7, new QTableWidgetItem(t.enabled ? "运营中" : "已停运"));
     }
 
     m_countLabel->setText("共 " + QString::number(trains.size()) + " 条记录");
@@ -290,6 +302,7 @@ void TrainManagementDialog::searchTrain()
         m_table->setItem(i, 6, new QTableWidgetItem(
                                    QString::number(t.remainingSeats) + "/" + QString::number(t.totalSeats)
                                    ));
+        m_table->setItem(i, 7, new QTableWidgetItem(t.enabled ? "运营中" : "已停运"));
     }
 
     m_countLabel->setText("找到 " + QString::number(results.size()) + " 条记录");
@@ -324,6 +337,7 @@ void TrainManagementDialog::searchByStation()
         m_table->setItem(i, 6, new QTableWidgetItem(
                                    QString::number(t.remainingSeats) + "/" + QString::number(t.totalSeats)
                                    ));
+        m_table->setItem(i, 7, new QTableWidgetItem(t.enabled ? "运营中" : "已停运"));
     }
 
     m_countLabel->setText("从该站出发共 " + QString::number(results.size()) + " 条记录");
@@ -534,6 +548,67 @@ void TrainManagementDialog::deleteTrain()
     }
 }
 
+void TrainManagementDialog::resumeTrain()
+{
+    int trainId = getSelectedTrainId();
+    if (trainId == 0) return;
+
+    auto all = m_manager->getAllTrains(false);
+    QString trainNumber;
+    for (const auto& t : all) {
+        if (t.trainId == trainId) {
+            trainNumber = t.trainNumber;
+            break;
+        }
+    }
+
+    QMessageBox::StandardButton reply = QMessageBox::question(
+        this, "确认恢复运营",
+        "确定要恢复车次 " + trainNumber + " 的运营吗？",
+        QMessageBox::Yes | QMessageBox::No
+        );
+
+    if (reply == QMessageBox::Yes) {
+        if (m_manager->resumeTrain(trainId)) {
+            showMessage(m_manager->statusMessage(), true);
+            loadData();
+        } else {
+            showMessage(m_manager->statusMessage(), false);
+        }
+    }
+}
+
+void TrainManagementDialog::deleteTrainPermanently()
+{
+    int trainId = getSelectedTrainId();
+    if (trainId == 0) return;
+
+    auto all = m_manager->getAllTrains(false);
+    QString trainNumber;
+    for (const auto& t : all) {
+        if (t.trainId == trainId) {
+            trainNumber = t.trainNumber;
+            break;
+        }
+    }
+
+    QMessageBox::StandardButton reply = QMessageBox::warning(
+        this, "确认物理删除",
+        "物理删除会彻底移除车次 " + trainNumber + "。\n"
+        "只有没有关联订单的车次才能删除。\n\n确定继续吗？",
+        QMessageBox::Yes | QMessageBox::No
+        );
+
+    if (reply == QMessageBox::Yes) {
+        if (m_manager->deleteTrainPermanently(trainId)) {
+            showMessage(m_manager->statusMessage(), true);
+            loadData();
+        } else {
+            showMessage(m_manager->statusMessage(), false);
+        }
+    }
+}
+
 void TrainManagementDialog::updateSeats()
 {
     int trainId = getSelectedTrainId();
@@ -574,6 +649,8 @@ void TrainManagementDialog::onTableRowClicked()
     bool hasSelection = (row >= 0 && row < m_table->rowCount());
     m_editBtn->setEnabled(hasSelection);
     m_deleteBtn->setEnabled(hasSelection);
+    m_resumeBtn->setEnabled(hasSelection);
+    m_purgeBtn->setEnabled(hasSelection);
     m_seatBtn->setEnabled(hasSelection);
 }
 
@@ -593,6 +670,8 @@ void TrainManagementDialog::clearSelection()
 {
     m_editBtn->setEnabled(false);
     m_deleteBtn->setEnabled(false);
+    m_resumeBtn->setEnabled(false);
+    m_purgeBtn->setEnabled(false);
     m_seatBtn->setEnabled(false);
     m_table->clearSelection();
 }

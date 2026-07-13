@@ -275,6 +275,48 @@ bool TrainManager::deleteTrain(int trainId)
     return true;
 }
 
+bool TrainManager::resumeTrain(int trainId)
+{
+    if (!m_dbManager) {
+        setStatus("数据库管理器未初始化");
+        return false;
+    }
+
+    if (trainId <= 0) {
+        setStatus("无效的车次ID");
+        return false;
+    }
+
+    if (!m_dbManager->setTrainEnabled(trainId, true)) {
+        setStatus("恢复运营失败: " + m_dbManager->lastError());
+        return false;
+    }
+
+    setStatus("车次已恢复运营");
+    return true;
+}
+
+bool TrainManager::deleteTrainPermanently(int trainId)
+{
+    if (!m_dbManager) {
+        setStatus("数据库管理器未初始化");
+        return false;
+    }
+
+    if (trainId <= 0) {
+        setStatus("无效的车次ID");
+        return false;
+    }
+
+    if (!m_dbManager->deleteTrainPermanently(trainId)) {
+        setStatus("物理删除失败: " + m_dbManager->lastError());
+        return false;
+    }
+
+    setStatus("车次已物理删除");
+    return true;
+}
+
 // ============================================================
 // 5. 按关键字搜索
 // ============================================================

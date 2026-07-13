@@ -219,6 +219,67 @@ bool DatabaseManager::deleteTrain(int trainId) {
     return true;
 }
 
+bool DatabaseManager::setTrainEnabled(int trainId, bool enabled) {
+    m_lastError.clear();
+    QSqlQuery query(QSqlDatabase::database(m_connectionName));
+
+    query.prepare(QStringLiteral(
+        "UPDATE Train SET enabled = :enabled WHERE trainId = :trainId"
+    ));
+    query.bindValue(":enabled", enabled ? 1 : 0);
+    query.bindValue(":trainId", trainId);
+
+    if (!query.exec()) {
+        m_lastError = query.lastError().text();
+        return false;
+    }
+
+    if (query.numRowsAffected() == 0) {
+        m_lastError = QStringLiteral("No train found for the given trainId.");
+        return false;
+    }
+
+    return true;
+}
+
+bool DatabaseManager::deleteTrainPermanently(int trainId) {
+    m_lastError.clear();
+    QSqlQuery query(QSqlDatabase::database(m_connectionName));
+
+    query.prepare(QStringLiteral(
+        "SELECT COUNT(*) FROM \"Order\" WHERE trainId = :trainId"
+    ));
+    query.bindValue(":trainId", trainId);
+
+    if (!query.exec()) {
+        m_lastError = query.lastError().text();
+        return false;
+    }
+
+    if (query.next() && query.value(0).toInt() > 0) {
+        m_lastError = QStringLiteral("该车次已有订单记录，不能物理删除。");
+        return false;
+    }
+
+    QSqlQuery deleteQuery(QSqlDatabase::database(m_connectionName));
+    deleteQuery.prepare(QStringLiteral(
+        "DELETE FROM Train WHERE trainId = :trainId"
+    ));
+    deleteQuery.bindValue(":trainId", trainId);
+
+    if (!deleteQuery.exec()) {
+        m_lastError = deleteQuery.lastError().text();
+        return false;
+    }
+
+    if (deleteQuery.numRowsAffected() == 0) {
+        m_lastError = QStringLiteral("No train found for the given trainId.");
+        return false;
+    }
+
+    return true;
+}
+
 QList<TrainRecord> DatabaseManager::searchTrains(const QString &keyword) const {
     m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));

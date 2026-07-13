@@ -24,6 +24,8 @@ private slots:
     void addTrain();
     void editTrain();
     void deleteTrain();
+    void resumeTrain();
+    void deleteTrainPermanently();
     void updateSeats();
     void onTableRowClicked();
 
@@ -44,6 +46,8 @@ private:
     QPushButton *m_addBtn;
     QPushButton *m_editBtn;
     QPushButton *m_deleteBtn;
+    QPushButton *m_resumeBtn;
+    QPushButton *m_purgeBtn;
     QPushButton *m_seatBtn;
     QLabel *m_messageLabel;
     QLabel *m_countLabel;

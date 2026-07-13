@@ -79,6 +79,8 @@ public:
     // >>> Jaime added for CharlesSmartWang, issue 7 & 8:
     QList<TrainRecord> getAllTrains(bool onlyEnabled = true) const;
     bool deleteTrain(int trainId);
+    bool setTrainEnabled(int trainId, bool enabled);
+    bool deleteTrainPermanently(int trainId);
     QList<TrainRecord> searchTrains(const QString &keyword) const;
     QList<TrainRecord> searchByStation(int stationId, bool isDeparture = true) const;
 
