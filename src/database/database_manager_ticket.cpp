@@ -47,17 +47,15 @@ QList<DatabaseManager::TrainWithStations> DatabaseManager::searchTripsByStation(
         TrainWithStations t;
         t.trainId = q.value(0).toInt();
         t.trainNumber = q.value(1).toString();
-        t.totalSeats = q.value(2).toInt();
-        t.departureTime = q.value(3).toString();
-        t.arrivalTime = q.value(4).toString();
+        t.totalSeats = q.value(13).toInt();
+        t.departureTime = q.value(11).toString();
+        t.arrivalTime = q.value(12).toString();
         t.enabled = q.value(5).toBool();
         t.departureStationName = q.value(6).toString();
         t.arrivalStationName = q.value(7).toString();
         t.tripId = q.value(8).toInt();
         t.remainingSeats = q.value(9).toInt();
         t.travelDate = q.value(10).toString();
-        // Trip 自己的时间（可覆盖 Train 默认值）
-        (void)q.value(11); (void)q.value(12); (void)q.value(13);
         rs.append(t);
     }
     return rs;

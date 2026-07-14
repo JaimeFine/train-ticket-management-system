@@ -6,6 +6,8 @@
 
 class QLineEdit;
 class QLabel;
+class QCheckBox;
+class QDateEdit;
 class QTabWidget;
 class QTableWidget;
 class TicketManager;
@@ -31,7 +33,7 @@ private:
     void loadOwnOrders();
     void showMessage(bool success, const QString &message);
     QString statusText(int status) const;
-    int selectedTrainId() const;
+    int selectedTripId() const;
     void writeOperationLog(const QString &action, const QString &detail);
 
     TicketManager *m_ticketManager = nullptr;
@@ -41,6 +43,8 @@ private:
     QLineEdit *m_departureEdit = nullptr;
     QLineEdit *m_arrivalEdit = nullptr;
     QLineEdit *m_trainNumberEdit = nullptr;
+    QDateEdit *m_travelDateEdit = nullptr;
+    QCheckBox *m_allDatesCheckBox = nullptr;
     QLineEdit *m_passengerNameEdit = nullptr;
     QTableWidget *m_searchResultsTable = nullptr;
 
