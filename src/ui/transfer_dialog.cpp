@@ -236,9 +236,12 @@ void TransferDialog::setupUI()
     m_resultTable->setStyleSheet(
         "QTableWidget {"
         "    background-color: #ffffff;"
+        "    color: #1f2933;"
         "    border: 1px solid #d8e0dc;"
         "    border-radius: 8px;"
         "    gridline-color: #e5ece8;"
+        "    selection-background-color: #d9f99d;"
+        "    selection-color: #153832;"
         "}"
         "QHeaderView::section {"
         "    background-color: #eef5f1;"

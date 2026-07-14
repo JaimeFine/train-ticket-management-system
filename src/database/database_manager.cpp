@@ -81,6 +81,15 @@ namespace {
 
         return true;
     }
+
+    bool tableHasRows(QSqlDatabase &database, const QString &tableName) {
+        QSqlQuery query(database);
+        if (!query.exec(QStringLiteral("SELECT 1 FROM %1 LIMIT 1").arg(tableName))) {
+            return false;
+        }
+
+        return query.next();
+    }
 }   // namespace
 
 DatabaseManager::DatabaseManager() : m_connectionName(QStringLiteral(
@@ -269,6 +278,14 @@ bool DatabaseManager::seedDemoData() {
     if (!database.isOpen()) {
         m_lastError = QStringLiteral("Database connection is not open.");
         return false;
+    }
+
+    // 已有完整演示数据时直接跳过，避免每次启动都重复跑整套种子写入。
+    if (tableHasRows(database, QStringLiteral("User"))
+        && tableHasRows(database, QStringLiteral("Station"))
+        && tableHasRows(database, QStringLiteral("Train"))
+        && tableHasRows(database, QStringLiteral("Trip"))) {
+        return true;
     }
 
     if (!database.transaction()) {

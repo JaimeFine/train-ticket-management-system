@@ -12,6 +12,33 @@
 #include <QTime>
 #include <queue>
 
+namespace {
+QDateTime parseRouteDateTime(const QString &timeText)
+{
+    QDateTime dateTime = QDateTime::fromString(timeText, "yyyy-MM-dd HH:mm");
+    if (dateTime.isValid()) {
+        return dateTime;
+    }
+
+    dateTime = QDateTime::fromString(timeText, "yyyy-MM-dd HH:mm:ss");
+    if (dateTime.isValid()) {
+        return dateTime;
+    }
+
+    const QTime time = QTime::fromString(timeText, "HH:mm");
+    if (time.isValid()) {
+        return QDateTime(QDate(2000, 1, 1), time);
+    }
+
+    const QTime timeWithSeconds = QTime::fromString(timeText, "HH:mm:ss");
+    if (timeWithSeconds.isValid()) {
+        return QDateTime(QDate(2000, 1, 1), timeWithSeconds);
+    }
+
+    return QDateTime();
+}
+}
+
 // ============================================================
 // RoutePath 实现
 // ============================================================
@@ -70,12 +97,8 @@ void RouteGraph::buildFromDatabase(DatabaseManager* dbManager)
     int edgeCount = 0;
     for (const TrainRecord& train : trains) {
         // 计算乘车时间（分钟）
-        QDateTime dep = QDateTime::fromString(train.departureTime, "yyyy-MM-dd HH:mm");
-        QDateTime arr = QDateTime::fromString(train.arrivalTime, "yyyy-MM-dd HH:mm");
-        if (!dep.isValid() || !arr.isValid()) {
-            dep = QDateTime::fromString(train.departureTime, "yyyy-MM-dd HH:mm:ss");
-            arr = QDateTime::fromString(train.arrivalTime, "yyyy-MM-dd HH:mm:ss");
-        }
+        QDateTime dep = parseRouteDateTime(train.departureTime);
+        QDateTime arr = parseRouteDateTime(train.arrivalTime);
         if (!dep.isValid() || !arr.isValid()) {
             qDebug() << "RouteGraph: 时间格式无效:" << train.departureTime << train.arrivalTime;
             continue;

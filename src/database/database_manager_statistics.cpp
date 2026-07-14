@@ -127,7 +127,7 @@ DatabaseManager::monthlyPassengerFlow() const
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     if (!query.exec(QStringLiteral(
-        "SELECT strftime('%%Y-%%m', purchaseTime) AS month, "
+        "SELECT strftime('%Y-%m', purchaseTime) AS month, "
         "       COUNT(*) AS total, "
         "       SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) AS booked, "
         "       SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) AS refunded "

@@ -275,8 +275,11 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     accountBlock->setSpacing(8);
     accountBlock->addWidget(roleBadge);
     accountBlock->addWidget(accountButton);
-    if (m_loginResult.role != UserRole::Guest) {
-        auto *logoutButton = new QPushButton(QStringLiteral("退出登录"), headerPanel);
+    {
+        const QString exitButtonText = m_loginResult.role == UserRole::Guest
+                                           ? QStringLiteral("返回登录")
+                                           : QStringLiteral("退出登录");
+        auto *logoutButton = new QPushButton(exitButtonText, headerPanel);
         logoutButton->setObjectName(QStringLiteral("logoutButton"));
         connect(logoutButton, &QPushButton::clicked, this, [this]() {
             m_logoutRequested = true;
