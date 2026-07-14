@@ -520,7 +520,7 @@ void TicketServiceDialog::searchTrains()
         const double price = result.value(QStringLiteral("dynamicPrice")).toDouble();
         m_searchResultsTable->setItem(row, 8, new QTableWidgetItem(
             price > 0.0
-                ? QStringLiteral("￥%1").arg(price, 0, 'f', 1)
+                ? QStringLiteral("￥%1").arg(price, 0, 'f', 0)
                 : QStringLiteral("待确认")));
 
         for (int column : {0, 1, 2, 3, 4, 5, 6, 7, 8}) {

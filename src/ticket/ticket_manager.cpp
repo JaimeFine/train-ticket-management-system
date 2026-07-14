@@ -81,7 +81,7 @@ double calculateBasePrice(const DatabaseManager::TrainWithStations &train,
     const double estimatedDistance = travelHours * profile.averageSpeed;
     const double basePrice = std::max(20.0,
                                       estimatedDistance * profile.pricePerKilometer);
-    return std::round(basePrice * 10.0) / 10.0;
+    return std::round(basePrice);
 }
 
 double calculateDynamicPrice(const DatabaseManager::TrainWithStations &train,
@@ -129,7 +129,7 @@ double calculateDynamicPrice(const DatabaseManager::TrainWithStations &train,
     }
 
     const double result = basePrice * seatFactor * timeFactor * dateFactor;
-    return std::round(result * 10.0) / 10.0;
+    return std::round(result);
 }
 
 QVariantMap trainToMap(const DatabaseManager::TrainWithStations &train)

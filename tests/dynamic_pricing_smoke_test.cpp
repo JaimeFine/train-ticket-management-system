@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
     }
 
     const double basePrice = normalResult.value(QStringLiteral("basePrice")).toDouble();
-    if (std::abs(basePrice - 220.8) > 0.001
+    if (std::abs(basePrice - 221.0) > 0.001
         || std::abs(busyResult.value(QStringLiteral("basePrice")).toDouble()
                     - basePrice) > 0.001) {
         qCritical() << "Base fare was not calculated from the train type correctly:"
