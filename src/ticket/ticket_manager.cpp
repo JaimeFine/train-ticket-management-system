@@ -1,6 +1,157 @@
 #include "ticket_manager.h"
 #include "database_manager.h"
+#include <QDate>
 #include <QDateTime>
+#include <QTime>
+
+#include <algorithm>
+#include <cmath>
+
+namespace {
+QDateTime readDateTime(const QString &text)
+{
+    QDateTime value = QDateTime::fromString(text, QStringLiteral("yyyy-MM-dd HH:mm:ss"));
+    if (!value.isValid()) {
+        value = QDateTime::fromString(text, Qt::ISODate);
+    }
+    return value;
+}
+
+QTime readTime(const QString &text)
+{
+    QTime value = QTime::fromString(text, QStringLiteral("HH:mm:ss"));
+    if (!value.isValid()) {
+        value = QTime::fromString(text, QStringLiteral("HH:mm"));
+    }
+    return value;
+}
+
+int calculateTravelMinutes(const QString &departureTime, const QString &arrivalTime)
+{
+    const QDateTime departure = readDateTime(departureTime);
+    const QDateTime arrival = readDateTime(arrivalTime);
+    if (departure.isValid() && arrival.isValid()) {
+        const qint64 minutes = departure.secsTo(arrival) / 60;
+        return minutes > 0 ? static_cast<int>(minutes) : 0;
+    }
+
+    const QTime departureClock = readTime(departureTime);
+    const QTime arrivalClock = readTime(arrivalTime);
+    if (!departureClock.isValid() || !arrivalClock.isValid()) {
+        return 0;
+    }
+
+    int seconds = departureClock.secsTo(arrivalClock);
+    if (seconds <= 0) {
+        seconds += 24 * 60 * 60;
+    }
+    return seconds / 60;
+}
+
+struct FareProfile
+{
+    double averageSpeed = 100.0;
+    double pricePerKilometer = 0.15;
+};
+
+FareProfile fareProfileForTrain(const QString &trainNumber)
+{
+    const QString number = trainNumber.trimmed().toUpper();
+    if (number.startsWith(QLatin1Char('G'))) {
+        return {240.0, 0.46};
+    }
+    if (number.startsWith(QLatin1Char('D'))
+        || number.startsWith(QLatin1Char('C'))) {
+        return {180.0, 0.31};
+    }
+    return {100.0, 0.15};
+}
+
+double calculateBasePrice(const DatabaseManager::TrainWithStations &train,
+                          int travelMinutes)
+{
+    if (travelMinutes <= 0) {
+        return 0.0;
+    }
+
+    // 数据库暂时没有线路里程，所以先按车次类型估算平均速度，
+    // 再用运行时间估算里程。这里的费率是课程项目模拟值，不代表12306实际报价。
+    const FareProfile profile = fareProfileForTrain(train.trainNumber);
+    const double travelHours = travelMinutes / 60.0;
+    const double estimatedDistance = travelHours * profile.averageSpeed;
+    const double basePrice = std::max(20.0,
+                                      estimatedDistance * profile.pricePerKilometer);
+    return std::round(basePrice * 10.0) / 10.0;
+}
+
+double calculateDynamicPrice(const DatabaseManager::TrainWithStations &train,
+                             int travelMinutes)
+{
+    const double basePrice = calculateBasePrice(train, travelMinutes);
+    if (basePrice <= 0.0) {
+        return 0.0;
+    }
+
+    // 同一趟行程余票越少，价格适当提高。
+    double seatFactor = 1.0;
+    if (train.totalSeats > 0) {
+        const double soldRate = 1.0 - static_cast<double>(train.remainingSeats)
+                                          / train.totalSeats;
+        if (soldRate >= 0.8) {
+            seatFactor = 1.25;
+        } else if (soldRate >= 0.5) {
+            seatFactor = 1.12;
+        }
+    }
+
+    // 早晚通勤高峰的需求较大，增加一个小幅高峰系数。
+    double timeFactor = 1.0;
+    const QDateTime departure = readDateTime(train.departureTime);
+    const QTime departureClock = departure.isValid()
+                                     ? departure.time()
+                                     : readTime(train.departureTime);
+    if (departureClock.isValid()) {
+        const int hour = departureClock.hour();
+        if ((hour >= 7 && hour < 10) || (hour >= 17 && hour < 20)) {
+            timeFactor = 1.10;
+        }
+    }
+
+    // 临近出发时乘客选择更少，因此当天和次日车次会稍贵一些。
+    double dateFactor = 1.0;
+    if (departure.isValid()) {
+        const int daysBeforeTravel = QDate::currentDate().daysTo(departure.date());
+        if (daysBeforeTravel >= 0 && daysBeforeTravel <= 1) {
+            dateFactor = 1.15;
+        } else if (daysBeforeTravel <= 3 && daysBeforeTravel > 1) {
+            dateFactor = 1.08;
+        }
+    }
+
+    const double result = basePrice * seatFactor * timeFactor * dateFactor;
+    return std::round(result * 10.0) / 10.0;
+}
+
+QVariantMap trainToMap(const DatabaseManager::TrainWithStations &train)
+{
+    QVariantMap map;
+    map[QStringLiteral("trainId")] = train.trainId;
+    map[QStringLiteral("trainNumber")] = train.trainNumber;
+    map[QStringLiteral("departureStation")] = train.departureStationName;
+    map[QStringLiteral("arrivalStation")] = train.arrivalStationName;
+    map[QStringLiteral("departureTime")] = train.departureTime;
+    map[QStringLiteral("arrivalTime")] = train.arrivalTime;
+    map[QStringLiteral("remainingSeats")] = train.remainingSeats;
+    map[QStringLiteral("totalSeats")] = train.totalSeats;
+
+    const int travelMinutes = calculateTravelMinutes(train.departureTime,
+                                                     train.arrivalTime);
+    map[QStringLiteral("travelMinutes")] = travelMinutes;
+    map[QStringLiteral("basePrice")] = calculateBasePrice(train, travelMinutes);
+    map[QStringLiteral("dynamicPrice")] = calculateDynamicPrice(train, travelMinutes);
+    return map;
+}
+}
 
 TicketManager::TicketManager(DatabaseManager &db) : m_db(db) {}
 
@@ -33,15 +184,11 @@ int TicketManager::bookTicket(int userId, int trainId, const QString &passengerN
 int TicketManager::remainingSeats(int trainId) const {
     auto t=m_db.findTrainById(trainId); return t?t->remainingSeats:-1;
 }
-static QVariantMap train2map(const DatabaseManager::TrainWithStations &t){
-    QVariantMap m;m["trainId"]=t.trainId;m["trainNumber"]=t.trainNumber;
-    m["departureStation"]=t.departureStationName;m["arrivalStation"]=t.arrivalStationName;
-    m["departureTime"]=t.departureTime;m["arrivalTime"]=t.arrivalTime;
-    m["remainingSeats"]=t.remainingSeats;m["totalSeats"]=t.totalSeats;return m;
-}
 QVector<QVariantMap> TicketManager::searchTrains(const QString &dep,const QString &arr,const QString &date) const {
     QVector<QVariantMap> r;
-    for(auto &t:m_db.searchTrainsByStation(dep,arr,date))r.append(train2map(t));
+    for (const auto &train : m_db.searchTrainsByStation(dep, arr, date)) {
+        r.append(trainToMap(train));
+    }
     return r;
 }
 QVector<QVariantMap> TicketManager::searchByTrainNumber(const QString &num) const {
@@ -49,11 +196,18 @@ QVector<QVariantMap> TicketManager::searchByTrainNumber(const QString &num) cons
     if(!t||!t->enabled)return{};
     auto ds=m_db.findStationById(t->departureStationId);
     auto as=m_db.findStationById(t->arrivalStationId);
-    QVariantMap m;m["trainId"]=t->trainId;m["trainNumber"]=t->trainNumber;
-    m["departureStation"]=ds?ds->stationName:"";m["arrivalStation"]=as?as->stationName:"";
-    m["departureTime"]=t->departureTime;m["arrivalTime"]=t->arrivalTime;
-    m["remainingSeats"]=t->remainingSeats;m["totalSeats"]=t->totalSeats;
-    return {m};
+
+    DatabaseManager::TrainWithStations train;
+    train.trainId = t->trainId;
+    train.trainNumber = t->trainNumber;
+    train.departureStationName = ds ? ds->stationName : QString();
+    train.arrivalStationName = as ? as->stationName : QString();
+    train.departureTime = t->departureTime;
+    train.arrivalTime = t->arrivalTime;
+    train.remainingSeats = t->remainingSeats;
+    train.totalSeats = t->totalSeats;
+    train.enabled = t->enabled;
+    return {trainToMap(train)};
 }
 QString TicketManager::lastError() const { return m_lastError; }
 // ══════════════════════ Issue 10: 退票 + 改签 + 订单查询 ══════════════════════

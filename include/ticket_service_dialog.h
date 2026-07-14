@@ -6,6 +6,8 @@
 
 class QLineEdit;
 class QLabel;
+class QCheckBox;
+class QDateEdit;
 class QTabWidget;
 class QTableWidget;
 class TicketManager;
@@ -41,7 +43,8 @@ private:
     QLineEdit *m_departureEdit = nullptr;
     QLineEdit *m_arrivalEdit = nullptr;
     QLineEdit *m_trainNumberEdit = nullptr;
-    QLineEdit *m_passengerNameEdit = nullptr;
+    QDateEdit *m_travelDateEdit = nullptr;
+    QCheckBox *m_allDatesCheckBox = nullptr;
     QTableWidget *m_searchResultsTable = nullptr;
 
     QLineEdit *m_refundOrderIdEdit = nullptr;
