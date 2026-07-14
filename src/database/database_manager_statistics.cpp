@@ -16,12 +16,11 @@ DatabaseManager::findAllOrdersWithDetails() const
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     query.prepare(QStringLiteral(
-        "SELECT o.orderId, o.userId, o.tripId, o.status, "
-        "       t.trainId, t.trainNumber, o.passengerName, o.purchaseTime, "
-        "       ds.stationName, a_s.stationName, o.travelDate "
+        "SELECT o.orderId, o.userId, o.trainId, o.status, "
+        "       t.trainNumber, o.passengerName, o.purchaseTime, "
+        "       ds.stationName, a_s.stationName "
         "FROM \"Order\" o "
-        "JOIN Trip tr ON o.tripId = tr.tripId "
-        "JOIN Train t ON tr.trainId = t.trainId "
+        "JOIN Train t  ON o.trainId = t.trainId "
         "JOIN Station ds ON t.departureStationId = ds.stationId "
         "JOIN Station a_s ON t.arrivalStationId   = a_s.stationId "
         "ORDER BY o.purchaseTime DESC"
@@ -37,15 +36,13 @@ DatabaseManager::findAllOrdersWithDetails() const
         OrderWithDetails d;
         d.orderId              = query.value(0).toInt();
         d.userId               = query.value(1).toInt();
-        d.tripId               = query.value(2).toInt();
+        d.trainId              = query.value(2).toInt();
         d.status               = query.value(3).toInt();
-        d.trainId              = query.value(4).toInt();
-        d.trainNumber          = query.value(5).toString();
-        d.passengerName        = query.value(6).toString();
-        d.purchaseTime         = query.value(7).toString();
-        d.departureStationName = query.value(8).toString();
-        d.arrivalStationName   = query.value(9).toString();
-        d.travelDate           = query.value(10).toString();
+        d.trainNumber          = query.value(4).toString();
+        d.passengerName        = query.value(5).toString();
+        d.purchaseTime         = query.value(6).toString();
+        d.departureStationName = query.value(7).toString();
+        d.arrivalStationName   = query.value(8).toString();
         results.append(d);
     }
     return results;
@@ -92,8 +89,7 @@ DatabaseManager::popularRoutes(int limit) const
     query.prepare(QStringLiteral(
         "SELECT ds.stationName, a_s.stationName, COUNT(*) AS cnt "
         "FROM \"Order\" o "
-        "JOIN Trip tr ON o.tripId = tr.tripId "
-        "JOIN Train t  ON tr.trainId = t.trainId "
+        "JOIN Train t  ON o.trainId = t.trainId "
         "JOIN Station ds ON t.departureStationId = ds.stationId "
         "JOIN Station a_s ON t.arrivalStationId   = a_s.stationId "
         "WHERE o.status = 0 "
@@ -127,7 +123,7 @@ DatabaseManager::monthlyPassengerFlow() const
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     if (!query.exec(QStringLiteral(
-        "SELECT strftime('%Y-%m', purchaseTime) AS month, "
+        "SELECT strftime('%%Y-%%m', purchaseTime) AS month, "
         "       COUNT(*) AS total, "
         "       SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END) AS booked, "
         "       SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END) AS refunded "
