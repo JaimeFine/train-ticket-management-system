@@ -9,6 +9,15 @@
 #include <cmath>
 
 namespace {
+struct HolidayPeriod
+{
+    int startMonth = 0;
+    int startDay = 0;
+    int endMonth = 0;
+    int endDay = 0;
+    double factor = 1.0;
+};
+
 QDateTime readDateTime(const QString &text)
 {
     QDateTime value = QDateTime::fromString(text, QStringLiteral("yyyy-MM-dd HH:mm:ss"));
@@ -49,6 +58,16 @@ int calculateTravelMinutes(const QString &departureTime, const QString &arrivalT
     return seconds / 60;
 }
 
+QDateTime readTripDepartureDateTime(const QString &travelDate, const QString &departureTime)
+{
+    const QDate date = QDate::fromString(travelDate, QStringLiteral("yyyy-MM-dd"));
+    const QTime time = readTime(departureTime);
+    if (!date.isValid() || !time.isValid()) {
+        return QDateTime();
+    }
+    return QDateTime(date, time);
+}
+
 struct FareProfile
 {
     double averageSpeed = 100.0;
@@ -68,7 +87,7 @@ FareProfile fareProfileForTrain(const QString &trainNumber)
     return {100.0, 0.15};
 }
 
-double calculateBasePrice(const QString &trainNumber, int travelMinutes)
+double estimateBasePrice(const QString &trainNumber, int travelMinutes)
 {
     if (travelMinutes <= 0) {
         return 0.0;
@@ -82,10 +101,48 @@ double calculateBasePrice(const QString &trainNumber, int travelMinutes)
     return std::round(basePrice);
 }
 
+double calculateBasePrice(const DatabaseManager::TrainWithStations &trip, int travelMinutes)
+{
+    if (trip.basePrice > 0.0) {
+        return trip.basePrice;
+    }
+
+    return estimateBasePrice(trip.trainNumber, travelMinutes);
+}
+
+double holidayDemandFactor(const QDate &travelDate)
+{
+    if (!travelDate.isValid()) {
+        return 1.0;
+    }
+
+    static const HolidayPeriod holidayPeriods[] = {
+        {1, 1, 1, 3, 1.10},
+        {5, 1, 5, 5, 1.15},
+        {10, 1, 10, 7, 1.20},
+    };
+
+    const int md = travelDate.month() * 100 + travelDate.day();
+    for (const HolidayPeriod &period : holidayPeriods) {
+        const int start = period.startMonth * 100 + period.startDay;
+        const int end = period.endMonth * 100 + period.endDay;
+        if (md >= start && md <= end) {
+            return period.factor;
+        }
+    }
+
+    if (travelDate.dayOfWeek() == Qt::Saturday
+        || travelDate.dayOfWeek() == Qt::Sunday) {
+        return 1.05;
+    }
+
+    return 1.0;
+}
+
 double calculateDynamicPrice(const DatabaseManager::TrainWithStations &trip,
                              int travelMinutes)
 {
-    const double basePrice = calculateBasePrice(trip.trainNumber, travelMinutes);
+    const double basePrice = calculateBasePrice(trip, travelMinutes);
     if (basePrice <= 0.0) {
         return 0.0;
     }
@@ -110,18 +167,33 @@ double calculateDynamicPrice(const DatabaseManager::TrainWithStations &trip,
         }
     }
 
-    double dateFactor = 1.0;
     const QDate travelDate = QDate::fromString(trip.travelDate, QStringLiteral("yyyy-MM-dd"));
-    if (travelDate.isValid()) {
-        const int daysBeforeTravel = QDate::currentDate().daysTo(travelDate);
-        if (daysBeforeTravel >= 0 && daysBeforeTravel <= 1) {
-            dateFactor = 1.15;
-        } else if (daysBeforeTravel > 1 && daysBeforeTravel <= 3) {
-            dateFactor = 1.08;
+    const double holidayFactor = holidayDemandFactor(travelDate);
+
+    double lastMinuteFactor = 1.0;
+    if (trip.totalSeats > 0) {
+        const double remainingRate =
+            static_cast<double>(trip.remainingSeats) / trip.totalSeats;
+        const QDateTime departureDateTime =
+            readTripDepartureDateTime(trip.travelDate, trip.departureTime);
+        if (remainingRate >= 0.60 && departureDateTime.isValid()) {
+            const double hoursBeforeDeparture =
+                QDateTime::currentDateTime().secsTo(departureDateTime) / 3600.0;
+            if (hoursBeforeDeparture >= 0.0) {
+                if (hoursBeforeDeparture <= 6.0) {
+                    lastMinuteFactor = 0.75;
+                } else if (hoursBeforeDeparture <= 24.0) {
+                    lastMinuteFactor = 0.84;
+                } else if (hoursBeforeDeparture <= 48.0) {
+                    lastMinuteFactor = 0.92;
+                }
+            }
         }
     }
 
-    return std::round(basePrice * seatFactor * timeFactor * dateFactor);
+    const double dynamicPrice =
+        basePrice * seatFactor * timeFactor * holidayFactor * lastMinuteFactor;
+    return std::round(std::max(basePrice * 0.70, dynamicPrice));
 }
 
 QVariantMap tripToMap(const DatabaseManager::TrainWithStations &trip)
@@ -141,7 +213,7 @@ QVariantMap tripToMap(const DatabaseManager::TrainWithStations &trip)
     const int travelMinutes = calculateTravelMinutes(trip.departureTime,
                                                      trip.arrivalTime);
     map[QStringLiteral("travelMinutes")] = travelMinutes;
-    map[QStringLiteral("basePrice")] = calculateBasePrice(trip.trainNumber, travelMinutes);
+    map[QStringLiteral("basePrice")] = calculateBasePrice(trip, travelMinutes);
     map[QStringLiteral("dynamicPrice")] = calculateDynamicPrice(trip, travelMinutes);
     return map;
 }
@@ -257,6 +329,7 @@ QVector<QVariantMap> TicketManager::searchByTrainNumber(const QString &number) c
         trip.arrivalTime = tripRecord.arrivalTime;
         trip.totalSeats = tripRecord.totalSeats;
         trip.remainingSeats = tripRecord.remainingSeats;
+        trip.basePrice = tripRecord.basePrice;
         trip.enabled = tripRecord.enabled;
         results.append(tripToMap(trip));
     }

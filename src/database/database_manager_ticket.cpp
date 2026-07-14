@@ -47,7 +47,7 @@ QList<DatabaseManager::TrainWithStations> DatabaseManager::searchTripsByStation(
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     QString sql = QStringLiteral(
-        "SELECT t.trainId, t.trainNumber, tr.totalSeats, tr.remainingSeats, "
+        "SELECT t.trainId, t.trainNumber, tr.totalSeats, tr.remainingSeats, tr.basePrice, "
         "tr.departureTime, tr.arrivalTime, t.enabled, ds.stationName, as2.stationName, "
         "tr.travelDate, tr.tripId "
         "FROM Train t "
@@ -92,13 +92,14 @@ QList<DatabaseManager::TrainWithStations> DatabaseManager::searchTripsByStation(
         record.trainNumber = query.value(1).toString();
         record.totalSeats = query.value(2).toInt();
         record.remainingSeats = query.value(3).toInt();
-        record.departureTime = query.value(4).toString();
-        record.arrivalTime = query.value(5).toString();
-        record.enabled = query.value(6).toBool();
-        record.departureStationName = query.value(7).toString();
-        record.arrivalStationName = query.value(8).toString();
-        record.travelDate = query.value(9).toString();
-        record.tripId = query.value(10).toInt();
+        record.basePrice = query.value(4).toDouble();
+        record.departureTime = query.value(5).toString();
+        record.arrivalTime = query.value(6).toString();
+        record.enabled = query.value(7).toBool();
+        record.departureStationName = query.value(8).toString();
+        record.arrivalStationName = query.value(9).toString();
+        record.travelDate = query.value(10).toString();
+        record.tripId = query.value(11).toInt();
         results.append(record);
     }
 
