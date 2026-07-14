@@ -12,6 +12,5 @@ struct TrainRecord {
     QString departureTime;
     QString arrivalTime;
     int totalSeats = 0;
-    int remainingSeats = 0;
     bool enabled = true;
 };

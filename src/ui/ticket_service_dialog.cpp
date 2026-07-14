@@ -4,6 +4,9 @@
 #include "database_manager.h"
 
 #include <QAbstractItemView>
+#include <QCheckBox>
+#include <QDate>
+#include <QDateEdit>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHeaderView>
@@ -29,6 +32,23 @@ QTableWidget *createTable(QWidget *parent, const QStringList &headers)
     table->verticalHeader()->setVisible(false);
     table->horizontalHeader()->setStretchLastSection(true);
     return table;
+}
+
+QString durationText(int totalMinutes)
+{
+    if (totalMinutes <= 0) {
+        return QStringLiteral("待确认");
+    }
+
+    const int hours = totalMinutes / 60;
+    const int minutes = totalMinutes % 60;
+    if (hours == 0) {
+        return QStringLiteral("%1分钟").arg(minutes);
+    }
+    if (minutes == 0) {
+        return QStringLiteral("%1小时").arg(hours);
+    }
+    return QStringLiteral("%1小时%2分钟").arg(hours).arg(minutes);
 }
 }
 
@@ -209,25 +229,42 @@ void TicketServiceDialog::setupSearchTab()
     m_arrivalEdit->setPlaceholderText(QStringLiteral("例如：上海虹桥"));
     m_trainNumberEdit = new QLineEdit(searchGroup);
     m_trainNumberEdit->setPlaceholderText(QStringLiteral("例如：G1001"));
+    m_travelDateEdit = new QDateEdit(QDate::currentDate(), searchGroup);
+    m_travelDateEdit->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
+    m_travelDateEdit->setCalendarPopup(true);
+    m_allDatesCheckBox = new QCheckBox(QStringLiteral("不限日期"), searchGroup);
+    m_allDatesCheckBox->setChecked(true);
+    m_travelDateEdit->setEnabled(false);
+    connect(m_allDatesCheckBox, &QCheckBox::toggled, this, [this](bool checked) {
+        m_travelDateEdit->setEnabled(!checked);
+    });
 
     formLayout->addRow(QStringLiteral("出发站"), m_departureEdit);
     formLayout->addRow(QStringLiteral("到达站"), m_arrivalEdit);
     formLayout->addRow(QStringLiteral("车次编号"), m_trainNumberEdit);
+    auto *dateLayout = new QHBoxLayout;
+    dateLayout->addWidget(m_travelDateEdit);
+    dateLayout->addWidget(m_allDatesCheckBox);
+    dateLayout->addStretch();
+    formLayout->addRow(QStringLiteral("出行日期"), dateLayout);
 
     auto *searchButton = new QPushButton(QStringLiteral("开始查询"), searchGroup);
-    connect(searchButton, &QPushButton::clicked, this, [this]() { searchTrains(); });
+    connect(searchButton, &QPushButton::clicked, this, [this]() { searchTrips(); });
 
     searchLayout->addLayout(formLayout);
     searchLayout->addWidget(searchButton, 0, Qt::AlignRight);
 
     m_searchResultsTable = createTable(tab, {
-        QStringLiteral("车次ID"),
+        QStringLiteral("班次ID"),
         QStringLiteral("车次编号"),
+        QStringLiteral("出行日期"),
         QStringLiteral("出发站"),
         QStringLiteral("到达站"),
         QStringLiteral("出发时间"),
         QStringLiteral("到达时间"),
-        QStringLiteral("余票")
+        QStringLiteral("行程时长"),
+        QStringLiteral("余票"),
+        QStringLiteral("动态票价")
     });
 
     auto *bookingGroup = new QGroupBox(QStringLiteral("订票"), tab);
@@ -280,9 +317,9 @@ void TicketServiceDialog::setupManageTab()
     m_changeOrderIdEdit = new QLineEdit(changeGroup);
     m_changeOrderIdEdit->setPlaceholderText(QStringLiteral("请输入原订单号"));
     m_changeTrainIdEdit = new QLineEdit(changeGroup);
-    m_changeTrainIdEdit->setPlaceholderText(QStringLiteral("请输入新车次ID"));
+    m_changeTrainIdEdit->setPlaceholderText(QStringLiteral("请输入新班次ID"));
     changeForm->addRow(QStringLiteral("原订单号"), m_changeOrderIdEdit);
-    changeForm->addRow(QStringLiteral("新车次ID"), m_changeTrainIdEdit);
+    changeForm->addRow(QStringLiteral("新班次ID"), m_changeTrainIdEdit);
     auto *changeButton = new QPushButton(QStringLiteral("办理改签"), changeGroup);
     connect(changeButton, &QPushButton::clicked, this, [this]() { changeOrder(); });
     changeLayout->addLayout(changeForm);
@@ -352,28 +389,51 @@ void TicketServiceDialog::setupQueryTab()
     m_tabWidget->addTab(tab, QStringLiteral("订单查询"));
 }
 
-void TicketServiceDialog::searchTrains()
+void TicketServiceDialog::searchTrips()
 {
     m_searchResultsTable->setRowCount(0);
+
+    const QString travelDate = m_allDatesCheckBox != nullptr && !m_allDatesCheckBox->isChecked()
+        ? m_travelDateEdit->date().toString(QStringLiteral("yyyy-MM-dd"))
+        : QString();
 
     QVector<QVariantMap> results;
     if (!m_trainNumberEdit->text().trimmed().isEmpty()) {
         results = m_ticketManager->searchByTrainNumber(m_trainNumberEdit->text().trimmed());
+        if (!travelDate.isEmpty()) {
+            QVector<QVariantMap> filteredResults;
+            for (const QVariantMap &result : results) {
+                if (result.value(QStringLiteral("travelDate")).toString() == travelDate) {
+                    filteredResults.append(result);
+                }
+            }
+            results = filteredResults;
+        }
     } else {
-        results = m_ticketManager->searchTrains(m_departureEdit->text().trimmed(),
-                                                m_arrivalEdit->text().trimmed());
+        results = m_ticketManager->searchTrips(m_departureEdit->text().trimmed(),
+                                               m_arrivalEdit->text().trimmed(),
+                                               travelDate);
     }
 
     m_searchResultsTable->setRowCount(results.size());
     for (int row = 0; row < results.size(); ++row) {
         const QVariantMap &result = results[row];
-        m_searchResultsTable->setItem(row, 0, new QTableWidgetItem(QString::number(result.value(QStringLiteral("trainId")).toInt())));
+        m_searchResultsTable->setItem(row, 0, new QTableWidgetItem(QString::number(result.value(QStringLiteral("tripId")).toInt())));
         m_searchResultsTable->setItem(row, 1, new QTableWidgetItem(result.value(QStringLiteral("trainNumber")).toString()));
-        m_searchResultsTable->setItem(row, 2, new QTableWidgetItem(result.value(QStringLiteral("departureStation")).toString()));
-        m_searchResultsTable->setItem(row, 3, new QTableWidgetItem(result.value(QStringLiteral("arrivalStation")).toString()));
-        m_searchResultsTable->setItem(row, 4, new QTableWidgetItem(result.value(QStringLiteral("departureTime")).toString()));
-        m_searchResultsTable->setItem(row, 5, new QTableWidgetItem(result.value(QStringLiteral("arrivalTime")).toString()));
-        m_searchResultsTable->setItem(row, 6, new QTableWidgetItem(QString::number(result.value(QStringLiteral("remainingSeats")).toInt())));
+        m_searchResultsTable->setItem(row, 2, new QTableWidgetItem(result.value(QStringLiteral("travelDate")).toString()));
+        m_searchResultsTable->setItem(row, 3, new QTableWidgetItem(result.value(QStringLiteral("departureStation")).toString()));
+        m_searchResultsTable->setItem(row, 4, new QTableWidgetItem(result.value(QStringLiteral("arrivalStation")).toString()));
+        m_searchResultsTable->setItem(row, 5, new QTableWidgetItem(result.value(QStringLiteral("departureTime")).toString()));
+        m_searchResultsTable->setItem(row, 6, new QTableWidgetItem(result.value(QStringLiteral("arrivalTime")).toString()));
+        m_searchResultsTable->setItem(row, 7, new QTableWidgetItem(durationText(
+            result.value(QStringLiteral("travelMinutes")).toInt())));
+        m_searchResultsTable->setItem(row, 8, new QTableWidgetItem(QString::number(
+            result.value(QStringLiteral("remainingSeats")).toInt())));
+        const double price = result.value(QStringLiteral("dynamicPrice")).toDouble();
+        m_searchResultsTable->setItem(row, 9, new QTableWidgetItem(
+            price > 0.0
+                ? QStringLiteral("￥%1").arg(price, 0, 'f', 0)
+                : QStringLiteral("待确认")));
     }
     m_searchResultsTable->resizeColumnsToContents();
     showMessage(true, results.isEmpty() ? QStringLiteral("没有匹配到车次。")
@@ -387,9 +447,9 @@ void TicketServiceDialog::bookSelectedTrain()
         return;
     }
 
-    const int trainId = selectedTrainId();
-    if (trainId <= 0) {
-        showMessage(false, QStringLiteral("请先在查询结果中选择一个车次。"));
+    const int tripId = selectedTripId();
+    if (tripId <= 0) {
+        showMessage(false, QStringLiteral("请先在查询结果中选择一个班次。"));
         return;
     }
     if (m_passengerNameEdit->text().trimmed().isEmpty()) {
@@ -398,7 +458,7 @@ void TicketServiceDialog::bookSelectedTrain()
     }
 
     const int orderId = m_ticketManager->bookTicket(m_loginResult.userId,
-                                                    trainId,
+                                                    tripId,
                                                     m_passengerNameEdit->text().trimmed());
     if (orderId < 0) {
         showMessage(false, m_ticketManager->lastError());
@@ -407,9 +467,9 @@ void TicketServiceDialog::bookSelectedTrain()
 
     showMessage(true, QStringLiteral("订票成功，订单号：%1").arg(orderId));
     writeOperationLog(QStringLiteral("订票"),
-                      QStringLiteral("用户 %1 预订车次 %2，订单号 %3")
+                      QStringLiteral("用户 %1 预订班次 %2，订单号 %3")
                           .arg(m_loginResult.username)
-                          .arg(trainId)
+                          .arg(tripId)
                           .arg(orderId));
     loadOwnOrders();
 }
@@ -438,23 +498,23 @@ void TicketServiceDialog::refundOrder()
 void TicketServiceDialog::changeOrder()
 {
     const int orderId = m_changeOrderIdEdit->text().trimmed().toInt();
-    const int newTrainId = m_changeTrainIdEdit->text().trimmed().toInt();
-    if (orderId <= 0 || newTrainId <= 0) {
-        showMessage(false, QStringLiteral("请输入有效的订单号和新车次ID。"));
+    const int newTripId = m_changeTrainIdEdit->text().trimmed().toInt();
+    if (orderId <= 0 || newTripId <= 0) {
+        showMessage(false, QStringLiteral("请输入有效的订单号和新班次ID。"));
         return;
     }
 
-    if (!m_ticketManager->changeTicket(orderId, newTrainId)) {
+    if (!m_ticketManager->changeTicket(orderId, newTripId)) {
         showMessage(false, m_ticketManager->lastError());
         return;
     }
 
     showMessage(true, QStringLiteral("改签成功。"));
     writeOperationLog(QStringLiteral("改签"),
-                      QStringLiteral("用户 %1 改签，原订单 %2，新车次 %3")
+                      QStringLiteral("用户 %1 改签，原订单 %2，新班次 %3")
                           .arg(m_loginResult.username)
                           .arg(orderId)
-                          .arg(newTrainId));
+                          .arg(newTripId));
     loadOwnOrders();
 }
 
@@ -526,12 +586,14 @@ QString TicketServiceDialog::statusText(int status) const
         return QStringLiteral("已退票");
     case 2:
         return QStringLiteral("已改签");
+    case 3:
+        return QStringLiteral("已过期");
     default:
         return QStringLiteral("未知状态");
     }
 }
 
-int TicketServiceDialog::selectedTrainId() const
+int TicketServiceDialog::selectedTripId() const
 {
     const int row = m_searchResultsTable->currentRow();
     if (row < 0) {
