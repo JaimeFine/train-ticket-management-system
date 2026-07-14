@@ -62,14 +62,12 @@ int main(int argc, char *argv[])
     normalTrain.trainNumber = uniqueName(QStringLiteral("G_PRICE_NORMAL"));
     normalTrain.departureStationId = storedDeparture->stationId;
     normalTrain.arrivalStationId = storedArrival->stationId;
-    normalTrain.departureTime = travelDate + QStringLiteral(" 11:00:00");
-    normalTrain.arrivalTime = travelDate + QStringLiteral(" 13:00:00");
+    normalTrain.departureTime = QStringLiteral("11:00:00");
+    normalTrain.arrivalTime = QStringLiteral("13:00:00");
     normalTrain.totalSeats = 100;
-    normalTrain.remainingSeats = 100;
 
     TrainRecord busyTrain = normalTrain;
     busyTrain.trainNumber = uniqueName(QStringLiteral("G_PRICE_BUSY"));
-    busyTrain.remainingSeats = 10;
 
     if (!databaseManager.addTrain(normalTrain)
         || !databaseManager.addTrain(busyTrain)) {
@@ -77,8 +75,29 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    const auto storedNormalTrain = databaseManager.findTrainByNumber(normalTrain.trainNumber);
+    const auto storedBusyTrain = databaseManager.findTrainByNumber(busyTrain.trainNumber);
+    if (!storedNormalTrain || !storedBusyTrain) {
+        qCritical() << "Could not reload pricing test trains.";
+        return 1;
+    }
+
+    const auto normalTripId =
+        databaseManager.createTrip(storedNormalTrain->trainId, travelDate, 100);
+    const auto busyTripId =
+        databaseManager.createTrip(storedBusyTrain->trainId, travelDate, 100);
+    if (!normalTripId || !busyTripId) {
+        qCritical() << "Could not create pricing test trips:" << databaseManager.lastError();
+        return 1;
+    }
+
+    if (!databaseManager.adjustTripSeats(*busyTripId, -90)) {
+        qCritical() << "Could not reduce busy-trip seats:" << databaseManager.lastError();
+        return 1;
+    }
+
     TicketManager ticketManager(databaseManager);
-    const QVector<QVariantMap> results = ticketManager.searchTrains(
+    const QVector<QVariantMap> results = ticketManager.searchTrips(
         departure.stationName,
         arrival.stationName,
         travelDate);
@@ -90,7 +109,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    const QVector<QVariantMap> allResults = ticketManager.searchTrains(
+    const QVector<QVariantMap> allResults = ticketManager.searchTrips(
         QString(), QString(), QString());
     if (findResult(allResults, normalTrain.trainNumber).isEmpty()
         || findResult(allResults, busyTrain.trainNumber).isEmpty()) {

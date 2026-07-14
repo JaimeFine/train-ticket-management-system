@@ -42,8 +42,8 @@ add_custom_command(TARGET database_init_smoke_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
         $<TARGET_FILE_DIR:database_init_smoke_test>/database
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql
-        $<TARGET_FILE_DIR:database_init_smoke_test>/database/schema_v1.sql
+        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v2.sql
+        $<TARGET_FILE_DIR:database_init_smoke_test>/database/schema_v2.sql
 )
 
 add_executable(user_api_smoke_test
@@ -67,8 +67,8 @@ add_custom_command(TARGET user_api_smoke_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
         $<TARGET_FILE_DIR:user_api_smoke_test>/database
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql
-        $<TARGET_FILE_DIR:user_api_smoke_test>/database/schema_v1.sql
+        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v2.sql
+        $<TARGET_FILE_DIR:user_api_smoke_test>/database/schema_v2.sql
 )
 
 add_executable(login_role_permission_test
@@ -94,8 +94,8 @@ add_custom_command(TARGET login_role_permission_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
         $<TARGET_FILE_DIR:login_role_permission_test>/database
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql
-        $<TARGET_FILE_DIR:login_role_permission_test>/database/schema_v1.sql
+        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v2.sql
+        $<TARGET_FILE_DIR:login_role_permission_test>/database/schema_v2.sql
 )
 
 add_executable(login_account_management_test
@@ -121,8 +121,8 @@ add_custom_command(TARGET login_account_management_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
         $<TARGET_FILE_DIR:login_account_management_test>/database
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql
-        $<TARGET_FILE_DIR:login_account_management_test>/database/schema_v1.sql
+        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v2.sql
+        $<TARGET_FILE_DIR:login_account_management_test>/database/schema_v2.sql
 )
 
 add_executable(ticket_issue9_smoke_test
@@ -132,6 +132,7 @@ add_executable(ticket_issue9_smoke_test
     ../src/database/database_manager_user.cpp
     ../src/database/database_manager_station.cpp
     ../src/database/database_manager_train.cpp
+    ../src/database/database_manager_trip.cpp
     ../src/database/database_manager_order.cpp
     ../src/database/database_manager_ticket.cpp
     ../src/database/database_manager_statistics.cpp
@@ -153,8 +154,8 @@ add_custom_command(TARGET ticket_issue9_smoke_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
         $<TARGET_FILE_DIR:ticket_issue9_smoke_test>/database
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql
-        $<TARGET_FILE_DIR:ticket_issue9_smoke_test>/database/schema_v1.sql
+        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v2.sql
+        $<TARGET_FILE_DIR:ticket_issue9_smoke_test>/database/schema_v2.sql
 )
 
 add_executable(dynamic_pricing_smoke_test
@@ -164,6 +165,7 @@ add_executable(dynamic_pricing_smoke_test
     ../src/database/database_manager_user.cpp
     ../src/database/database_manager_station.cpp
     ../src/database/database_manager_train.cpp
+    ../src/database/database_manager_trip.cpp
     ../src/database/database_manager_order.cpp
     ../src/database/database_manager_ticket.cpp
     ../src/database/database_manager_statistics.cpp
@@ -185,8 +187,8 @@ add_custom_command(TARGET dynamic_pricing_smoke_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
         $<TARGET_FILE_DIR:dynamic_pricing_smoke_test>/database
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql
-        $<TARGET_FILE_DIR:dynamic_pricing_smoke_test>/database/schema_v1.sql
+        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v2.sql
+        $<TARGET_FILE_DIR:dynamic_pricing_smoke_test>/database/schema_v2.sql
 )
 
 add_executable(station_api_smoke_test
@@ -210,8 +212,8 @@ add_custom_command(TARGET station_api_smoke_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
         $<TARGET_FILE_DIR:station_api_smoke_test>/database
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql
-        $<TARGET_FILE_DIR:station_api_smoke_test>/database/schema_v1.sql
+        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v2.sql
+        $<TARGET_FILE_DIR:station_api_smoke_test>/database/schema_v2.sql
 )
 
 add_executable(train_api_smoke_test
@@ -236,8 +238,8 @@ add_custom_command(TARGET train_api_smoke_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
         $<TARGET_FILE_DIR:train_api_smoke_test>/database
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql
-        $<TARGET_FILE_DIR:train_api_smoke_test>/database/schema_v1.sql
+        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v2.sql
+        $<TARGET_FILE_DIR:train_api_smoke_test>/database/schema_v2.sql
 )
 
 add_executable(order_api_smoke_test
@@ -246,6 +248,7 @@ add_executable(order_api_smoke_test
     ../src/database/database_manager_user.cpp
     ../src/database/database_manager_station.cpp
     ../src/database/database_manager_train.cpp
+    ../src/database/database_manager_trip.cpp
     ../src/database/database_manager_order.cpp
 )
 
@@ -264,8 +267,8 @@ add_custom_command(TARGET order_api_smoke_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
         $<TARGET_FILE_DIR:order_api_smoke_test>/database
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql
-        $<TARGET_FILE_DIR:order_api_smoke_test>/database/schema_v1.sql
+        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v2.sql
+        $<TARGET_FILE_DIR:order_api_smoke_test>/database/schema_v2.sql
 )
 
 add_executable(ticket_issue10_smoke_test
@@ -274,6 +277,7 @@ add_executable(ticket_issue10_smoke_test
     ../src/database/database_manager_user.cpp
     ../src/database/database_manager_station.cpp
     ../src/database/database_manager_train.cpp
+    ../src/database/database_manager_trip.cpp
     ../src/database/database_manager_order.cpp
     ../src/database/database_manager_ticket.cpp
     ../src/database/database_manager_statistics.cpp
@@ -296,14 +300,15 @@ add_custom_command(TARGET ticket_issue10_smoke_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
         $<TARGET_FILE_DIR:ticket_issue10_smoke_test>/database
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql
-        $<TARGET_FILE_DIR:ticket_issue10_smoke_test>/database/schema_v1.sql
+        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v2.sql
+        $<TARGET_FILE_DIR:ticket_issue10_smoke_test>/database/schema_v2.sql
 )
 
 add_executable(statistics_smoke_test
     statistics_smoke_test.cpp
     ../src/database/database_manager.cpp ../src/database/database_manager_user.cpp
     ../src/database/database_manager_station.cpp ../src/database/database_manager_train.cpp
+    ../src/database/database_manager_trip.cpp
     ../src/database/database_manager_order.cpp ../src/database/database_manager_ticket.cpp
     ../src/database/database_manager_statistics.cpp
     ../src/database/database_manager_operation_log.cpp
@@ -314,4 +319,4 @@ target_link_libraries(statistics_smoke_test PRIVATE Qt${QT_VERSION_MAJOR}::Core 
 add_qt_smoke_test(statistics_smoke_test)
 add_custom_command(TARGET statistics_smoke_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:statistics_smoke_test>/database
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v1.sql $<TARGET_FILE_DIR:statistics_smoke_test>/database/schema_v1.sql)
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v2.sql $<TARGET_FILE_DIR:statistics_smoke_test>/database/schema_v2.sql)

@@ -71,10 +71,9 @@ int main(int argc, char *argv[])
     train.trainNumber = makeUniqueName(QStringLiteral("ISSUE9_TRAIN"));
     train.departureStationId = departureRecord->stationId;
     train.arrivalStationId = arrivalRecord->stationId;
-    train.departureTime = QStringLiteral("2026-07-10 09:00:00");
-    train.arrivalTime = QStringLiteral("2026-07-10 12:00:00");
+    train.departureTime = QStringLiteral("09:00:00");
+    train.arrivalTime = QStringLiteral("12:00:00");
     train.totalSeats = 80;
-    train.remainingSeats = 80;
     train.enabled = true;
 
     if (!manager.addTrain(train)) {
@@ -88,13 +87,20 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    const int initialSeats = ticketManager.remainingSeats(storedTrain->trainId);
+    const auto storedTripId =
+        manager.createTrip(storedTrain->trainId, QStringLiteral("2026-07-10"), 80);
+    if (!storedTripId.has_value()) {
+        qCritical() << "Could not create test trip:" << manager.lastError();
+        return 1;
+    }
+
+    const int initialSeats = ticketManager.remainingSeats(*storedTripId);
     if (initialSeats != 80) {
         qCritical() << "Unexpected initial remaining seats:" << initialSeats;
         return 1;
     }
 
-    const auto searchByStations = ticketManager.searchTrains(
+    const auto searchByStations = ticketManager.searchTrips(
         departureStation.stationName,
         arrivalStation.stationName,
         QStringLiteral("2026-07-10")
@@ -114,7 +120,7 @@ int main(int argc, char *argv[])
 
     const int createdOrderId = ticketManager.bookTicket(
         storedUser->userId,
-        storedTrain->trainId,
+        *storedTripId,
         QStringLiteral("Issue9 Passenger")
     );
     if (createdOrderId <= 0) {
@@ -123,7 +129,7 @@ int main(int argc, char *argv[])
     }
 
     const int seatsAfterBooking =
-        ticketManager.remainingSeats(storedTrain->trainId);
+        ticketManager.remainingSeats(*storedTripId);
     if (seatsAfterBooking != 79) {
         qCritical() << "Remaining seats did not decrease correctly:"
                     << seatsAfterBooking;
@@ -139,7 +145,7 @@ int main(int argc, char *argv[])
     bool orderFound = false;
     for (const auto &order : storedOrders) {
         if (order.orderId == createdOrderId &&
-            order.trainId == storedTrain->trainId &&
+            order.tripId == *storedTripId &&
             order.passengerName == QStringLiteral("Issue9 Passenger") &&
             order.status == 0) {
             orderFound = true;

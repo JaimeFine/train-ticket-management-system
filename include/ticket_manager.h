@@ -8,13 +8,13 @@ class DatabaseManager;
 class TicketManager {
 public:
     explicit TicketManager(DatabaseManager &db);
-    int  bookTicket(int userId,int trainId,const QString &passengerName);
-    int  remainingSeats(int trainId) const;
-    QVector<QVariantMap> searchTrains(const QString &dep,const QString &arr,const QString &date="") const;
+    int  bookTicket(int userId,int tripId,const QString &passengerName);
+    int  remainingSeats(int tripId) const;
+    QVector<QVariantMap> searchTrips(const QString &dep,const QString &arr,const QString &date="") const;
     QVector<QVariantMap> searchByTrainNumber(const QString &number) const;
     // Issue 10
     bool refundTicket(int orderId);
-    bool changeTicket(int orderId,int newTrainId);
+    bool changeTicket(int orderId,int newTripId);
     QVector<QVariantMap> queryOrdersByUser(int userId) const;
     QVector<QVariantMap> queryOrdersByPassenger(const QString &name) const;
     QVector<QVariantMap> queryOrderByOrderId(int orderId) const;

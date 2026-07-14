@@ -25,7 +25,7 @@ private:
     void setupManageTab();
     void setupQueryTab();
 
-    void searchTrains();
+    void searchTrips();
     void bookSelectedTrain();
     void refundOrder();
     void changeOrder();
@@ -33,7 +33,7 @@ private:
     void loadOwnOrders();
     void showMessage(bool success, const QString &message);
     QString statusText(int status) const;
-    int selectedTrainId() const;
+    int selectedTripId() const;
     void writeOperationLog(const QString &action, const QString &detail);
 
     TicketManager *m_ticketManager = nullptr;

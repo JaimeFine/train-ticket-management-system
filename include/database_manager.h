@@ -7,6 +7,7 @@
 #include "database/station_record.h"
 #include "database/user_record.h"
 #include "database/train_record.h"
+#include "database/trip_record.h"
 
 class QSqlDatabase;
 
@@ -54,6 +55,15 @@ public:
     std::optional<TrainRecord> findTrainByNumber(const QString &trainNumber) const;
     bool updateTrain(const TrainRecord &train);
 
+    // >>> Trip APIs
+    std::optional<int> createTrip(int trainId, const QString &travelDate, int totalSeats);
+    std::optional<TripRecord> findTripById(int tripId) const;
+    std::optional<TripRecord> findOrCreateTrip(int trainId,
+                                               const QString &travelDate,
+                                               int totalSeats);
+    bool adjustTripSeats(int tripId, int delta);
+    QList<TripRecord> findTripsByTrain(int trainId) const;
+
     // >>> Order APIs
     std::optional<int> createOrder(const OrderRecord &order);
     QList<OrderRecord> findOrdersByUser(int userId) const;
@@ -67,8 +77,12 @@ public:
     struct TrainWithStations {
         int trainId=0,totalSeats=0,remainingSeats=0;
         QString trainNumber,departureStationName,arrivalStationName;
-        QString departureTime,arrivalTime; bool enabled=true;
+        QString departureTime,arrivalTime,travelDate;
+        int tripId = 0;
+        bool enabled=true;
     };
+    QList<TrainWithStations> searchTripsByStation(
+        const QString &dep,const QString &arr,const QString &date) const;
     QList<TrainWithStations> searchTrainsByStation(
         const QString &dep,const QString &arr,const QString &date) const;
 
@@ -86,9 +100,9 @@ public:
 
     // ── Issue 11: 订单历史 + 统计 ──────────────────────────
     struct OrderWithDetails {
-        int orderId=0,userId=0,trainId=0,status=0;
+        int orderId=0,userId=0,tripId=0,trainId=0,status=0;
         QString trainNumber,passengerName,purchaseTime;
-        QString departureStationName,arrivalStationName;
+        QString departureStationName,arrivalStationName,travelDate;
     };
     QList<OrderWithDetails> findAllOrdersWithDetails() const;
     int countOrdersByStatus(int status) const;
