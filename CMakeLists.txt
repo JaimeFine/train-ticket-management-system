@@ -35,6 +35,7 @@ set(SOURCES
     src/ui/ticket_service_dialog.cpp
     src/ui/statistics_dialog.cpp
     src/database/database_manager_ticket.cpp
+    src/database/database_manager_trip.cpp
     src/ui/train_management_dialog.cpp
     src/ui/station_management_dialog.cpp
     src/database/database_manager_statistics.cpp
