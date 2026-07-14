@@ -3,14 +3,14 @@
 #include "database/train_record.h"
 #include "database/station_record.h"
 
+#include <algorithm>
 #include <QDateTime>
 #include <QDebug>
 #include <QHash>
 #include <QSet>
-#include <climits>
-#include <QDateTime>
+#include <QStringList>
+#include <QTime>
 #include <queue>
-#include <cmath>
 
 // ============================================================
 // RoutePath 实现
@@ -29,7 +29,7 @@ QString RoutePath::description() const
         desc += QString::number(stationIds[i]);
     }
     return desc + QStringLiteral("（共%1段行程，%2）")
-                      .arg(transferCount)
+                      .arg(trainIds.size())
                       .arg(timeString());
 }
 
@@ -67,6 +67,7 @@ void RouteGraph::buildFromDatabase(DatabaseManager* dbManager)
 
     // 2. 加载车次并构建边
     QList<TrainRecord> trains = dbManager->getAllTrains(true);
+    int edgeCount = 0;
     for (const TrainRecord& train : trains) {
         // 计算乘车时间（分钟）
         QDateTime dep = QDateTime::fromString(train.departureTime, "yyyy-MM-dd HH:mm");
@@ -95,10 +96,11 @@ void RouteGraph::buildFromDatabase(DatabaseManager* dbManager)
         edge.remainingSeats = train.remainingSeats;
 
         m_adjacency[train.departureStationId].append(edge);
+        ++edgeCount;
     }
 
     qDebug() << "RouteGraph: 构建完成，站点数=" << m_stationNames.size()
-             << ", 边数=" << m_adjacency.size();
+             << ", 边数=" << edgeCount;
 }
 
 QList<RouteEdge> RouteGraph::getEdgesFrom(int stationId) const
@@ -212,38 +214,54 @@ RoutePath RouteManager::findShortestPath(int fromStationId, int toStationId,
     QDate baseDate = startTime.date();
 
     // 数据结构
-    QHash<int, int> bestTotal;          // 到某站的最短总时间（分钟）
-    QHash<int, int> bestTravel;         // 到某站的最短纯乘车时间
-    QHash<int, int> bestTransfer;       // 到某站的最短换乘次数
-    QHash<int, QDateTime> arriveTime;   // 到某站的实际到达时间
+    QHash<int, int> bestScore;          // 当前优化目标下的最佳评分
+    QHash<int, int> bestTotalTime;      // 到某站的最短总时间（分钟）
+    QHash<int, int> bestTravelTime;     // 到某站的最短纯乘车时间
+    QHash<int, int> bestTransferCount;  // 到某站的最短换乘次数
+    QHash<int, QDateTime> bestArrivalTime;
     QHash<int, int> prevStation;
     QHash<int, int> prevTrain;
+    QHash<int, QString> prevTrainNumber;
+    QHash<int, int> prevSegmentTime;
 
     for (int stationId : allStations) {
-        bestTotal[stationId] = INT_MAX;
-        bestTravel[stationId] = INT_MAX;
-        bestTransfer[stationId] = INT_MAX;
+        bestScore[stationId] = INT_MAX;
+        bestTotalTime[stationId] = INT_MAX;
+        bestTravelTime[stationId] = INT_MAX;
+        bestTransferCount[stationId] = INT_MAX;
     }
 
     // 状态结构（小顶堆）
     struct State {
-        int total;          // 总时间（分钟）
-        int travel;         // 乘车时间
+        int score;          // 当前优化目标对应的评分
+        int totalTime;      // 总时间（分钟）
+        int travelTime;     // 纯乘车时间
         int transfers;      // 换乘次数
+        int legs;           // 已乘坐的车次数
         int stationId;
         QDateTime currentTime;
         bool operator>(const State& other) const {
-            return total > other.total;
+            if (score != other.score) {
+                return score > other.score;
+            }
+            if (totalTime != other.totalTime) {
+                return totalTime > other.totalTime;
+            }
+            if (transfers != other.transfers) {
+                return transfers > other.transfers;
+            }
+            return travelTime > other.travelTime;
         }
     };
     std::priority_queue<State, std::vector<State>, std::greater<State>> pq;
 
     // 起点初始化
-    bestTotal[fromStationId] = 0;
-    bestTravel[fromStationId] = 0;
-    bestTransfer[fromStationId] = 0;
-    arriveTime[fromStationId] = startTime;
-    pq.push({0, 0, 0, fromStationId, startTime});
+    bestScore[fromStationId] = 0;
+    bestTotalTime[fromStationId] = 0;
+    bestTravelTime[fromStationId] = 0;
+    bestTransferCount[fromStationId] = 0;
+    bestArrivalTime[fromStationId] = startTime;
+    pq.push({0, 0, 0, 0, 0, fromStationId, startTime});
 
     while (!pq.empty()) {
         State cur = pq.top();
@@ -251,9 +269,10 @@ RoutePath RouteManager::findShortestPath(int fromStationId, int toStationId,
 
         int u = cur.stationId;
         // 如果当前状态已经比记录差，跳过
-        if (cur.total > bestTotal[u]) continue;
-        if (cur.travel > bestTravel[u]) continue;
-        if (cur.transfers > bestTransfer[u]) continue;
+        if (cur.score > bestScore[u]) continue;
+        if (cur.score == bestScore[u] && cur.totalTime > bestTotalTime[u]) continue;
+        if (cur.score == bestScore[u] && cur.totalTime == bestTotalTime[u]
+            && cur.transfers > bestTransferCount[u]) continue;
 
         if (u == toStationId) break;
 
@@ -276,7 +295,7 @@ RoutePath RouteManager::findShortestPath(int fromStationId, int toStationId,
             }
 
             // 检查是否能赶上这班车
-            QDateTime currentArrival = arriveTime[u];
+            QDateTime currentArrival = bestArrivalTime[u];
             int waitMinutes = 0;
             if (u == fromStationId) {
                 // 起点：必须发车时间 >= startTime（或允许稍等）
@@ -309,44 +328,52 @@ RoutePath RouteManager::findShortestPath(int fromStationId, int toStationId,
             if (travelMinutes <= 0) travelMinutes = 1;
 
             // 计算新状态
-            int newTotal = cur.total + waitMinutes + travelMinutes;
-            int newTravel = cur.travel + travelMinutes;
-            int newTransfers = cur.transfers + 1;
+            int newTotalTime = cur.totalTime + waitMinutes + travelMinutes;
+            int newTravelTime = cur.travelTime + travelMinutes;
+            int newLegs = cur.legs + 1;
+            int newTransfers = std::max(0, newLegs - 1);
 
             // 根据优化目标计算综合权重（用于比较）
-            int weight = 0;
+            int score = 0;
             switch (criterion) {
             case OptimizationCriterion::TimeFirst:
-                weight = newTotal;
+                score = newTotalTime;
                 break;
             case OptimizationCriterion::TransferFirst:
-                weight = newTransfers;
+                score = newTransfers;
                 break;
             case OptimizationCriterion::Balanced:
-                weight = newTotal + newTransfers * 20;  // 换乘一次惩罚20分钟
+                score = newTotalTime + newTransfers * 20;  // 换乘一次惩罚20分钟
                 break;
             default:
-                weight = newTotal;
+                score = newTotalTime;
                 break;
             }
 
             // 只保留更优的状态
-            if (weight < bestTotal[edge.toStationId] ||
-                (weight == bestTotal[edge.toStationId] && newTransfers < bestTransfer[edge.toStationId]) ||
-                (weight == bestTotal[edge.toStationId] && newTransfers == bestTransfer[edge.toStationId] && newTravel < bestTravel[edge.toStationId])) {
-                bestTotal[edge.toStationId] = weight;
-                bestTravel[edge.toStationId] = newTravel;
-                bestTransfer[edge.toStationId] = newTransfers;
-                arriveTime[edge.toStationId] = arr;
+            if (score < bestScore[edge.toStationId] ||
+                (score == bestScore[edge.toStationId] && newTotalTime < bestTotalTime[edge.toStationId]) ||
+                (score == bestScore[edge.toStationId] && newTotalTime == bestTotalTime[edge.toStationId]
+                 && newTransfers < bestTransferCount[edge.toStationId]) ||
+                (score == bestScore[edge.toStationId] && newTotalTime == bestTotalTime[edge.toStationId]
+                 && newTransfers == bestTransferCount[edge.toStationId]
+                 && newTravelTime < bestTravelTime[edge.toStationId])) {
+                bestScore[edge.toStationId] = score;
+                bestTotalTime[edge.toStationId] = newTotalTime;
+                bestTravelTime[edge.toStationId] = newTravelTime;
+                bestTransferCount[edge.toStationId] = newTransfers;
+                bestArrivalTime[edge.toStationId] = arr;
                 prevStation[edge.toStationId] = u;
                 prevTrain[edge.toStationId] = edge.trainId;
-                pq.push({newTotal, newTravel, newTransfers, edge.toStationId, arr});
+                prevTrainNumber[edge.toStationId] = edge.trainNumber;
+                prevSegmentTime[edge.toStationId] = travelMinutes;
+                pq.push({score, newTotalTime, newTravelTime, newTransfers, newLegs, edge.toStationId, arr});
             }
         }
     }
 
     // 检查是否找到路径
-    if (bestTotal[toStationId] == INT_MAX) {
+    if (bestScore[toStationId] == INT_MAX) {
         setError("未找到可行的换乘路线");
         return emptyResult;
     }
@@ -358,15 +385,18 @@ RoutePath RouteManager::findShortestPath(int fromStationId, int toStationId,
         result.stationIds.prepend(currentStation);
         int prev = prevStation[currentStation];
         result.trainIds.prepend(prevTrain[currentStation]);
+        result.trainNumbers.prepend(prevTrainNumber[currentStation]);
+        result.segmentTimes.prepend(prevSegmentTime[currentStation]);
         currentStation = prev;
     }
     result.stationIds.prepend(fromStationId);
 
     // 计算各种时间
-    result.totalTime = bestTotal[toStationId];
-    result.travelTime = bestTravel[toStationId];
+    result.totalWeight = bestScore[toStationId];
+    result.totalTime = bestTotalTime[toStationId];
+    result.travelTime = bestTravelTime[toStationId];
     result.waitTime = result.totalTime - result.travelTime;
-    result.transferCount = bestTransfer[toStationId] - 1; // 减1因为从起点到第一个终点也算一次
+    result.transferCount = bestTransferCount[toStationId];
 
     clearError();
     return result;

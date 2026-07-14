@@ -14,6 +14,25 @@
 #include <QSqlQuery>
 #include <QSqlError>
 
+namespace {
+QString formatMinutes(int minutes)
+{
+    if (minutes <= 0) {
+        return QStringLiteral("-");
+    }
+
+    const int hours = minutes / 60;
+    const int remainMinutes = minutes % 60;
+    if (hours == 0) {
+        return QStringLiteral("%1分钟").arg(remainMinutes);
+    }
+    if (remainMinutes == 0) {
+        return QStringLiteral("%1小时").arg(hours);
+    }
+    return QStringLiteral("%1小时%2分钟").arg(hours).arg(remainMinutes);
+}
+}
+
 TransferDialog::TransferDialog(RouteManager* routeManager, QWidget *parent)
     : QDialog(parent)
     , m_routeManager(routeManager)
@@ -348,19 +367,22 @@ void TransferDialog::showPathResult(const RoutePath& path)
     m_resultTable->setRowCount(rowCount);
 
     for (int i = 0; i < rowCount; ++i) {
-        int trainId = path.trainIds[i];
         int fromStation = path.stationIds[i];
         int toStation = path.stationIds[i + 1];
 
         m_resultTable->setItem(i, 0, new QTableWidgetItem(QString::number(i + 1)));
-        m_resultTable->setItem(i, 1, new QTableWidgetItem(QString::number(trainId)));
+        m_resultTable->setItem(i, 1, new QTableWidgetItem(
+                                         path.trainNumbers.value(i, QString::number(path.trainIds.value(i)))
+                                         ));
         m_resultTable->setItem(i, 2, new QTableWidgetItem(
                                          m_stationNameMap.value(fromStation, QString::number(fromStation))
                                          ));
         m_resultTable->setItem(i, 3, new QTableWidgetItem(
                                          m_stationNameMap.value(toStation, QString::number(toStation))
                                          ));
-        m_resultTable->setItem(i, 4, new QTableWidgetItem("-"));
+        m_resultTable->setItem(i, 4, new QTableWidgetItem(
+                                         formatMinutes(path.segmentTimes.value(i))
+                                         ));
     }
 
     m_statusLabel->setText("✅ 查询成功");

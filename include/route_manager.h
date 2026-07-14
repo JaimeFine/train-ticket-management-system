@@ -6,11 +6,8 @@
 #include <QString>
 #include <QDateTime>
 #include <QVector>
-#include <climits>
 
 class DatabaseManager;
-class TrainRecord;
-class StationRecord;
 
 // 边权重计算模式
 enum class OptimizationCriterion {
@@ -36,6 +33,8 @@ struct RouteEdge {
 struct RoutePath {
     QList<int> stationIds;      // 站点序列（ID）
     QList<int> trainIds;        // 车次序列（ID）
+    QList<QString> trainNumbers; // 车次序列（展示用）
+    QList<int> segmentTimes;    // 每段乘车时间（分钟）
     int totalWeight = 0;        // 综合权重
     int totalTime = 0;          // 实际总出行时间（分钟，含换乘等待）
     int travelTime = 0;         // 纯乘车时间（分钟）

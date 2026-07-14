@@ -10,6 +10,7 @@
 #include "route_manager.h"
 
 #include <QFrame>
+#include <QDebug>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
