@@ -34,6 +34,7 @@ set(SOURCES
     src/ui/ticket_service_dialog.cpp
     src/ui/statistics_dialog.cpp
     src/database/database_manager_ticket.cpp
+    src/database/database_manager_trip.cpp
     src/ui/train_management_dialog.cpp
     src/ui/station_management_dialog.cpp
     src/database/database_manager_statistics.cpp
@@ -84,8 +85,8 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
         $<TARGET_FILE_DIR:${PROJECT_NAME}>/database
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/database/schema_v1.sql
-        $<TARGET_FILE_DIR:${PROJECT_NAME}>/database/schema_v1.sql
+        ${CMAKE_CURRENT_SOURCE_DIR}/database/schema_v2.sql
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/database/schema_v2.sql
 )
 
 # ── Tests (optional subdirectory) ────────────────────────────────────────────

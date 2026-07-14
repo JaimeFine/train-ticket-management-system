@@ -1,90 +1,48 @@
 #include "database_manager.h"
-
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
-#include <QString>
 
 std::optional<int> DatabaseManager::createOrder(const OrderRecord &order) {
-    QSqlQuery query(QSqlDatabase::database(m_connectionName));
-
-    query.prepare(QStringLiteral(
-        "INSERT INTO \"Order\" ("
-        "userId, trainId, passengerName, purchaseTime, status"
-        ") "
-        "VALUES (:userId, :trainId, :passengerName, :purchaseTime, :status)"
-    ));
-
-    query.bindValue(":userId", order.userId);
-    query.bindValue(":trainId", order.trainId);
-    query.bindValue(":passengerName", order.passengerName);
-    query.bindValue(":purchaseTime", order.purchaseTime);
-    query.bindValue(":status", order.status);
-
-    if (!query.exec()) {
-        m_lastError = query.lastError().text();
-        return std::nullopt;
-    }
-
-    return query.lastInsertId().toInt();
+    QSqlQuery q(QSqlDatabase::database(m_connectionName));
+    q.prepare("INSERT INTO \"Order\"(userId,tripId,passengerName,travelDate,purchaseTime,price,status) "
+              "VALUES(:uid,:tid,:name,:date,:pt,:pr,:st)");
+    q.bindValue(":uid", order.userId);
+    q.bindValue(":tid", order.tripId);
+    q.bindValue(":name", order.passengerName);
+    q.bindValue(":date", order.travelDate);
+    q.bindValue(":pt", order.purchaseTime);
+    q.bindValue(":pr", order.price);
+    q.bindValue(":st", order.status);
+    if (!q.exec()) { m_lastError = q.lastError().text(); return std::nullopt; }
+    return q.lastInsertId().toInt();
 }
 
 QList<OrderRecord> DatabaseManager::findOrdersByUser(int userId) const {
     m_lastError.clear();
-    QSqlQuery query(QSqlDatabase::database(m_connectionName));
-
-    query.prepare(QStringLiteral(
-        "SELECT orderId, userId, trainId, passengerName, purchaseTime, status "
-        "FROM \"Order\" "
-        "WHERE userId = :userId"
-    ));
-
-    query.bindValue(":userId", userId);
-
-    QList<OrderRecord> records;
-
-    if (!query.exec()) {
-        m_lastError = query.lastError().text();
-        return records;
+    QSqlQuery q(QSqlDatabase::database(m_connectionName));
+    q.prepare("SELECT orderId,userId,tripId,passengerName,travelDate,purchaseTime,status "
+              "FROM \"Order\" WHERE userId=:uid ORDER BY purchaseTime DESC");
+    q.bindValue(":uid", userId);
+    QList<OrderRecord> rs;
+    if (!q.exec()) { m_lastError = q.lastError().text(); return rs; }
+    while (q.next()) {
+        OrderRecord r;
+        r.orderId = q.value(0).toInt(); r.userId = q.value(1).toInt();
+        r.tripId = q.value(2).toInt(); r.passengerName = q.value(3).toString();
+        r.travelDate = q.value(4).toString(); r.purchaseTime = q.value(5).toString();
+        r.status = q.value(6).toInt();
+        rs.append(r);
     }
-
-    while (query.next()) {
-        OrderRecord record;
-        record.orderId = query.value(0).toInt();
-        record.userId = query.value(1).toInt();
-        record.trainId = query.value(2).toInt();
-        record.passengerName = query.value(3).toString();
-        record.purchaseTime = query.value(4).toString();
-        record.status = query.value(5).toInt();
-
-        records.append(record);
-    }
-
-    return records;
+    return rs;
 }
 
 bool DatabaseManager::updateOrderStatus(int orderId, int status) {
     m_lastError.clear();
-    QSqlQuery query(QSqlDatabase::database(m_connectionName));
-
-    query.prepare(QStringLiteral(
-        "UPDATE \"Order\" "
-        "SET status = :status "
-        "WHERE orderId = :orderId"
-    ));
-
-    query.bindValue(":orderId", orderId);
-    query.bindValue(":status", status);
-
-    if (!query.exec()) {
-        m_lastError = query.lastError().text();
-        return false;
-    }
-
-    // Check if any row was actually updated
-    if (query.numRowsAffected() == 0) {
-        return false;
-    }
-
-    return true;
+    QSqlQuery q(QSqlDatabase::database(m_connectionName));
+    q.prepare("UPDATE \"Order\" SET status=:st WHERE orderId=:id");
+    q.bindValue(":id", orderId);
+    q.bindValue(":st", status);
+    if (!q.exec()) { m_lastError = q.lastError().text(); return false; }
+    return q.numRowsAffected() > 0;
 }
