@@ -25,7 +25,7 @@ namespace {
         QDir baseDir(QCoreApplication::applicationDirPath());
 
         QString fullPath = baseDir.filePath(QStringLiteral(
-            "database/schema_v1.sql")
+            "database/schema_v2.sql")
         );
 
         return fullPath;
@@ -328,17 +328,16 @@ bool DatabaseManager::seedDemoData() {
         QString departureTime;
         QString arrivalTime;
         int totalSeats;
-        int remainingSeats;
         int enabled;
     } demoTrains[] = {
         {QStringLiteral("G1001"), QStringLiteral("北京南"), QStringLiteral("上海虹桥"),
-         QStringLiteral("08:00"), QStringLiteral("12:38"), 600, 600, 1},
+         QStringLiteral("08:00"), QStringLiteral("12:38"), 600, 1},
         {QStringLiteral("G1002"), QStringLiteral("上海虹桥"), QStringLiteral("北京南"),
-         QStringLiteral("14:00"), QStringLiteral("18:40"), 600, 600, 1},
+         QStringLiteral("14:00"), QStringLiteral("18:40"), 600, 1},
         {QStringLiteral("G2001"), QStringLiteral("南京南"), QStringLiteral("杭州东"),
-         QStringLiteral("09:15"), QStringLiteral("11:10"), 480, 480, 1},
+         QStringLiteral("09:15"), QStringLiteral("11:10"), 480, 1},
         {QStringLiteral("G2002"), QStringLiteral("杭州东"), QStringLiteral("南京南"),
-         QStringLiteral("15:20"), QStringLiteral("17:18"), 480, 480, 1}
+         QStringLiteral("15:20"), QStringLiteral("17:18"), 480, 1}
     };
 
     for (const DemoTrainSeed &train : demoTrains) {
@@ -348,9 +347,9 @@ bool DatabaseManager::seedDemoData() {
                 QStringLiteral(
                     "INSERT OR IGNORE INTO Train ("
                     "trainNumber, departureStationId, arrivalStationId, "
-                    "departureTime, arrivalTime, totalSeats, remainingSeats, enabled"
+                    "departureTime, arrivalTime, totalSeats, enabled"
                     ") "
-                    "SELECT ?, dep.stationId, arr.stationId, ?, ?, ?, ?, ? "
+                    "SELECT ?, dep.stationId, arr.stationId, ?, ?, ?, ? "
                     "FROM Station dep, Station arr "
                     "WHERE dep.stationName = ? AND arr.stationName = ?"
                 ),
@@ -359,13 +358,37 @@ bool DatabaseManager::seedDemoData() {
                     train.departureTime,
                     train.arrivalTime,
                     train.totalSeats,
-                    train.remainingSeats,
                     train.enabled,
                     train.departureStationName,
                     train.arrivalStationName
                 })) {
             database.rollback();
             return false;
+        }
+    }
+
+    const QString today =
+        QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd"));
+    const QString tomorrow =
+        QDateTime::currentDateTime().addDays(1).toString(QStringLiteral("yyyy-MM-dd"));
+
+    for (const QString &travelDate : {today, tomorrow}) {
+        for (const DemoTrainSeed &train : demoTrains) {
+            if (!execPrepared(
+                    database,
+                    &m_lastError,
+                    QStringLiteral(
+                        "INSERT OR IGNORE INTO Trip ("
+                        "trainId, travelDate, departureTime, arrivalTime, "
+                        "totalSeats, remainingSeats, basePrice, enabled"
+                        ") "
+                        "SELECT trainId, ?, departureTime, arrivalTime, totalSeats, totalSeats, 0, 1 "
+                        "FROM Train WHERE trainNumber = ?"
+                    ),
+                    {travelDate, train.trainNumber})) {
+                database.rollback();
+                return false;
+            }
         }
     }
 
@@ -392,15 +415,15 @@ QString DatabaseManager::resolveDatabasePath() const {
     QDir baseDir(QCoreApplication::applicationDirPath());
 
     if (baseDir.exists(QStringLiteral("database"))) {
-        return baseDir.filePath(QStringLiteral("database/train_ticket.db"));
+        return baseDir.filePath(QStringLiteral("database/train_ticket_v2.db"));
     }
 
     QDir parentDir = baseDir;
     if (parentDir.cdUp() && parentDir.exists(QStringLiteral("database"))) {
-        return parentDir.filePath(QStringLiteral("database/train_ticket.db"));
+        return parentDir.filePath(QStringLiteral("database/train_ticket_v2.db"));
     }
 
     // If neither directory exists, create one beside the executable.
     baseDir.mkpath(QStringLiteral("database"));
-    return baseDir.filePath(QStringLiteral("database/train_ticket.db"));
+    return baseDir.filePath(QStringLiteral("database/train_ticket_v2.db"));
 }

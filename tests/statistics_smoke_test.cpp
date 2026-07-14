@@ -55,16 +55,18 @@ int main(int argc, char *argv[]) {
     train.trainNumber        = uniq("Stats_G");
     train.departureStationId = dep->stationId;
     train.arrivalStationId   = arr->stationId;
-    train.departureTime      = "2026-07-10 08:00";
-    train.arrivalTime        = "2026-07-10 12:00";
+    train.departureTime      = "08:00";
+    train.arrivalTime        = "12:00";
     train.totalSeats         = 50;
-    train.remainingSeats     = 50;
     train.enabled            = true;
     if (!db.addTrain(train)) { qCritical() << "FAIL: addTrain:" << db.lastError(); return 1; }
 
     auto storedTrain = db.findTrainByNumber(train.trainNumber);
     if (!storedTrain) { qCritical() << "FAIL: findTrainByNumber returned null"; return 1; }
     qDebug() << "OK: train created:" << storedTrain->trainNumber;
+
+    const auto storedTripId = db.createTrip(storedTrain->trainId, "2026-07-10", 50);
+    if (!storedTripId) { qCritical() << "FAIL: createTrip:" << db.lastError(); return 1; }
 
     // ── Managers ─────────────────────────────────────────────────────
     TicketManager tm(db);
@@ -82,9 +84,9 @@ int main(int argc, char *argv[]) {
     qDebug() << "OK: baselines =" << baseOrders << baseBooked << baseRefunded << baseChanged;
 
     // ── Book 3 tickets, refund 1 ────────────────────────────────────
-    const int o1 = tm.bookTicket(storedUser->userId, storedTrain->trainId, "Passenger_A");
-    const int o2 = tm.bookTicket(storedUser->userId, storedTrain->trainId, "Passenger_B");
-    const int o3 = tm.bookTicket(storedUser->userId, storedTrain->trainId, "Passenger_C");
+    const int o1 = tm.bookTicket(storedUser->userId, *storedTripId, "Passenger_A");
+    const int o2 = tm.bookTicket(storedUser->userId, *storedTripId, "Passenger_B");
+    const int o3 = tm.bookTicket(storedUser->userId, *storedTripId, "Passenger_C");
 
     if (o1 <= 0) { qCritical() << "FAIL: bookTicket A returned" << o1 << "error:" << tm.lastError(); return 1; }
     if (o2 <= 0) { qCritical() << "FAIL: bookTicket B returned" << o2 << "error:" << tm.lastError(); return 1; }

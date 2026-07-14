@@ -66,20 +66,18 @@ int main(int argc, char *argv[]) {
     trainA.trainNumber = makeUnique(QStringLiteral("ISSUE10_A"));
     trainA.departureStationId = dep->stationId;
     trainA.arrivalStationId = arr->stationId;
-    trainA.departureTime = QStringLiteral("2026-07-10 08:00");
-    trainA.arrivalTime = QStringLiteral("2026-07-10 12:00");
+    trainA.departureTime = QStringLiteral("08:00");
+    trainA.arrivalTime = QStringLiteral("12:00");
     trainA.totalSeats = 10;
-    trainA.remainingSeats = 10;
     trainA.enabled = true;
 
     TrainRecord trainB;
     trainB.trainNumber = makeUnique(QStringLiteral("ISSUE10_B"));
     trainB.departureStationId = dep->stationId;
     trainB.arrivalStationId = arr->stationId;
-    trainB.departureTime = QStringLiteral("2026-07-10 13:00");
-    trainB.arrivalTime = QStringLiteral("2026-07-10 17:00");
+    trainB.departureTime = QStringLiteral("13:00");
+    trainB.arrivalTime = QStringLiteral("17:00");
     trainB.totalSeats = 8;
-    trainB.remainingSeats = 8;
     trainB.enabled = true;
 
     if (!db.addTrain(trainA) || !db.addTrain(trainB)) {
@@ -96,17 +94,26 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    const auto tripA =
+        db.createTrip(storedTrainA->trainId, QStringLiteral("2026-07-10"), 10);
+    const auto tripB =
+        db.createTrip(storedTrainB->trainId, QStringLiteral("2026-07-10"), 8);
+    if (!tripA.has_value() || !tripB.has_value()) {
+        qCritical() << "Could not create issue10 trips:" << db.lastError();
+        return 1;
+    }
+
     TicketManager tm(db);
 
     const int refundOrderId = tm.bookTicket(
-        storedUser->userId, storedTrainA->trainId, QStringLiteral("Refund Passenger")
+        storedUser->userId, *tripA, QStringLiteral("Refund Passenger")
     );
     if (refundOrderId < 0) {
         qCritical() << "bookTicket for refund flow failed:" << tm.lastError();
         return 1;
     }
 
-    if (tm.remainingSeats(storedTrainA->trainId) != 9) {
+    if (tm.remainingSeats(*tripA) != 9) {
         qCritical() << "Seat count did not decrease after booking refund flow order.";
         return 1;
     }
@@ -123,7 +130,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (tm.remainingSeats(storedTrainA->trainId) != 10) {
+    if (tm.remainingSeats(*tripA) != 10) {
         qCritical() << "Seat count was not restored after refund.";
         return 1;
     }
@@ -131,24 +138,24 @@ int main(int argc, char *argv[]) {
     qDebug() << "PASS: refundTicket restored seat and updated order status.";
 
     const int changeOrderId = tm.bookTicket(
-        storedUser->userId, storedTrainA->trainId, QStringLiteral("Change Passenger")
+        storedUser->userId, *tripA, QStringLiteral("Change Passenger")
     );
     if (changeOrderId < 0) {
         qCritical() << "bookTicket for change flow failed:" << tm.lastError();
         return 1;
     }
 
-    if (tm.remainingSeats(storedTrainA->trainId) != 9) {
+    if (tm.remainingSeats(*tripA) != 9) {
         qCritical() << "Seat count did not decrease after booking change flow order.";
         return 1;
     }
 
-    if (tm.remainingSeats(storedTrainB->trainId) != 8) {
+    if (tm.remainingSeats(*tripB) != 8) {
         qCritical() << "Unexpected initial seat count for target train.";
         return 1;
     }
 
-    if (!tm.changeTicket(changeOrderId, storedTrainB->trainId)) {
+    if (!tm.changeTicket(changeOrderId, *tripB)) {
         qCritical() << "changeTicket failed:" << tm.lastError();
         return 1;
     }
@@ -160,12 +167,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (tm.remainingSeats(storedTrainA->trainId) != 10) {
+    if (tm.remainingSeats(*tripA) != 10) {
         qCritical() << "Old train seat was not restored after change ticket.";
         return 1;
     }
 
-    if (tm.remainingSeats(storedTrainB->trainId) != 7) {
+    if (tm.remainingSeats(*tripB) != 7) {
         qCritical() << "New train seat was not deducted after change ticket.";
         return 1;
     }
@@ -174,7 +181,7 @@ int main(int argc, char *argv[]) {
     bool foundReplacementOrder = false;
     for (const OrderRecord &order : orders) {
         if (order.orderId != changeOrderId &&
-            order.trainId == storedTrainB->trainId &&
+            order.tripId == *tripB &&
             order.passengerName == QStringLiteral("Change Passenger") &&
             order.status == 0) {
             foundReplacementOrder = true;

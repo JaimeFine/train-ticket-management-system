@@ -5,17 +5,36 @@
 #include <QSqlQuery>
 #include <QString>
 
+namespace {
+int loadRepresentativeRemainingSeats(const QString &connectionName,
+                                     int trainId,
+                                     int fallbackSeats)
+{
+    QSqlQuery query(QSqlDatabase::database(connectionName));
+    query.prepare(QStringLiteral(
+        "SELECT remainingSeats "
+        "FROM Trip WHERE trainId = :trainId AND enabled = 1 "
+        "ORDER BY travelDate ASC, departureTime ASC LIMIT 1"
+    ));
+    query.bindValue(":trainId", trainId);
+    if (!query.exec() || !query.next()) {
+        return fallbackSeats;
+    }
+    return query.value(0).toInt();
+}
+}
+
 bool DatabaseManager::addTrain(const TrainRecord &train) {
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     query.prepare(QStringLiteral(
         "INSERT INTO Train ("
         "trainNumber, departureStationId, arrivalStationId, departureTime, "
-        "arrivalTime, totalSeats, remainingSeats, enabled"
+        "arrivalTime, totalSeats, enabled"
         ") "
         "VALUES ("
         ":trainNumber, :departureStationId, :arrivalStationId, :departureTime, "
-        ":arrivalTime, :totalSeats, :remainingSeats, :enabled"
+        ":arrivalTime, :totalSeats, :enabled"
         ")"
     ));
 
@@ -25,7 +44,6 @@ bool DatabaseManager::addTrain(const TrainRecord &train) {
     query.bindValue(":departureTime", train.departureTime);
     query.bindValue(":arrivalTime", train.arrivalTime);
     query.bindValue(":totalSeats", train.totalSeats);
-    query.bindValue(":remainingSeats", train.remainingSeats);
     query.bindValue(":enabled", train.enabled);
 
     if (!query.exec()) {
@@ -42,7 +60,7 @@ std::optional<TrainRecord> DatabaseManager::findTrainById(int trainId) const {
 
     query.prepare(QStringLiteral(
         "SELECT trainId, trainNumber, departureStationId, arrivalStationId, "
-        "departureTime, arrivalTime, totalSeats, remainingSeats, enabled "
+        "departureTime, arrivalTime, totalSeats, enabled "
         "FROM Train "
         "WHERE trainId = :trainId"
     ));
@@ -66,8 +84,9 @@ std::optional<TrainRecord> DatabaseManager::findTrainById(int trainId) const {
     record.departureTime = query.value(4).toString();
     record.arrivalTime = query.value(5).toString();
     record.totalSeats = query.value(6).toInt();
-    record.remainingSeats = query.value(7).toInt();
-    record.enabled = query.value(8).toBool();
+    record.remainingSeats = loadRepresentativeRemainingSeats(
+        m_connectionName, record.trainId, record.totalSeats);
+    record.enabled = query.value(7).toBool();
 
     return record;
 }
@@ -80,7 +99,7 @@ std::optional<TrainRecord> DatabaseManager::findTrainByNumber(
 
     query.prepare(QStringLiteral(
         "SELECT trainId, trainNumber, departureStationId, arrivalStationId, "
-        "departureTime, arrivalTime, totalSeats, remainingSeats, enabled "
+        "departureTime, arrivalTime, totalSeats, enabled "
         "FROM Train "
         "WHERE trainNumber = :trainNumber"
     ));
@@ -104,8 +123,9 @@ std::optional<TrainRecord> DatabaseManager::findTrainByNumber(
     record.departureTime = query.value(4).toString();
     record.arrivalTime = query.value(5).toString();
     record.totalSeats = query.value(6).toInt();
-    record.remainingSeats = query.value(7).toInt();
-    record.enabled = query.value(8).toBool();
+    record.remainingSeats = loadRepresentativeRemainingSeats(
+        m_connectionName, record.trainId, record.totalSeats);
+    record.enabled = query.value(7).toBool();
 
     return record;
 }
@@ -122,7 +142,6 @@ bool DatabaseManager::updateTrain(const TrainRecord &train) {
         "   departureTime = :departureTime, "
         "   arrivalTime = :arrivalTime, "
         "   totalSeats = :totalSeats, "
-        "   remainingSeats = :remainingSeats, "
         "   enabled = :enabled "
         "WHERE trainId = :trainId"
     ));
@@ -134,7 +153,6 @@ bool DatabaseManager::updateTrain(const TrainRecord &train) {
     query.bindValue(":departureTime", train.departureTime);
     query.bindValue(":arrivalTime", train.arrivalTime);
     query.bindValue(":totalSeats", train.totalSeats);
-    query.bindValue(":remainingSeats", train.remainingSeats);
     query.bindValue(":enabled", train.enabled);
 
     if (!query.exec()) {
@@ -156,7 +174,7 @@ QList<TrainRecord> DatabaseManager::getAllTrains(bool onlyEnabled) const {
 
     QString sql = QStringLiteral(
         "SELECT trainId, trainNumber, departureStationId, arrivalStationId, "
-        "departureTime, arrivalTime, totalSeats, remainingSeats, enabled "
+        "departureTime, arrivalTime, totalSeats, enabled "
         "FROM Train"
     );
 
@@ -186,8 +204,9 @@ QList<TrainRecord> DatabaseManager::getAllTrains(bool onlyEnabled) const {
         record.departureTime = query.value(4).toString();
         record.arrivalTime = query.value(5).toString();
         record.totalSeats = query.value(6).toInt();
-        record.remainingSeats = query.value(7).toInt();
-        record.enabled = query.value(8).toBool();
+        record.remainingSeats = loadRepresentativeRemainingSeats(
+            m_connectionName, record.trainId, record.totalSeats);
+        record.enabled = query.value(7).toBool();
         results.append(record);
     }
 
@@ -247,7 +266,10 @@ bool DatabaseManager::deleteTrainPermanently(int trainId) {
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     query.prepare(QStringLiteral(
-        "SELECT COUNT(*) FROM \"Order\" WHERE trainId = :trainId"
+        "SELECT COUNT(*) "
+        "FROM \"Order\" o "
+        "JOIN Trip tr ON o.tripId = tr.tripId "
+        "WHERE tr.trainId = :trainId"
     ));
     query.bindValue(":trainId", trainId);
 
@@ -261,18 +283,28 @@ bool DatabaseManager::deleteTrainPermanently(int trainId) {
         return false;
     }
 
-    QSqlQuery deleteQuery(QSqlDatabase::database(m_connectionName));
-    deleteQuery.prepare(QStringLiteral(
-        "DELETE FROM Train WHERE trainId = :trainId"
+    QSqlQuery deleteTrips(QSqlDatabase::database(m_connectionName));
+    deleteTrips.prepare(QStringLiteral(
+        "DELETE FROM Trip WHERE trainId = :trainId"
     ));
-    deleteQuery.bindValue(":trainId", trainId);
-
-    if (!deleteQuery.exec()) {
-        m_lastError = deleteQuery.lastError().text();
+    deleteTrips.bindValue(":trainId", trainId);
+    if (!deleteTrips.exec()) {
+        m_lastError = deleteTrips.lastError().text();
         return false;
     }
 
-    if (deleteQuery.numRowsAffected() == 0) {
+    QSqlQuery deleteTrainQuery(QSqlDatabase::database(m_connectionName));
+    deleteTrainQuery.prepare(QStringLiteral(
+        "DELETE FROM Train WHERE trainId = :trainId"
+    ));
+    deleteTrainQuery.bindValue(":trainId", trainId);
+
+    if (!deleteTrainQuery.exec()) {
+        m_lastError = deleteTrainQuery.lastError().text();
+        return false;
+    }
+
+    if (deleteTrainQuery.numRowsAffected() == 0) {
         m_lastError = QStringLiteral("No train found for the given trainId.");
         return false;
     }
@@ -287,7 +319,7 @@ QList<TrainRecord> DatabaseManager::searchTrains(const QString &keyword) const {
     query.prepare(QStringLiteral(
         "SELECT t.trainId, t.trainNumber, t.departureStationId, "
         "t.arrivalStationId, t.departureTime, t.arrivalTime, "
-        "t.totalSeats, t.remainingSeats, t.enabled "
+        "t.totalSeats, t.enabled "
         "FROM Train t "
         "LEFT JOIN Station s1 ON t.departureStationId = s1.stationId "
         "LEFT JOIN Station s2 ON t.arrivalStationId = s2.stationId "
@@ -317,8 +349,9 @@ QList<TrainRecord> DatabaseManager::searchTrains(const QString &keyword) const {
         record.departureTime = query.value(4).toString();
         record.arrivalTime = query.value(5).toString();
         record.totalSeats = query.value(6).toInt();
-        record.remainingSeats = query.value(7).toInt();
-        record.enabled = query.value(8).toBool();
+        record.remainingSeats = loadRepresentativeRemainingSeats(
+            m_connectionName, record.trainId, record.totalSeats);
+        record.enabled = query.value(7).toBool();
         results.append(record);
     }
 
@@ -333,7 +366,7 @@ QList<TrainRecord> DatabaseManager::searchByStation(
 
     QString sql = QStringLiteral(
         "SELECT trainId, trainNumber, departureStationId, arrivalStationId, "
-        "departureTime, arrivalTime, totalSeats, remainingSeats, enabled "
+        "departureTime, arrivalTime, totalSeats, enabled "
         "FROM Train WHERE "
     );
 
@@ -367,8 +400,9 @@ QList<TrainRecord> DatabaseManager::searchByStation(
         record.departureTime = query.value(4).toString();
         record.arrivalTime = query.value(5).toString();
         record.totalSeats = query.value(6).toInt();
-        record.remainingSeats = query.value(7).toInt();
-        record.enabled = query.value(8).toBool();
+        record.remainingSeats = loadRepresentativeRemainingSeats(
+            m_connectionName, record.trainId, record.totalSeats);
+        record.enabled = query.value(7).toBool();
         results.append(record);
     }
 
