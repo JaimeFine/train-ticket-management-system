@@ -17,7 +17,6 @@ struct Train {
     QString departureTime;       // 出发时间，如 "08:00"
     QString arrivalTime;         // 到达时间，如 "12:30"
     int totalSeats;              // 总座位数
-    int remainingSeats;          // 剩余座位数
     bool enabled;                // true=启用，false=停运
 };
 
@@ -46,9 +45,6 @@ public:
     // ---------- 搜索 ----------
     QVector<Train> searchTrains(const QString& keyword);
     QVector<Train> searchByStation(int stationId, bool isDeparture = true);
-
-    // ---------- 座位管理 ----------
-    bool updateRemainingSeats(int trainId, int delta);
 
 private:
     DatabaseManager* m_dbManager;

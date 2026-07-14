@@ -23,7 +23,7 @@ private:
     void setupManageTab();
     void setupQueryTab();
 
-    void searchTrains();
+    void searchTrips();
     void bookSelectedTrain();
     void refundOrder();
     void changeOrder();

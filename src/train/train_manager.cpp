@@ -39,7 +39,6 @@ Train TrainManager::convertToTrain(const TrainRecord& record) const
     t.departureTime = record.departureTime;
     t.arrivalTime = record.arrivalTime;
     t.totalSeats = record.totalSeats;
-    t.remainingSeats = record.remainingSeats;
     t.enabled = record.enabled;
     return t;
 }
@@ -54,7 +53,6 @@ TrainRecord TrainManager::convertToRecord(const Train& train) const
     record.departureTime = train.departureTime;
     record.arrivalTime = train.arrivalTime;
     record.totalSeats = train.totalSeats;
-    record.remainingSeats = train.remainingSeats;
     record.enabled = train.enabled;
     return record;
 }
@@ -128,13 +126,6 @@ bool TrainManager::addTrain(const Train& train)
         setStatus("总座位数必须大于 0");
         return false;
     }
-
-    if (train.remainingSeats < 0 || train.remainingSeats > train.totalSeats) {
-        setStatus("剩余座位数必须在 0 到总座位数之间");
-        return false;
-    }
-
-    // ---- 检查车次号是否已存在 ----
     // SQL: SELECT trainId FROM Train WHERE trainNumber = ?;
     auto existing = m_dbManager->findTrainByNumber(train.trainNumber);
     if (existing.has_value()) {
@@ -206,11 +197,6 @@ bool TrainManager::updateTrain(const Train& train)
 
     if (train.totalSeats <= 0) {
         setStatus("总座位数必须大于 0");
-        return false;
-    }
-
-    if (train.remainingSeats < 0 || train.remainingSeats > train.totalSeats) {
-        setStatus("剩余座位数必须在 0 到总座位数之间");
         return false;
     }
 
@@ -370,31 +356,3 @@ QVector<Train> TrainManager::searchByStation(int stationId, bool isDeparture)
     return result;
 }
 
-// ============================================================
-// 7. 更新剩余座位
-// ============================================================
-bool TrainManager::updateRemainingSeats(int trainId, int delta)
-{
-    if (!m_dbManager) {
-        setStatus("数据库管理器未初始化");
-        return false;
-    }
-
-    if (trainId <= 0) {
-        setStatus("无效的车次ID");
-        return false;
-    }
-
-    if (delta == 0) {
-        setStatus("变动数量不能为 0");
-        return false;
-    }
-
-    if (!m_dbManager->adjustTrainSeats(trainId, delta)) {
-        setStatus("更新余票失败: " + m_dbManager->lastError());
-        return false;
-    }
-
-    setStatus("余票更新成功");
-    return true;
-}

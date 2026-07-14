@@ -215,7 +215,7 @@ void TicketServiceDialog::setupSearchTab()
     formLayout->addRow(QStringLiteral("车次编号"), m_trainNumberEdit);
 
     auto *searchButton = new QPushButton(QStringLiteral("开始查询"), searchGroup);
-    connect(searchButton, &QPushButton::clicked, this, [this]() { searchTrains(); });
+    connect(searchButton, &QPushButton::clicked, this, [this]() { searchTrips(); });
 
     searchLayout->addLayout(formLayout);
     searchLayout->addWidget(searchButton, 0, Qt::AlignRight);
@@ -352,7 +352,7 @@ void TicketServiceDialog::setupQueryTab()
     m_tabWidget->addTab(tab, QStringLiteral("订单查询"));
 }
 
-void TicketServiceDialog::searchTrains()
+void TicketServiceDialog::searchTrips()
 {
     m_searchResultsTable->setRowCount(0);
 
@@ -360,7 +360,7 @@ void TicketServiceDialog::searchTrains()
     if (!m_trainNumberEdit->text().trimmed().isEmpty()) {
         results = m_ticketManager->searchByTrainNumber(m_trainNumberEdit->text().trimmed());
     } else {
-        results = m_ticketManager->searchTrains(m_departureEdit->text().trimmed(),
+        results = m_ticketManager->searchTrips(m_departureEdit->text().trimmed(),
                                                 m_arrivalEdit->text().trimmed());
     }
 
