@@ -52,6 +52,7 @@ int main(int argc, char *argv[]) {
     train.departureTime = QStringLiteral("2026-07-08 09:00");
     train.arrivalTime = QStringLiteral("2026-07-08 12:30");
     train.totalSeats = 120;
+    train.remainingSeats = 120;
     train.enabled = true;
 
     if (!manager.addTrain(train)) {
@@ -88,6 +89,7 @@ int main(int argc, char *argv[]) {
     TrainRecord updatedTrain = *byId;
     updatedTrain.departureTime = QStringLiteral("2026-07-08 09:30");
     updatedTrain.arrivalTime = QStringLiteral("2026-07-08 13:00");
+    updatedTrain.remainingSeats = 98;
     updatedTrain.enabled = false;
 
     if (!manager.updateTrain(updatedTrain)) {
@@ -105,6 +107,7 @@ int main(int argc, char *argv[]) {
 
     if (afterUpdate->departureTime != updatedTrain.departureTime ||
         afterUpdate->arrivalTime != updatedTrain.arrivalTime ||
+        afterUpdate->remainingSeats != updatedTrain.remainingSeats ||
         afterUpdate->enabled != updatedTrain.enabled) {
         qCritical() << "Updated train fields were not saved correctly.";
         return 1;
