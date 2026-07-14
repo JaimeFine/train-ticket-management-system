@@ -8,7 +8,6 @@
 // - QCoreApplication / QDir / QFileInfo help us buils a safe path
 
 #include <QCoreApplication>
-#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -368,17 +367,25 @@ bool DatabaseManager::seedDemoData() {
         }
     }
 
-    // V2: create Trip records for demo trains (today + tomorrow)
-    const QString today = QDateTime::currentDateTime().toString("yyyy-MM-dd");
-    const QString tomorrow = QDateTime::currentDateTime().addDays(1).toString("yyyy-MM-dd");
-    for (const QString &date : {today, tomorrow}) {
+    const QString today =
+        QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd"));
+    const QString tomorrow =
+        QDateTime::currentDateTime().addDays(1).toString(QStringLiteral("yyyy-MM-dd"));
+
+    for (const QString &travelDate : {today, tomorrow}) {
         for (const DemoTrainSeed &train : demoTrains) {
-            if (!execPrepared(database, &m_lastError,
-                    QStringLiteral("INSERT OR IGNORE INTO Trip "
-                        "(trainId,travelDate,departureTime,arrivalTime,totalSeats,remainingSeats,enabled) "
-                        "SELECT trainId,?,departureTime,arrivalTime,totalSeats,totalSeats,1 "
-                        "FROM Train WHERE trainNumber=?"),
-                    {date, train.trainNumber})) {
+            if (!execPrepared(
+                    database,
+                    &m_lastError,
+                    QStringLiteral(
+                        "INSERT OR IGNORE INTO Trip ("
+                        "trainId, travelDate, departureTime, arrivalTime, "
+                        "totalSeats, remainingSeats, basePrice, enabled"
+                        ") "
+                        "SELECT trainId, ?, departureTime, arrivalTime, totalSeats, totalSeats, 0, 1 "
+                        "FROM Train WHERE trainNumber = ?"
+                    ),
+                    {travelDate, train.trainNumber})) {
                 database.rollback();
                 return false;
             }
@@ -408,15 +415,15 @@ QString DatabaseManager::resolveDatabasePath() const {
     QDir baseDir(QCoreApplication::applicationDirPath());
 
     if (baseDir.exists(QStringLiteral("database"))) {
-        return baseDir.filePath(QStringLiteral("database/train_ticket.db"));
+        return baseDir.filePath(QStringLiteral("database/train_ticket_v2.db"));
     }
 
     QDir parentDir = baseDir;
     if (parentDir.cdUp() && parentDir.exists(QStringLiteral("database"))) {
-        return parentDir.filePath(QStringLiteral("database/train_ticket.db"));
+        return parentDir.filePath(QStringLiteral("database/train_ticket_v2.db"));
     }
 
     // If neither directory exists, create one beside the executable.
     baseDir.mkpath(QStringLiteral("database"));
-    return baseDir.filePath(QStringLiteral("database/train_ticket.db"));
+    return baseDir.filePath(QStringLiteral("database/train_ticket_v2.db"));
 }

@@ -67,8 +67,8 @@ int main(int argc, char *argv[]) {
     train.trainNumber = makeUniqueName(QStringLiteral("order_train"));
     train.departureStationId = departureRecord->stationId;
     train.arrivalStationId = arrivalRecord->stationId;
-    train.departureTime = QStringLiteral("2026-07-08 14:00");
-    train.arrivalTime = QStringLiteral("2026-07-08 18:00");
+    train.departureTime = QStringLiteral("14:00");
+    train.arrivalTime = QStringLiteral("18:00");
     train.totalSeats = 150;
     train.enabled = true;
 
@@ -84,21 +84,20 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    const QString travelDate = QStringLiteral("2026-07-08");
-    const std::optional<int> tripId =
-        manager.createTrip(storedTrain->trainId, travelDate, storedTrain->totalSeats);
-    if (!tripId.has_value()) {
-        qCritical() << "createTrip() failed:" << manager.lastError();
+    const auto storedTripId =
+        manager.createTrip(storedTrain->trainId, QStringLiteral("2026-07-08"), 150);
+    if (!storedTripId.has_value()) {
+        qCritical() << "Could not create trip for order test:" << manager.lastError();
         return 1;
     }
 
     OrderRecord order;
     order.userId = storedUser->userId;
-    order.tripId = *tripId;
+    order.trainId = storedTrain->trainId;
+    order.tripId = *storedTripId;
     order.passengerName = QStringLiteral("Smoke Passenger");
-    order.travelDate = travelDate;
+    order.travelDate = QStringLiteral("2026-07-08");
     order.purchaseTime = QStringLiteral("2026-07-08 13:30");
-    order.price = 0.0;
     order.status = 0;
 
     if (!manager.createOrder(order)) {
@@ -114,7 +113,7 @@ int main(int argc, char *argv[]) {
 
     const OrderRecord createdOrder = orders.back();
     if (createdOrder.userId != storedUser->userId ||
-        createdOrder.tripId != *tripId ||
+        createdOrder.tripId != *storedTripId ||
         createdOrder.passengerName != order.passengerName) {
         qCritical() << "Order data mismatch after creation.";
         return 1;

@@ -7,7 +7,9 @@
 #include <QCheckBox>
 #include <QDate>
 #include <QDateEdit>
+#include <QDialogButtonBox>
 #include <QFormLayout>
+#include <QGridLayout>
 #include <QGroupBox>
 #include <QHeaderView>
 #include <QHBoxLayout>
@@ -62,7 +64,8 @@ TicketServiceDialog::TicketServiceDialog(TicketManager &ticketManager,
 {
     setWindowTitle(QStringLiteral("票务服务中心"));
     setModal(true);
-    resize(980, 680);
+    resize(1220, 780);
+    setMinimumSize(1080, 680);
 
     setStyleSheet(QStringLiteral(R"QSS(
         QDialog {
@@ -166,6 +169,46 @@ TicketServiceDialog::TicketServiceDialog(TicketManager &ticketManager,
         QPushButton#dangerButton:hover {
             background: #991b1b;
         }
+        QGroupBox#compactSearchGroup {
+            margin-top: 9px;
+            padding: 7px 10px 9px 10px;
+        }
+        QGroupBox#compactSearchGroup QLineEdit,
+        QGroupBox#compactSearchGroup QDateEdit {
+            min-height: 28px;
+            border: 1px solid #cbd8d2;
+            border-radius: 7px;
+            padding: 2px 8px;
+            background: #ffffff;
+        }
+        QGroupBox#compactSearchGroup QDateEdit {
+            padding: 2px 32px 2px 8px;
+        }
+        QGroupBox#compactSearchGroup QDateEdit::drop-down {
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            width: 28px;
+            border-left: 1px solid #d8e0dc;
+            background: #eef5f1;
+            border-top-right-radius: 6px;
+            border-bottom-right-radius: 6px;
+        }
+        QGroupBox#compactSearchGroup QDateEdit:disabled {
+            color: #7b8983;
+            background: #edf1ef;
+        }
+        QLabel#dateArrowLabel {
+            color: #42514b;
+            background: transparent;
+            font-size: 11px;
+        }
+        QLabel#dateArrowLabel:disabled {
+            color: #9aa6a1;
+        }
+        QGroupBox#compactSearchGroup QPushButton {
+            min-height: 28px;
+            padding: 3px 12px;
+        }
     )QSS"));
 
     auto *rootLayout = new QVBoxLayout(this);
@@ -174,7 +217,7 @@ TicketServiceDialog::TicketServiceDialog(TicketManager &ticketManager,
 
     auto *titleLabel = new QLabel(QStringLiteral("票务服务中心"), this);
     titleLabel->setObjectName(QStringLiteral("titleLabel"));
-    auto *hintLabel = new QLabel(QStringLiteral("查询车次、办理订票退改签，以及查看订单信息。"), this);
+    auto *hintLabel = new QLabel(QStringLiteral("查询列车时刻、余票和动态票价，办理订票退改签并查看订单。"), this);
     hintLabel->setObjectName(QStringLiteral("hintLabel"));
     hintLabel->setWordWrap(true);
 
@@ -203,6 +246,9 @@ TicketServiceDialog::TicketServiceDialog(TicketManager &ticketManager,
     rootLayout->addWidget(m_tabWidget);
     rootLayout->addWidget(closeButton, 0, Qt::AlignRight);
 
+    // 打开车票查询时先显示全部运营车次，乘客不输入条件也能直接看时刻表。
+    searchTrips();
+
     if (m_loginResult.role == UserRole::Guest) {
         showMessage(true, QStringLiteral("游客可先查询车次；如需订票、退改签或查看订单，请先注册并登录。"));
     } else if (m_loginResult.role == UserRole::User) {
@@ -217,11 +263,28 @@ void TicketServiceDialog::setupSearchTab()
     layout->setContentsMargins(16, 16, 16, 16);
     layout->setSpacing(12);
 
-    auto *searchGroup = new QGroupBox(QStringLiteral("车次查询"), tab);
+    auto *scheduleTitle = new QLabel(QStringLiteral("车次时刻表"), tab);
+    scheduleTitle->setObjectName(QStringLiteral("titleLabel"));
+    auto *scheduleDescription = new QLabel(
+        QStringLiteral("可查看全部运营车次，也可以按站点、车次和日期筛选。"), tab);
+    scheduleDescription->setObjectName(QStringLiteral("hintLabel"));
+
+    auto *scheduleHeaderLayout = new QHBoxLayout;
+    scheduleHeaderLayout->setSpacing(14);
+    scheduleHeaderLayout->addWidget(scheduleTitle);
+    scheduleHeaderLayout->addWidget(scheduleDescription);
+    scheduleHeaderLayout->addStretch();
+
+    auto *searchGroup = new QGroupBox(QStringLiteral("查询条件"), tab);
+    searchGroup->setObjectName(QStringLiteral("compactSearchGroup"));
     auto *searchLayout = new QVBoxLayout(searchGroup);
-    auto *formLayout = new QFormLayout;
-    formLayout->setHorizontalSpacing(14);
-    formLayout->setVerticalSpacing(10);
+    searchLayout->setContentsMargins(10, 7, 10, 8);
+    auto *conditionLayout = new QGridLayout;
+    conditionLayout->setHorizontalSpacing(10);
+    conditionLayout->setVerticalSpacing(0);
+    conditionLayout->setColumnStretch(1, 1);
+    conditionLayout->setColumnStretch(3, 1);
+    conditionLayout->setColumnStretch(5, 1);
 
     m_departureEdit = new QLineEdit(searchGroup);
     m_departureEdit->setPlaceholderText(QStringLiteral("例如：北京南"));
@@ -232,27 +295,47 @@ void TicketServiceDialog::setupSearchTab()
     m_travelDateEdit = new QDateEdit(QDate::currentDate(), searchGroup);
     m_travelDateEdit->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
     m_travelDateEdit->setCalendarPopup(true);
+    m_travelDateEdit->setFixedWidth(155);
+    m_travelDateEdit->setToolTip(QStringLiteral("选择需要查询的出行日期"));
+
+    auto *dateArrowLabel = new QLabel(QStringLiteral("▼"), m_travelDateEdit);
+    dateArrowLabel->setObjectName(QStringLiteral("dateArrowLabel"));
+    dateArrowLabel->setGeometry(126, 0, 28, 34);
+    dateArrowLabel->setAlignment(Qt::AlignCenter);
+    dateArrowLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
     m_allDatesCheckBox = new QCheckBox(QStringLiteral("不限日期"), searchGroup);
     m_allDatesCheckBox->setChecked(true);
     m_travelDateEdit->setEnabled(false);
-    connect(m_allDatesCheckBox, &QCheckBox::toggled, this, [this](bool checked) {
+
+    dateArrowLabel->setEnabled(false);
+    connect(m_allDatesCheckBox, &QCheckBox::toggled, this, [this, dateArrowLabel](bool checked) {
         m_travelDateEdit->setEnabled(!checked);
+        dateArrowLabel->setEnabled(!checked);
     });
 
-    formLayout->addRow(QStringLiteral("出发站"), m_departureEdit);
-    formLayout->addRow(QStringLiteral("到达站"), m_arrivalEdit);
-    formLayout->addRow(QStringLiteral("车次编号"), m_trainNumberEdit);
-    auto *dateLayout = new QHBoxLayout;
-    dateLayout->addWidget(m_travelDateEdit);
-    dateLayout->addWidget(m_allDatesCheckBox);
-    dateLayout->addStretch();
-    formLayout->addRow(QStringLiteral("出行日期"), dateLayout);
-
     auto *searchButton = new QPushButton(QStringLiteral("开始查询"), searchGroup);
+    auto *showAllButton = new QPushButton(QStringLiteral("显示全部"), searchGroup);
     connect(searchButton, &QPushButton::clicked, this, [this]() { searchTrips(); });
+    connect(showAllButton, &QPushButton::clicked, this, [this]() {
+        m_departureEdit->clear();
+        m_arrivalEdit->clear();
+        m_trainNumberEdit->clear();
+        m_allDatesCheckBox->setChecked(true);
+        searchTrips();
+    });
 
-    searchLayout->addLayout(formLayout);
-    searchLayout->addWidget(searchButton, 0, Qt::AlignRight);
+    conditionLayout->addWidget(new QLabel(QStringLiteral("出发站"), searchGroup), 0, 0);
+    conditionLayout->addWidget(m_departureEdit, 0, 1);
+    conditionLayout->addWidget(new QLabel(QStringLiteral("到达站"), searchGroup), 0, 2);
+    conditionLayout->addWidget(m_arrivalEdit, 0, 3);
+    conditionLayout->addWidget(new QLabel(QStringLiteral("车次编号"), searchGroup), 0, 4);
+    conditionLayout->addWidget(m_trainNumberEdit, 0, 5);
+    conditionLayout->addWidget(new QLabel(QStringLiteral("出行日期"), searchGroup), 0, 6);
+    conditionLayout->addWidget(m_travelDateEdit, 0, 7);
+    conditionLayout->addWidget(m_allDatesCheckBox, 0, 8);
+    conditionLayout->addWidget(searchButton, 0, 9);
+    conditionLayout->addWidget(showAllButton, 0, 10);
+    searchLayout->addLayout(conditionLayout);
 
     m_searchResultsTable = createTable(tab, {
         QStringLiteral("班次ID"),
@@ -266,30 +349,43 @@ void TicketServiceDialog::setupSearchTab()
         QStringLiteral("余票"),
         QStringLiteral("动态票价")
     });
+    m_searchResultsTable->setWordWrap(false);
+    m_searchResultsTable->setMinimumHeight(400);
+    m_searchResultsTable->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+    m_searchResultsTable->verticalHeader()->setDefaultSectionSize(36);
 
-    auto *bookingGroup = new QGroupBox(QStringLiteral("订票"), tab);
-    auto *bookingLayout = new QVBoxLayout(bookingGroup);
-    auto *bookingForm = new QFormLayout;
-    m_passengerNameEdit = new QLineEdit(bookingGroup);
-    m_passengerNameEdit->setPlaceholderText(QStringLiteral("请输入乘客姓名"));
-    bookingForm->addRow(QStringLiteral("乘客姓名"), m_passengerNameEdit);
+    // 站点名称需要多一点空间，其他列按实际内容排版，避免最后一列被无限拉长。
+    QHeaderView *scheduleHeader = m_searchResultsTable->horizontalHeader();
+    scheduleHeader->setStretchLastSection(false);
+    scheduleHeader->setMinimumSectionSize(72);
+    scheduleHeader->setSectionResizeMode(QHeaderView::ResizeToContents);
+    scheduleHeader->setSectionResizeMode(2, QHeaderView::Stretch);
+    scheduleHeader->setSectionResizeMode(3, QHeaderView::Stretch);
 
-    auto *bookButton = new QPushButton(QStringLiteral("预订选中车次"), bookingGroup);
+    auto *actionLayout = new QHBoxLayout;
+    auto *scheduleHint = new QLabel(
+        QStringLiteral("选择一班车次后，可继续办理订票。"), tab);
+    auto *bookButton = new QPushButton(QStringLiteral("预订选中班次"), tab);
     connect(bookButton, &QPushButton::clicked, this, [this]() { bookSelectedTrain(); });
-
-    bookingLayout->addLayout(bookingForm);
-    bookingLayout->addWidget(bookButton, 0, Qt::AlignRight);
 
     const bool canBook = m_loginResult.role == UserRole::User
                          || m_loginResult.role == UserRole::Seller
                          || m_loginResult.role == UserRole::Admin;
-    bookingGroup->setEnabled(canBook);
+    bookButton->setEnabled(canBook);
+    if (!canBook) {
+        scheduleHint->setText(QStringLiteral("游客可以查看时刻表，登录后可办理订票。"));
+    }
 
+    actionLayout->addWidget(scheduleHint);
+    actionLayout->addStretch();
+    actionLayout->addWidget(bookButton);
+
+    layout->addLayout(scheduleHeaderLayout);
     layout->addWidget(searchGroup);
-    layout->addWidget(m_searchResultsTable);
-    layout->addWidget(bookingGroup);
+    layout->addWidget(m_searchResultsTable, 1);
+    layout->addLayout(actionLayout);
 
-    m_tabWidget->addTab(tab, QStringLiteral("查询与订票"));
+    m_tabWidget->addTab(tab, QStringLiteral("车票查询"));
 }
 
 void TicketServiceDialog::setupManageTab()
@@ -393,14 +489,13 @@ void TicketServiceDialog::searchTrips()
 {
     m_searchResultsTable->setRowCount(0);
 
-    const QString travelDate = m_allDatesCheckBox != nullptr && !m_allDatesCheckBox->isChecked()
-        ? m_travelDateEdit->date().toString(QStringLiteral("yyyy-MM-dd"))
-        : QString();
-
+    const QString travelDate = m_allDatesCheckBox->isChecked()
+                                   ? QString()
+                                   : m_travelDateEdit->date().toString(QStringLiteral("yyyy-MM-dd"));
     QVector<QVariantMap> results;
     if (!m_trainNumberEdit->text().trimmed().isEmpty()) {
         results = m_ticketManager->searchByTrainNumber(m_trainNumberEdit->text().trimmed());
-        if (!travelDate.isEmpty()) {
+        if (!travelDate.isEmpty() && !results.isEmpty()) {
             QVector<QVariantMap> filteredResults;
             for (const QVariantMap &result : results) {
                 if (result.value(QStringLiteral("travelDate")).toString() == travelDate) {
@@ -427,15 +522,17 @@ void TicketServiceDialog::searchTrips()
         m_searchResultsTable->setItem(row, 6, new QTableWidgetItem(result.value(QStringLiteral("arrivalTime")).toString()));
         m_searchResultsTable->setItem(row, 7, new QTableWidgetItem(durationText(
             result.value(QStringLiteral("travelMinutes")).toInt())));
-        m_searchResultsTable->setItem(row, 8, new QTableWidgetItem(QString::number(
-            result.value(QStringLiteral("remainingSeats")).toInt())));
+        m_searchResultsTable->setItem(row, 8, new QTableWidgetItem(QString::number(result.value(QStringLiteral("remainingSeats")).toInt())));
         const double price = result.value(QStringLiteral("dynamicPrice")).toDouble();
         m_searchResultsTable->setItem(row, 9, new QTableWidgetItem(
             price > 0.0
                 ? QStringLiteral("￥%1").arg(price, 0, 'f', 0)
                 : QStringLiteral("待确认")));
+
+        for (int column : {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}) {
+            m_searchResultsTable->item(row, column)->setTextAlignment(Qt::AlignCenter);
+        }
     }
-    m_searchResultsTable->resizeColumnsToContents();
     showMessage(true, results.isEmpty() ? QStringLiteral("没有匹配到车次。")
                                         : QStringLiteral("查询完成，共 %1 条结果。").arg(results.size()));
 }
@@ -452,14 +549,91 @@ void TicketServiceDialog::bookSelectedTrain()
         showMessage(false, QStringLiteral("请先在查询结果中选择一个班次。"));
         return;
     }
-    if (m_passengerNameEdit->text().trimmed().isEmpty()) {
+
+    QDialog passengerDialog(this);
+    passengerDialog.setWindowTitle(QStringLiteral("填写乘客信息"));
+    passengerDialog.setModal(true);
+    passengerDialog.resize(520, 250);
+    passengerDialog.setMinimumSize(480, 230);
+    passengerDialog.setStyleSheet(QStringLiteral(R"QSS(
+        QDialog {
+            background: #f4f7f5;
+            color: #1f2933;
+            font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI";
+            font-size: 14px;
+        }
+        QLabel#passengerTitle {
+            color: #173c34;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        QLabel#passengerHint {
+            color: #586861;
+        }
+        QLineEdit {
+            min-height: 40px;
+            border: 1px solid #b8cbc3;
+            border-radius: 8px;
+            padding: 4px 12px;
+            background: #ffffff;
+        }
+        QLineEdit:focus {
+            border: 2px solid #0f766e;
+            padding: 3px 11px;
+        }
+        QPushButton {
+            min-width: 90px;
+            min-height: 34px;
+            border: none;
+            border-radius: 8px;
+            padding: 4px 14px;
+            color: #ffffff;
+            background: #176b5b;
+            font-weight: 700;
+        }
+        QPushButton:hover {
+            background: #0f5749;
+        }
+    )QSS"));
+
+    auto *dialogLayout = new QVBoxLayout(&passengerDialog);
+    dialogLayout->setContentsMargins(28, 24, 28, 22);
+    dialogLayout->setSpacing(12);
+
+    auto *dialogTitle = new QLabel(QStringLiteral("乘客信息"), &passengerDialog);
+    dialogTitle->setObjectName(QStringLiteral("passengerTitle"));
+    auto *dialogHint = new QLabel(
+        QStringLiteral("请输入本次乘车人的姓名，确认后将生成订单。"), &passengerDialog);
+    dialogHint->setObjectName(QStringLiteral("passengerHint"));
+    auto *passengerNameEdit = new QLineEdit(&passengerDialog);
+    passengerNameEdit->setPlaceholderText(QStringLiteral("请输入乘客姓名"));
+    passengerNameEdit->setFocus();
+
+    auto *dialogButtons = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &passengerDialog);
+    dialogButtons->button(QDialogButtonBox::Ok)->setText(QStringLiteral("确认订票"));
+    dialogButtons->button(QDialogButtonBox::Cancel)->setText(QStringLiteral("取消"));
+    connect(dialogButtons, &QDialogButtonBox::accepted, &passengerDialog, &QDialog::accept);
+    connect(dialogButtons, &QDialogButtonBox::rejected, &passengerDialog, &QDialog::reject);
+
+    dialogLayout->addWidget(dialogTitle);
+    dialogLayout->addWidget(dialogHint);
+    dialogLayout->addWidget(passengerNameEdit);
+    dialogLayout->addStretch();
+    dialogLayout->addWidget(dialogButtons);
+
+    if (passengerDialog.exec() != QDialog::Accepted) {
+        return;
+    }
+    const QString passengerName = passengerNameEdit->text().trimmed();
+    if (passengerName.isEmpty()) {
         showMessage(false, QStringLiteral("请输入乘客姓名。"));
         return;
     }
 
     const int orderId = m_ticketManager->bookTicket(m_loginResult.userId,
                                                     tripId,
-                                                    m_passengerNameEdit->text().trimmed());
+                                                    passengerName);
     if (orderId < 0) {
         showMessage(false, m_ticketManager->lastError());
         return;
@@ -586,8 +760,6 @@ QString TicketServiceDialog::statusText(int status) const
         return QStringLiteral("已退票");
     case 2:
         return QStringLiteral("已改签");
-    case 3:
-        return QStringLiteral("已过期");
     default:
         return QStringLiteral("未知状态");
     }

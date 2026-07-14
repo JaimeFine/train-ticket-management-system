@@ -71,8 +71,8 @@ int main(int argc, char *argv[])
     train.trainNumber = makeUniqueName(QStringLiteral("ISSUE9_TRAIN"));
     train.departureStationId = departureRecord->stationId;
     train.arrivalStationId = arrivalRecord->stationId;
-    train.departureTime = QStringLiteral("2026-07-10 09:00:00");
-    train.arrivalTime = QStringLiteral("2026-07-10 12:00:00");
+    train.departureTime = QStringLiteral("09:00:00");
+    train.arrivalTime = QStringLiteral("12:00:00");
     train.totalSeats = 80;
     train.enabled = true;
 
@@ -87,15 +87,14 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    const QString travelDate = QStringLiteral("2026-07-10");
-    const auto tripId =
-        manager.createTrip(storedTrain->trainId, travelDate, storedTrain->totalSeats);
-    if (!tripId.has_value()) {
-        qCritical() << "createTrip() failed:" << manager.lastError();
+    const auto storedTripId =
+        manager.createTrip(storedTrain->trainId, QStringLiteral("2026-07-10"), 80);
+    if (!storedTripId.has_value()) {
+        qCritical() << "Could not create test trip:" << manager.lastError();
         return 1;
     }
 
-    const int initialSeats = ticketManager.remainingSeats(*tripId);
+    const int initialSeats = ticketManager.remainingSeats(*storedTripId);
     if (initialSeats != 80) {
         qCritical() << "Unexpected initial remaining seats:" << initialSeats;
         return 1;
@@ -104,7 +103,7 @@ int main(int argc, char *argv[])
     const auto searchByStations = ticketManager.searchTrips(
         departureStation.stationName,
         arrivalStation.stationName,
-        travelDate
+        QStringLiteral("2026-07-10")
     );
     if (searchByStations.isEmpty()) {
         qCritical() << "searchTrains() returned no result.";
@@ -121,7 +120,7 @@ int main(int argc, char *argv[])
 
     const int createdOrderId = ticketManager.bookTicket(
         storedUser->userId,
-        *tripId,
+        *storedTripId,
         QStringLiteral("Issue9 Passenger")
     );
     if (createdOrderId <= 0) {
@@ -130,7 +129,7 @@ int main(int argc, char *argv[])
     }
 
     const int seatsAfterBooking =
-        ticketManager.remainingSeats(*tripId);
+        ticketManager.remainingSeats(*storedTripId);
     if (seatsAfterBooking != 79) {
         qCritical() << "Remaining seats did not decrease correctly:"
                     << seatsAfterBooking;
@@ -146,7 +145,7 @@ int main(int argc, char *argv[])
     bool orderFound = false;
     for (const auto &order : storedOrders) {
         if (order.orderId == createdOrderId &&
-            order.tripId == *tripId &&
+            order.tripId == *storedTripId &&
             order.passengerName == QStringLiteral("Issue9 Passenger") &&
             order.status == 0) {
             orderFound = true;

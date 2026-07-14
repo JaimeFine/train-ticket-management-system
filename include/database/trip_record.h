@@ -1,5 +1,5 @@
 #pragma once
-/** TripRecord: one specific departure of a train on one date */
+
 #include <QString>
 
 struct TripRecord {

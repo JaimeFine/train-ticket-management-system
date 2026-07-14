@@ -25,6 +25,7 @@ set(SOURCES
     src/database/database_manager_user.cpp
     src/database/database_manager_station.cpp
     src/database/database_manager_train.cpp
+    src/database/database_manager_trip.cpp
     src/database/database_manager_order.cpp
     src/database/database_manager_operation_log.cpp
     src/ui/account_management_dialog.cpp

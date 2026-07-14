@@ -45,7 +45,6 @@ private:
     QLineEdit *m_trainNumberEdit = nullptr;
     QDateEdit *m_travelDateEdit = nullptr;
     QCheckBox *m_allDatesCheckBox = nullptr;
-    QLineEdit *m_passengerNameEdit = nullptr;
     QTableWidget *m_searchResultsTable = nullptr;
 
     QLineEdit *m_refundOrderIdEdit = nullptr;

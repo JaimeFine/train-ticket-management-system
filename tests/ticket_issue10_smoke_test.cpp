@@ -66,8 +66,8 @@ int main(int argc, char *argv[]) {
     trainA.trainNumber = makeUnique(QStringLiteral("ISSUE10_A"));
     trainA.departureStationId = dep->stationId;
     trainA.arrivalStationId = arr->stationId;
-    trainA.departureTime = QStringLiteral("2026-07-10 08:00");
-    trainA.arrivalTime = QStringLiteral("2026-07-10 12:00");
+    trainA.departureTime = QStringLiteral("08:00");
+    trainA.arrivalTime = QStringLiteral("12:00");
     trainA.totalSeats = 10;
     trainA.enabled = true;
 
@@ -75,8 +75,8 @@ int main(int argc, char *argv[]) {
     trainB.trainNumber = makeUnique(QStringLiteral("ISSUE10_B"));
     trainB.departureStationId = dep->stationId;
     trainB.arrivalStationId = arr->stationId;
-    trainB.departureTime = QStringLiteral("2026-07-10 13:00");
-    trainB.arrivalTime = QStringLiteral("2026-07-10 17:00");
+    trainB.departureTime = QStringLiteral("13:00");
+    trainB.arrivalTime = QStringLiteral("17:00");
     trainB.totalSeats = 8;
     trainB.enabled = true;
 
@@ -94,11 +94,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    const QString travelDate = QStringLiteral("2026-07-10");
-    const auto tripA = db.createTrip(storedTrainA->trainId, travelDate, storedTrainA->totalSeats);
-    const auto tripB = db.createTrip(storedTrainB->trainId, travelDate, storedTrainB->totalSeats);
+    const auto tripA =
+        db.createTrip(storedTrainA->trainId, QStringLiteral("2026-07-10"), 10);
+    const auto tripB =
+        db.createTrip(storedTrainB->trainId, QStringLiteral("2026-07-10"), 8);
     if (!tripA.has_value() || !tripB.has_value()) {
-        qCritical() << "createTrip failed:" << db.lastError();
+        qCritical() << "Could not create issue10 trips:" << db.lastError();
         return 1;
     }
 
