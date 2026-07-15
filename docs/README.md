@@ -249,6 +249,13 @@ Notes:
 - manual showcase utilities live under `demo/`
 - `dynamic_pricing_live_demo` is meant for visual inspection, not pass/fail CI
 
+Run commands seen in this repo:
+
+```powershell
+.\build\demo\Debug\dynamic_pricing_live_demo.exe
+.\build\tests\Debug\dynamic_pricing_live_demo.exe
+```
+
 ## Safe Extension Rules
 
 When adding or modifying functionality, prefer these boundaries:

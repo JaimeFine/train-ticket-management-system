@@ -11,6 +11,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QRandomGenerator>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QTableWidget>
@@ -28,11 +29,18 @@ QString uniqueName(const QString &prefix)
 
 struct DemoScenario
 {
+    enum class Kind {
+        NormalWeekday,
+        BusySwing,
+        Holiday,
+        NearDeparture
+    };
+
     QString label;
     QString trainNumber;
     int tripId = 0;
     QString travelDate;
-    bool isBusy = false;
+    Kind kind = Kind::NormalWeekday;
 };
 
 bool setTripBasePrice(DatabaseManager &db, int tripId, double basePrice)
@@ -126,7 +134,7 @@ public:
 
         auto *title = new QLabel(QStringLiteral("动态票价实时演示"), this);
         title->setObjectName(QStringLiteral("title"));
-        auto *hint = new QLabel(QStringLiteral("这个窗口会实时刷新价格结果。高余票场景会在“充足/紧张”之间切换，方便直观看到动态票价变化。"), this);
+        auto *hint = new QLabel(QStringLiteral("这个窗口会实时刷新价格结果。每次点击“立即刷新”都会为演示场景重新生成余票数据，方便直观看到动态票价变化。"), this);
         hint->setObjectName(QStringLiteral("hint"));
         hint->setWordWrap(true);
         rootLayout->addWidget(title);
@@ -216,12 +224,12 @@ private:
         const QDateTime nearDeparture = QDateTime::currentDateTime().addSecs(2 * 60 * 60);
 
         auto createScenario = [&](const QString &label,
+                                  DemoScenario::Kind kind,
                                   const QString &trainPrefix,
                                   const QString &travelDate,
                                   const QString &departureTime,
                                   const QString &arrivalTime,
-                                  int seats,
-                                  bool busy) {
+                                  int seats) {
             TrainRecord train;
             train.trainNumber = uniqueName(trainPrefix);
             train.departureStationId = depStation->stationId;
@@ -252,45 +260,79 @@ private:
             scenario.trainNumber = train.trainNumber;
             scenario.tripId = *tripId;
             scenario.travelDate = travelDate;
-            scenario.isBusy = busy;
+            scenario.kind = kind;
             m_scenarios.append(scenario);
         };
 
-        createScenario(QStringLiteral("普通工作日"), QStringLiteral("DEMO_NORMAL"),
+        createScenario(QStringLiteral("普通工作日"), DemoScenario::Kind::NormalWeekday, QStringLiteral("DEMO_NORMAL"),
                        weekday.toString(QStringLiteral("yyyy-MM-dd")),
-                       QStringLiteral("09:00"), QStringLiteral("11:00"), 100, false);
-        createScenario(QStringLiteral("余票波动演示"), QStringLiteral("DEMO_BUSY"),
+                       QStringLiteral("09:00"), QStringLiteral("11:00"), 100);
+        createScenario(QStringLiteral("余票波动演示"), DemoScenario::Kind::BusySwing, QStringLiteral("DEMO_BUSY"),
                        weekday.toString(QStringLiteral("yyyy-MM-dd")),
-                       QStringLiteral("09:00"), QStringLiteral("11:00"), 100, true);
-        createScenario(QStringLiteral("节假日"), QStringLiteral("DEMO_HOLIDAY"),
+                       QStringLiteral("09:00"), QStringLiteral("11:00"), 100);
+        createScenario(QStringLiteral("节假日"), DemoScenario::Kind::Holiday, QStringLiteral("DEMO_HOLIDAY"),
                        holiday.toString(QStringLiteral("yyyy-MM-dd")),
-                       QStringLiteral("10:00"), QStringLiteral("12:00"), 100, false);
-        createScenario(QStringLiteral("临近发车"), QStringLiteral("DEMO_NEAR"),
+                       QStringLiteral("10:00"), QStringLiteral("12:00"), 100);
+        createScenario(QStringLiteral("临近发车"), DemoScenario::Kind::NearDeparture, QStringLiteral("DEMO_NEAR"),
                        nearDeparture.date().toString(QStringLiteral("yyyy-MM-dd")),
                        nearDeparture.time().toString(QStringLiteral("HH:mm")),
                        nearDeparture.addSecs(2 * 60 * 60).time().toString(QStringLiteral("HH:mm")),
-                       100, false);
+                       100);
+    }
+
+    int randomTargetSeats(const DemoScenario &scenario, int totalSeats) const
+    {
+        auto *rng = QRandomGenerator::global();
+        switch (scenario.kind) {
+        case DemoScenario::Kind::NormalWeekday:
+            return rng->bounded(70, totalSeats + 1);
+        case DemoScenario::Kind::BusySwing:
+            if (rng->bounded(2) == 0) {
+                return rng->bounded(5, 21);
+            }
+            return rng->bounded(55, 91);
+        case DemoScenario::Kind::Holiday:
+            return rng->bounded(20, 71);
+        case DemoScenario::Kind::NearDeparture:
+            return rng->bounded(50, totalSeats + 1);
+        }
+
+        return totalSeats;
+    }
+
+    double randomBasePrice(const DemoScenario &scenario) const
+    {
+        auto *rng = QRandomGenerator::global();
+        switch (scenario.kind) {
+        case DemoScenario::Kind::NormalWeekday:
+            return rng->bounded(260, 341);
+        case DemoScenario::Kind::BusySwing:
+            return rng->bounded(280, 361);
+        case DemoScenario::Kind::Holiday:
+            return rng->bounded(320, 421);
+        case DemoScenario::Kind::NearDeparture:
+            return rng->bounded(240, 321);
+        }
+
+        return 300.0;
     }
 
     void refreshDashboard()
     {
         for (DemoScenario &scenario : m_scenarios) {
-            if (!scenario.isBusy) {
-                continue;
-            }
-
             const auto trip = m_db.findTripById(scenario.tripId);
             if (!trip.has_value()) {
                 continue;
             }
 
-            const int targetSeats = m_busyScarce ? 10 : 80;
+            const int targetSeats = randomTargetSeats(scenario, trip->totalSeats);
             const int delta = targetSeats - trip->remainingSeats;
             if (delta != 0) {
                 m_db.adjustTripSeats(scenario.tripId, delta);
             }
+
+            setTripBasePrice(m_db, scenario.tripId, randomBasePrice(scenario));
         }
-        m_busyScarce = !m_busyScarce;
 
         const QVector<QVariantMap> results = m_ticketManager.searchTrips(QString(), QString(), QString());
         m_table->setRowCount(m_scenarios.size());
@@ -339,7 +381,6 @@ private:
     TicketManager &m_ticketManager;
     QVector<DemoScenario> m_scenarios;
     QTimer m_timer;
-    bool m_busyScarce = false;
     QLabel *m_sceneCountValue = nullptr;
     QLabel *m_minPriceValue = nullptr;
     QLabel *m_maxPriceValue = nullptr;

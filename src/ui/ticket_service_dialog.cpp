@@ -734,14 +734,29 @@ void TicketServiceDialog::runOrderQuery()
     QVector<QVariantMap> results;
     const QString orderIdText = m_queryOrderIdEdit->text().trimmed();
     const QString passengerName = m_queryPassengerEdit->text().trimmed();
+    bool orderIdOk = false;
+    const int orderId = orderIdText.toInt(&orderIdOk);
 
     if (m_loginResult.role == UserRole::Guest) {
         showMessage(false, QStringLiteral("游客不能查询订单，请先登录。"));
         return;
+    } else if (!orderIdText.isEmpty() && !orderIdOk) {
+        showMessage(false, QStringLiteral("请输入有效订单号。"));
+        return;
     } else if (m_loginResult.role == UserRole::User) {
-        results = m_ticketManager->queryOrdersByUser(m_loginResult.userId);
+        if (!orderIdText.isEmpty()) {
+            const QVector<QVariantMap> matchedOrders =
+                m_ticketManager->queryOrderByOrderId(orderId);
+            for (const auto &order : matchedOrders) {
+                if (order.value(QStringLiteral("userId")).toInt() == m_loginResult.userId) {
+                    results.append(order);
+                }
+            }
+        } else {
+            results = m_ticketManager->queryOrdersByUser(m_loginResult.userId);
+        }
     } else if (!orderIdText.isEmpty()) {
-        results = m_ticketManager->queryOrderByOrderId(orderIdText.toInt());
+        results = m_ticketManager->queryOrderByOrderId(orderId);
     } else if (!passengerName.isEmpty()) {
         results = m_ticketManager->queryOrdersByPassenger(passengerName);
     } else {
