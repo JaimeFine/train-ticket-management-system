@@ -1,6 +1,7 @@
 #include "order_history_dialog.h"
 
 #include "ticket_manager.h"
+#include "app_style.h"
 
 #include <QAbstractItemView>
 #include <QHeaderView>
@@ -86,12 +87,12 @@ OrderHistoryDialog::OrderHistoryDialog(const TicketManager &ticketManager,
         QStringLiteral("购票时间"),
         QStringLiteral("状态")
     });
-    m_ordersTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_ordersTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-    m_ordersTable->setSelectionMode(QAbstractItemView::SingleSelection);
-    m_ordersTable->setAlternatingRowColors(true);
-    m_ordersTable->verticalHeader()->setVisible(false);
-    m_ordersTable->horizontalHeader()->setStretchLastSection(true);
+    UiStyle::prepareTable(m_ordersTable);
+    QHeaderView *ordersHeader = m_ordersTable->horizontalHeader();
+    ordersHeader->setStretchLastSection(false);
+    ordersHeader->setSectionResizeMode(QHeaderView::ResizeToContents);
+    ordersHeader->setSectionResizeMode(2, QHeaderView::Stretch);
+    ordersHeader->setSectionResizeMode(3, QHeaderView::Stretch);
 
     auto *closeButton = new QPushButton(QStringLiteral("关闭"), this);
     connect(closeButton, &QPushButton::clicked, this, &QDialog::accept);
@@ -127,7 +128,6 @@ void OrderHistoryDialog::loadOrders()
                                new QTableWidgetItem(statusText(order.value(QStringLiteral("status")).toInt())));
     }
 
-    m_ordersTable->resizeColumnsToContents();
 }
 
 QString OrderHistoryDialog::statusText(int status) const

@@ -1,6 +1,7 @@
 #include "train_management_dialog.h"
 #include "database_manager.h"
 #include "station_management_dialog.h"
+#include "app_style.h"
 
 #include <QComboBox>
 #include <QFormLayout>
@@ -9,6 +10,9 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QPainter>
+#include <QPaintEvent>
+#include <QPainterPath>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QTableWidget>
@@ -16,6 +20,60 @@
 #include <QVBoxLayout>
 
 namespace {
+// Windows 下 QComboBox 的系统箭头会受 Qt 样式影响，曾出现图标消失和位置偏移。
+// 这里保留 QComboBox 原有的下拉功能，只接管右侧箭头区域的绘制。
+class StationComboBox : public QComboBox
+{
+protected:
+    void paintEvent(QPaintEvent *event) override
+    {
+        QComboBox::paintEvent(event);
+
+        // 先让 Qt 画文字和控件状态，再盖上统一的箭头背景。
+        // 外框最后绘制，获得焦点时边框就不会在右侧接缝处断开。
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        const qreal arrowAreaWidth = 36.0;
+
+        QPainterPath clipPath;
+        // 背景按控件圆角裁剪，右上角和右下角不会溢出方块。
+        clipPath.addRoundedRect(QRectF(0.5, 0.5, width() - 1.0, height() - 1.0),
+                                8.0, 8.0);
+        painter.setClipPath(clipPath);
+        painter.fillRect(QRectF(width() - arrowAreaWidth, 0.0,
+                                arrowAreaWidth, height()),
+                         QColor(QStringLiteral("#eef5f1")));
+        painter.setClipping(false);
+
+        painter.setPen(QPen(QColor(QStringLiteral("#d8e0dc")), 1.0));
+        painter.drawLine(QPointF(width() - arrowAreaWidth, 1.0),
+                         QPointF(width() - arrowAreaWidth, height() - 1.0));
+
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(isEnabled() ? QColor(QStringLiteral("#8fa5a0"))
+                                     : QColor(QStringLiteral("#bdc8c4")));
+
+        const qreal centerX = width() - arrowAreaWidth / 2.0;
+        const qreal centerY = height() / 2.0;
+        QPolygonF arrow;
+        arrow << QPointF(centerX - 4.5, centerY - 2.5)
+              << QPointF(centerX + 4.5, centerY - 2.5)
+              << QPointF(centerX, centerY + 4.0);
+        painter.drawPolygon(arrow);
+
+        const qreal borderWidth = hasFocus() ? 2.0 : 1.0;
+        const qreal borderOffset = borderWidth / 2.0;
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(hasFocus() ? QColor(QStringLiteral("#0f766e"))
+                                      : QColor(QStringLiteral("#cbd8d2")),
+                            borderWidth));
+        painter.drawRoundedRect(QRectF(borderOffset, borderOffset,
+                                       width() - borderWidth,
+                                       height() - borderWidth),
+                                8.0, 8.0);
+    }
+};
+
 void styleTrainEditDialog(QDialog &dialog)
 {
     dialog.setStyleSheet(
@@ -69,14 +127,7 @@ TrainManagementDialog::TrainManagementDialog(TrainManager* manager, QWidget *par
     : QDialog(parent)
     , m_manager(manager)
 {
-    setStyleSheet(
-        "QDialog {"
-        "    background: #eef2f3;"
-        "    color: #1f2933;"
-        "    font-family: \"Microsoft YaHei UI\", \"Microsoft YaHei\", \"Segoe UI\";"
-        "    font-size: 14px;"
-        "}"
-        );
+    setStyleSheet(UiStyle::dialogStyleSheet());
     setupUI();
     loadStations();
     loadData();
@@ -94,64 +145,14 @@ void TrainManagementDialog::setupUI()
     m_searchInput = new QLineEdit();
     m_searchInput->setPlaceholderText("输入车次号或站点名称...");
     m_searchInput->setMinimumWidth(250);
-    m_searchInput->setStyleSheet(
-        "QLineEdit {"
-        "    color: #1f2933;"
-        "    background-color: #ffffff;"
-        "    border: 1px solid #cbd8d2;"
-        "    border-radius: 6px;"
-        "    padding: 4px 8px;"
-        "    font-size: 13px;"
-        "}"
-        "QLineEdit:focus {"
-        "    border: 2px solid #0f766e;"
-        "}"
-        "QLineEdit::placeholder {"
-        "    color: #8b9490;"
-        "}"
-        );
     m_searchBtn = new QPushButton("搜索");
     m_refreshBtn = new QPushButton("刷新");
 
-    m_stationCombo = new QComboBox();
+    m_stationCombo = new StationComboBox();
+    m_stationCombo->setObjectName(QStringLiteral("stationSearchCombo"));
     m_stationCombo->addItem("-- 选择出发站 --");
-    m_stationCombo->setStyleSheet(
-        "QComboBox {"
-        "    color: #1f2933;"
-        "    background-color: #ffffff;"
-        "    border: 1px solid #cbd8d2;"
-        "    border-radius: 6px;"
-        "    padding: 4px 8px;"
-        "    min-height: 26px;"
-        "}"
-        "QComboBox:hover {"
-        "    border: 1px solid #0f766e;"
-        "}"
-        "QComboBox::drop-down {"
-        "    border: none;"
-        "}"
-        "QComboBox QAbstractItemView {"
-        "    color: #1f2933;"
-        "    background-color: #ffffff;"
-        "    border: 1px solid #cbd8d2;"
-        "    border-radius: 6px;"
-        "    selection-background-color: #d9f99d;"
-        "    selection-color: #153832;"
-        "    outline: none;"
-        "}"
-        "QComboBox QAbstractItemView::item {"
-        "    padding: 6px 10px;"
-        "    min-height: 26px;"
-        "}"
-        "QComboBox QAbstractItemView::item:hover {"
-        "    background-color: #f0f5f3;"
-        "}"
-        );
     m_searchStationBtn = new QPushButton("按出发站查询");
-    m_searchStationBtn->setStyleSheet("background-color: #176b5b; color: white; border-radius: 6px; padding: 6px 12px;");
-    // 站点管理按钮 - 正确文本和功能
     QPushButton *stationBtn = new QPushButton("站点管理");
-    stationBtn->setStyleSheet("background-color: #17a2b8; color: white; border-radius: 6px; padding: 6px 12px;");
     connect(stationBtn, &QPushButton::clicked, [this]() {
         StationManagementDialog dialog(m_manager->databaseManager(), this);
         dialog.exec();
@@ -176,56 +177,28 @@ void TrainManagementDialog::setupUI()
         "ID", "车次号", "出发站", "到达站",
         "出发时间", "到达时间", "余票/总座", "状态"
     });
-    m_table->verticalHeader()->setVisible(false);
-
-    m_table->setStyleSheet(
-        "QTableWidget {"
-        "    background-color: #ffffff;"
-        "    alternate-background-color: #f5f8f7;"
-        "    color: #1f2933;"
-        "    border: 1px solid #d8e0dc;"
-        "    border-radius: 8px;"
-        "    gridline-color: #e5ece8;"
-        "}"
-        "QHeaderView::section {"
-        "    background-color: #eef5f1;"
-        "    color: #33433d;"
-        "    padding: 6px;"
-        "    border: none;"
-        "    font-weight: bold;"
-        "    font-size: 13px;"
-        "}"
-        "QTableWidget::item {"
-        "    color: #1f2933;"
-        "    padding: 4px;"
-        "}"
-        );
+    UiStyle::prepareTable(m_table);
     m_table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
-    m_table->setSelectionMode(QAbstractItemView::SingleSelection);
-    m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_table->setAlternatingRowColors(true);
     mainLayout->addWidget(m_table);
 
     // -------- 操作按钮 --------
     QHBoxLayout *actionLayout = new QHBoxLayout();
 
     m_addBtn = new QPushButton("添加车次");
-    m_addBtn->setStyleSheet("background-color: #28a745; color: white; font-weight: bold;");
 
     m_editBtn = new QPushButton("编辑");
     m_editBtn->setEnabled(false);
 
     m_deleteBtn = new QPushButton("停运");
     m_deleteBtn->setEnabled(false);
-    m_deleteBtn->setStyleSheet("background-color: #dc3545; color: white;");
+    m_deleteBtn->setObjectName(QStringLiteral("dangerButton"));
 
     m_resumeBtn = new QPushButton("恢复运营");
     m_resumeBtn->setEnabled(false);
 
     m_purgeBtn = new QPushButton("物理删除");
     m_purgeBtn->setEnabled(false);
-    m_purgeBtn->setStyleSheet("background-color: #7f1d1d; color: white;");
+    m_purgeBtn->setObjectName(QStringLiteral("dangerButton"));
 
     m_seatBtn = new QPushButton("Trip座位说明");
     m_seatBtn->setEnabled(false);
@@ -449,8 +422,8 @@ void TrainManagementDialog::addTrain()
         train.arrivalStationId = arriveCombo->currentData().toInt();
         train.departureTime = departTimeEdit->text().trimmed();
         train.arrivalTime = arriveTimeEdit->text().trimmed();
+        // Train 只保存车次模板和总座位数，具体日期的余票由对应的 Trip 记录维护。
         train.totalSeats = totalSeatsSpin->value();
-        // V2: seats are per Trip now;
         train.enabled = true;
 
         if (train.trainNumber.isEmpty()) {
@@ -543,8 +516,8 @@ void TrainManagementDialog::editTrain()
         train.arrivalStationId = arriveCombo->currentData().toInt();
         train.departureTime = departTimeEdit->text().trimmed();
         train.arrivalTime = arriveTimeEdit->text().trimmed();
+        // 修改车次模板时不直接改余票，已经生成的 Trip 仍保留各自的座位数据。
         train.totalSeats = totalSeatsSpin->value();
-        // V2: seats per Trip;
         train.enabled = current.enabled;
 
         if (train.trainNumber.isEmpty()) {
