@@ -418,15 +418,6 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       true,
                       showOperationLogDialog);
 
-        addModuleCard(QStringLiteral("换乘查询"),
-                      QStringLiteral("查询两站之间的最优换乘路线，支持时间最短、换乘最少、综合平衡。"),
-                      QStringLiteral("智能推荐"),
-                      QStringLiteral("进入查询"),
-                      true,
-                      [this]() {
-                          openTransferDialog();
-                      });
-
     } else if (m_loginResult.role == UserRole::User) {
         addModuleCard(QStringLiteral("车票查询"),
                       QStringLiteral("查询车次、余票，并可直接预订选中的车次。"),
@@ -519,14 +510,6 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                           openAccountDialog(true);
                       });
 
-        addModuleCard(QStringLiteral("换乘查询"),
-                      QStringLiteral("查询两站之间的最优换乘路线，支持时间最短、换乘最少、综合平衡。"),
-                      QStringLiteral("智能推荐"),
-                      QStringLiteral("进入查询"),
-                      true,
-                      [this]() {
-                          openTransferDialog();
-                      });
     }
 
     pageLayout->addWidget(headerPanel);
