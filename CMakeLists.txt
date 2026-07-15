@@ -25,18 +25,21 @@ set(SOURCES
     src/database/database_manager_user.cpp
     src/database/database_manager_station.cpp
     src/database/database_manager_train.cpp
+    src/database/database_manager_trip.cpp
     src/database/database_manager_order.cpp
     src/database/database_manager_operation_log.cpp
+    src/route_manager.cpp
     src/ui/account_management_dialog.cpp
     src/ui/main_window.cpp
     src/ui/order_history_dialog.cpp
     src/ui/operation_log_dialog.cpp
     src/ui/ticket_service_dialog.cpp
     src/ui/statistics_dialog.cpp
+    src/ui/transfer_dialog.cpp
     src/database/database_manager_ticket.cpp
-    src/database/database_manager_trip.cpp
     src/ui/train_management_dialog.cpp
     src/ui/station_management_dialog.cpp
+    src/ui/app_style.cpp
     src/database/database_manager_statistics.cpp
 )
 
@@ -53,15 +56,28 @@ set(HEADERS
     include/operation_log_dialog.h
     include/ticket_service_dialog.h
     include/statistics_dialog.h
+    include/route_manager.h
+    include/transfer_dialog.h
     include/train_management_dialog.h
     include/station_management_dialog.h
+    include/app_style.h
 )
 
 # ── Resources ────────────────────────────────────────────────────────────────
 set(RESOURCES
     resources/resources.qrc
-    resources/app_icon.rc
 )
+
+# Windows 资源文件不依赖 Qt 头文件，单独编译可以避免带空格路径被 windres 拆开。
+if(WIN32)
+    add_library(AppIconResource OBJECT resources/app_icon.rc)
+    set_target_properties(AppIconResource PROPERTIES
+        AUTOMOC OFF
+        AUTOUIC OFF
+        AUTORCC OFF
+    )
+    list(APPEND RESOURCES $<TARGET_OBJECTS:AppIconResource>)
+endif()
 
 # ── Executable ───────────────────────────────────────────────────────────────
 add_executable(${PROJECT_NAME}

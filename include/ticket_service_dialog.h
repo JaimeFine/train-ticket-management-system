@@ -32,6 +32,7 @@ private:
     void runOrderQuery();
     void loadOwnOrders();
     void showMessage(bool success, const QString &message);
+    void refreshOrderQueryTable(const QVector<QVariantMap> &results);
     QString statusText(int status) const;
     int selectedTripId() const;
     void writeOperationLog(const QString &action, const QString &detail);
@@ -45,7 +46,6 @@ private:
     QLineEdit *m_trainNumberEdit = nullptr;
     QDateEdit *m_travelDateEdit = nullptr;
     QCheckBox *m_allDatesCheckBox = nullptr;
-    QLineEdit *m_passengerNameEdit = nullptr;
     QTableWidget *m_searchResultsTable = nullptr;
 
     QLineEdit *m_refundOrderIdEdit = nullptr;

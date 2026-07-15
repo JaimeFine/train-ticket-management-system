@@ -6,6 +6,8 @@
 #include "ticket_service_dialog.h"
 #include "train_management_dialog.h"
 #include "main_window.h"
+#include "transfer_dialog.h"
+#include "route_manager.h"
 
 #include <QFrame>
 #include <QGridLayout>
@@ -272,8 +274,11 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     accountBlock->setSpacing(8);
     accountBlock->addWidget(roleBadge);
     accountBlock->addWidget(accountButton);
-    if (m_loginResult.role != UserRole::Guest) {
-        auto *logoutButton = new QPushButton(QStringLiteral("退出登录"), headerPanel);
+    {
+        const QString exitButtonText = m_loginResult.role == UserRole::Guest
+                                           ? QStringLiteral("返回登录")
+                                           : QStringLiteral("退出登录");
+        auto *logoutButton = new QPushButton(exitButtonText, headerPanel);
         logoutButton->setObjectName(QStringLiteral("logoutButton"));
         connect(logoutButton, &QPushButton::clicked, this, [this]() {
             m_logoutRequested = true;
@@ -287,19 +292,14 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     headerLayout->addLayout(accountBlock);
 
     auto showTrainStationMessage = [this]() {
-        qDebug() << "=== showTrainStationMessage called ===";
         if (m_trainManager == nullptr) {
-            qDebug() << "m_trainManager is NULL!";
             QMessageBox::warning(this,
                                  QStringLiteral("车次管理"),
                                  QStringLiteral("车次管理服务尚未初始化。"));
             return;
         }
-        qDebug() << "Creating TrainManagementDialog...";
         TrainManagementDialog dialog(m_trainManager, this);
-        qDebug() << "Executing TrainManagementDialog...";
         dialog.exec();
-        qDebug() << "TrainManagementDialog closed.";
     };
 
     auto showStatisticsDialog = [this]() {
@@ -417,6 +417,16 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       QStringLiteral("查看日志"),
                       true,
                       showOperationLogDialog);
+
+        addModuleCard(QStringLiteral("换乘查询"),
+                      QStringLiteral("查询两站之间的最优换乘路线，支持时间最短、换乘最少、综合平衡。"),
+                      QStringLiteral("智能推荐"),
+                      QStringLiteral("进入查询"),
+                      true,
+                      [this]() {
+                          openTransferDialog();
+                      });
+
     } else if (m_loginResult.role == UserRole::User) {
         addModuleCard(QStringLiteral("车票查询"),
                       QStringLiteral("查询车次、余票，并可直接预订选中的车次。"),
@@ -444,6 +454,15 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       [openTicketServiceDialog]() {
                           openTicketServiceDialog(2);
                       });
+        addModuleCard(QStringLiteral("换乘查询"),
+                      QStringLiteral("查询两站之间的最优换乘路线，支持时间最短、换乘最少、综合平衡。"),
+                      QStringLiteral("智能推荐"),
+                      QStringLiteral("进入查询"),
+                      true,
+                      [this]() {
+                          openTransferDialog();
+                      });
+
     } else if (m_loginResult.role == UserRole::Seller) {
         addModuleCard(QStringLiteral("车票查询"),
                       QStringLiteral("查询车次、余票，并可协助乘客订票。"),
@@ -472,6 +491,15 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                           openTicketServiceDialog(2);
                       });
 
+        addModuleCard(QStringLiteral("换乘查询"),
+                      QStringLiteral("查询两站之间的最优换乘路线，支持时间最短、换乘最少、综合平衡。"),
+                      QStringLiteral("智能推荐"),
+                      QStringLiteral("进入查询"),
+                      true,
+                      [this]() {
+                          openTransferDialog();
+                      });
+
     } else if (m_loginResult.role == UserRole::Guest) {
         addModuleCard(QStringLiteral("车票查询"),
                       QStringLiteral("先查询车次和余票，决定是否注册后继续订票。"),
@@ -489,6 +517,15 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       true,
                       [openAccountDialog]() {
                           openAccountDialog(true);
+                      });
+
+        addModuleCard(QStringLiteral("换乘查询"),
+                      QStringLiteral("查询两站之间的最优换乘路线，支持时间最短、换乘最少、综合平衡。"),
+                      QStringLiteral("智能推荐"),
+                      QStringLiteral("进入查询"),
+                      true,
+                      [this]() {
+                          openTransferDialog();
                       });
     }
 
@@ -518,4 +555,25 @@ MainWindow::MainWindow(const LoginResult &loginResult,
 bool MainWindow::logoutRequested() const
 {
     return m_logoutRequested;
+}
+
+void MainWindow::openTransferDialog()
+{
+    if (m_trainManager == nullptr) {
+        QMessageBox::warning(this,
+                             QStringLiteral("换乘查询"),
+                             QStringLiteral("车次服务尚未初始化，请稍后重试。"));
+        return;
+    }
+
+    RouteManager routeManager(m_trainManager->databaseManager());
+    if (!routeManager.buildGraph()) {
+        QMessageBox::warning(this,
+                             QStringLiteral("换乘查询"),
+                             QStringLiteral("无法构建路线图：%1").arg(routeManager.lastError()));
+        return;
+    }
+
+    TransferDialog dialog(&routeManager, this);
+    dialog.exec();
 }

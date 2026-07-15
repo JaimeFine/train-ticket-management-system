@@ -3,6 +3,7 @@
 #include "database_manager.h"
 
 #include <QDateTime>
+#include <QTimer>
 #include <optional>
 #include <QString>
 
@@ -108,9 +109,16 @@ LoginResult LoginManager::authenticate(const QString &username, const QString &p
                 QStringLiteral("账号已被禁用。")};
     }
 
-    m_databaseManager->addOperationLog(userAccount->username,
-                                       QStringLiteral("登录"),
-                                       QStringLiteral("用户成功登录系统"));
+    // 登录结果先返回给界面，日志写入排到下一轮事件循环，避免同步磁盘写拖慢登录体感。
+    DatabaseManager *databaseManager = m_databaseManager;
+    const QString usernameForLog = userAccount->username;
+    QTimer::singleShot(0, [databaseManager, usernameForLog]() {
+        if (databaseManager != nullptr && databaseManager->isOpen()) {
+            databaseManager->addOperationLog(usernameForLog,
+                                             QStringLiteral("登录"),
+                                             QStringLiteral("用户成功登录系统"));
+        }
+    });
 
     return {true,
             *role,

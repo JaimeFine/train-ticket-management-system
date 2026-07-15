@@ -18,12 +18,12 @@ DatabaseManager::findAllOrdersWithDetails() const
 
     // 订单 -> Trip -> Train -> Station（出发/到达各连一次），把外键翻译成可读名称
     query.prepare(QStringLiteral(
-        "SELECT o.orderId, o.userId, o.tripId, o.status, "
-        "       t.trainId, t.trainNumber, o.passengerName, o.purchaseTime, "
+        "SELECT o.orderId, o.userId, o.tripId, t.trainId, o.status, "
+        "       t.trainNumber, o.passengerName, o.purchaseTime, "
         "       ds.stationName, a_s.stationName, o.travelDate "
         "FROM \"Order\" o "
         "JOIN Trip tr ON o.tripId = tr.tripId "
-        "JOIN Train t ON tr.trainId = t.trainId "
+        "JOIN Train t  ON tr.trainId = t.trainId "
         "JOIN Station ds ON t.departureStationId = ds.stationId "
         "JOIN Station a_s ON t.arrivalStationId   = a_s.stationId "
         "ORDER BY o.purchaseTime DESC"
@@ -40,8 +40,8 @@ DatabaseManager::findAllOrdersWithDetails() const
         d.orderId              = query.value(0).toInt();
         d.userId               = query.value(1).toInt();
         d.tripId               = query.value(2).toInt();
-        d.status               = query.value(3).toInt();
-        d.trainId              = query.value(4).toInt();
+        d.trainId              = query.value(3).toInt();
+        d.status               = query.value(4).toInt();
         d.trainNumber          = query.value(5).toString();
         d.passengerName        = query.value(6).toString();
         d.purchaseTime         = query.value(7).toString();

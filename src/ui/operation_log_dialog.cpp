@@ -1,9 +1,11 @@
 #include "operation_log_dialog.h"
 
 #include "database_manager.h"
+#include "app_style.h"
 
 #include <QAbstractItemView>
 #include <QHeaderView>
+#include <QLabel>
 #include <QPushButton>
 #include <QTableWidget>
 #include <QTableWidgetItem>
@@ -17,8 +19,17 @@ OperationLogDialog::OperationLogDialog(const DatabaseManager &databaseManager,
     setWindowTitle(QStringLiteral("系统操作日志"));
     setModal(true);
     resize(860, 560);
+    setStyleSheet(UiStyle::dialogStyleSheet());
 
     auto *layout = new QVBoxLayout(this);
+    layout->setContentsMargins(24, 22, 24, 22);
+    layout->setSpacing(14);
+
+    auto *titleLabel = new QLabel(QStringLiteral("系统操作日志"), this);
+    titleLabel->setObjectName(QStringLiteral("titleLabel"));
+    auto *hintLabel = new QLabel(QStringLiteral("查看登录、账号维护和票务办理等操作记录。"), this);
+    hintLabel->setObjectName(QStringLiteral("hintLabel"));
+
     m_table = new QTableWidget(this);
     m_table->setColumnCount(5);
     m_table->setHorizontalHeaderLabels({
@@ -28,16 +39,19 @@ OperationLogDialog::OperationLogDialog(const DatabaseManager &databaseManager,
         QStringLiteral("详情"),
         QStringLiteral("时间")
     });
-    m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
-    m_table->setSelectionMode(QAbstractItemView::SingleSelection);
-    m_table->verticalHeader()->setVisible(false);
-    m_table->horizontalHeader()->setStretchLastSection(true);
+    UiStyle::prepareTable(m_table);
+    QHeaderView *header = m_table->horizontalHeader();
+    header->setStretchLastSection(false);
+    header->setSectionResizeMode(QHeaderView::ResizeToContents);
+    header->setSectionResizeMode(3, QHeaderView::Stretch);
+    header->setSectionResizeMode(4, QHeaderView::Stretch);
 
     auto *closeButton = new QPushButton(QStringLiteral("关闭"), this);
     connect(closeButton, &QPushButton::clicked, this, &QDialog::accept);
 
-    layout->addWidget(m_table);
+    layout->addWidget(titleLabel);
+    layout->addWidget(hintLabel);
+    layout->addWidget(m_table, 1);
     layout->addWidget(closeButton, 0, Qt::AlignRight);
 
     loadLogs();
@@ -55,5 +69,4 @@ void OperationLogDialog::loadLogs()
         m_table->setItem(row, 3, new QTableWidgetItem(log.detail));
         m_table->setItem(row, 4, new QTableWidgetItem(log.createdAt));
     }
-    m_table->resizeColumnsToContents();
 }

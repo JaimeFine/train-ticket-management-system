@@ -1,5 +1,5 @@
 #pragma once
-// TripRecord：每日班次（V2），即某车次在某一天的一次发车；余票在班次级维护
+
 #include <QString>
 
 struct TripRecord {

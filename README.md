@@ -26,6 +26,12 @@ Build release:
 cmake --build build --config Release --target TrainTicketSystem
 ```
 
+Configure with tests enabled:
+
+```powershell
+cmake -S . -B build -DBUILD_TESTS=ON
+```
+
 Run:
 
 ```text
@@ -81,7 +87,7 @@ Demo trains:
 - If you want a completely fresh demo database, delete:
 
 ```text
-database\train_ticket.db
+database\train_ticket_v2.db
 ```
 
 and start the app again.
@@ -99,3 +105,38 @@ train/
 ├── CMakeLists.txt
 └── README.md
 ```
+
+## Tests
+
+Build the dynamic pricing smoke test:
+
+```powershell
+cmake --build build --config Debug --target dynamic_pricing_smoke_test
+```
+
+Run the smoke test:
+
+```powershell
+ctest --test-dir build -C Debug -R dynamic_pricing_smoke_test --output-on-failure
+```
+
+## Dynamic Pricing Demonstration
+
+Build the live pricing demo target:
+
+```powershell
+cmake --build build --config Debug --target dynamic_pricing_live_demo
+```
+
+Run the live demo:
+
+```powershell
+.\build\tests\Debug\dynamic_pricing_live_demo.exe
+```
+
+The live demo opens a Qt window that shows dynamic ticket prices in real time for several scenarios, including:
+
+- normal weekday pricing
+- seat-scarcity pricing
+- holiday pricing
+- near-departure discount behavior

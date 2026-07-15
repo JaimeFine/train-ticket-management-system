@@ -8,7 +8,6 @@
 // - QCoreApplication / QDir / QFileInfo 用于构造安全路径
 
 #include <QCoreApplication>
-#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -84,6 +83,15 @@ namespace {
         }
 
         return true;
+    }
+
+    bool tableHasRows(QSqlDatabase &database, const QString &tableName) {
+        QSqlQuery query(database);
+        if (!query.exec(QStringLiteral("SELECT 1 FROM %1 LIMIT 1").arg(tableName))) {
+            return false;
+        }
+
+        return query.next();
     }
 }   // namespace
 
@@ -286,7 +294,14 @@ bool DatabaseManager::seedDemoData() {
         return false;
     }
 
-    // 整批种子数据放同一事务：要么全部写入，要么全部回滚
+    // 已有完整演示数据时直接跳过，避免每次启动都重复跑整套种子写入。
+    if (tableHasRows(database, QStringLiteral("User"))
+        && tableHasRows(database, QStringLiteral("Station"))
+        && tableHasRows(database, QStringLiteral("Train"))
+        && tableHasRows(database, QStringLiteral("Trip"))) {
+        return true;
+    }
+
     if (!database.transaction()) {
         m_lastError = database.lastError().text();
         return false;
@@ -386,17 +401,25 @@ bool DatabaseManager::seedDemoData() {
         }
     }
 
-    // V2：为演示车次生成今天和明天的班次(Trip)记录，余票初始为满座
-    const QString today = QDateTime::currentDateTime().toString("yyyy-MM-dd");
-    const QString tomorrow = QDateTime::currentDateTime().addDays(1).toString("yyyy-MM-dd");
-    for (const QString &date : {today, tomorrow}) {
+    const QString today =
+        QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd"));
+    const QString tomorrow =
+        QDateTime::currentDateTime().addDays(1).toString(QStringLiteral("yyyy-MM-dd"));
+
+    for (const QString &travelDate : {today, tomorrow}) {
         for (const DemoTrainSeed &train : demoTrains) {
-            if (!execPrepared(database, &m_lastError,
-                    QStringLiteral("INSERT OR IGNORE INTO Trip "
-                        "(trainId,travelDate,departureTime,arrivalTime,totalSeats,remainingSeats,enabled) "
-                        "SELECT trainId,?,departureTime,arrivalTime,totalSeats,totalSeats,1 "
-                        "FROM Train WHERE trainNumber=?"),
-                    {date, train.trainNumber})) {
+            if (!execPrepared(
+                    database,
+                    &m_lastError,
+                    QStringLiteral(
+                        "INSERT OR IGNORE INTO Trip ("
+                        "trainId, travelDate, departureTime, arrivalTime, "
+                        "totalSeats, remainingSeats, basePrice, enabled"
+                        ") "
+                        "SELECT trainId, ?, departureTime, arrivalTime, totalSeats, totalSeats, 0, 1 "
+                        "FROM Train WHERE trainNumber = ?"
+                    ),
+                    {travelDate, train.trainNumber})) {
                 database.rollback();
                 return false;
             }
@@ -427,15 +450,15 @@ QString DatabaseManager::resolveDatabasePath() const {
     QDir baseDir(QCoreApplication::applicationDirPath());
 
     if (baseDir.exists(QStringLiteral("database"))) {
-        return baseDir.filePath(QStringLiteral("database/train_ticket.db"));
+        return baseDir.filePath(QStringLiteral("database/train_ticket_v2.db"));
     }
 
     QDir parentDir = baseDir;
     if (parentDir.cdUp() && parentDir.exists(QStringLiteral("database"))) {
-        return parentDir.filePath(QStringLiteral("database/train_ticket.db"));
+        return parentDir.filePath(QStringLiteral("database/train_ticket_v2.db"));
     }
 
     // 两处都没有时，在可执行文件旁新建 database 目录。
     baseDir.mkpath(QStringLiteral("database"));
-    return baseDir.filePath(QStringLiteral("database/train_ticket.db"));
+    return baseDir.filePath(QStringLiteral("database/train_ticket_v2.db"));
 }
