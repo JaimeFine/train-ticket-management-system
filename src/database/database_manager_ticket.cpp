@@ -4,23 +4,28 @@
 #include <QSqlError>
 #include <QSqlQuery>
 
-// ══════════════════════ Transaction helpers ══════════════════════
+// ══════════════════════ 事务辅助函数 ══════════════════════
+// 开启事务（购票/退票需要原子地更新余票和订单）
 bool DatabaseManager::beginTransaction() {
     return QSqlDatabase::database(m_connectionName).transaction();
 }
+// 提交事务
 bool DatabaseManager::commitTransaction() {
     return QSqlDatabase::database(m_connectionName).commit();
 }
+// 回滚事务
 bool DatabaseManager::rollbackTransaction() {
     return QSqlDatabase::database(m_connectionName).rollback();
 }
 
-// ══════════════════════ Issue 9: search (V2: through Trip) ══════════════════════
+// ══════════════════════ Issue 9: 余票搜索（V2 经 Trip 查询）══════════════════════
+// 按出发/到达站名和日期搜索可售班次；条件为空则不参与过滤
 QList<DatabaseManager::TrainWithStations> DatabaseManager::searchTripsByStation(
     const QString &dep, const QString &arr, const QString &date) const
 {
     m_lastError.clear();
     QSqlQuery q(QSqlDatabase::database(m_connectionName));
+    // JOIN 两次 Station 取起讫站名，JOIN Trip 取具体日期班次；只查启用且有余票的班次
     QString sql = QStringLiteral(
         "SELECT t.trainId,t.trainNumber,t.totalSeats,"
         "t.departureTime,t.arrivalTime,t.enabled,"
@@ -61,7 +66,8 @@ QList<DatabaseManager::TrainWithStations> DatabaseManager::searchTripsByStation(
     return rs;
 }
 
-// ══════════════════════ Issue 10: query (V2: tripId + travelDate) ══════════════════════
+// ══════════════════════ Issue 10: 订单查询（V2：tripId + travelDate）══════════════════════
+// 按订单ID查询单条订单，未找到返回 nullopt
 std::optional<OrderRecord> DatabaseManager::findOrderById(int orderId) const
 {
     m_lastError.clear();
@@ -75,10 +81,11 @@ std::optional<OrderRecord> DatabaseManager::findOrderById(int orderId) const
     r.orderId=q.value(0).toInt(); r.userId=q.value(1).toInt();
     r.tripId=q.value(2).toInt(); r.passengerName=q.value(3).toString();
     r.travelDate=q.value(4).toString(); r.purchaseTime=q.value(5).toString();
-    r.status=q.value(6).toInt();
+    r.status=q.value(6).toInt();  // 状态码：0=已购票，1=已退票
     return r;
 }
 
+// 按乘客姓名模糊查询订单，按购票时间倒序
 QList<OrderRecord> DatabaseManager::findOrdersByPassenger(const QString &name) const
 {
     m_lastError.clear();

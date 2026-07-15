@@ -1,10 +1,13 @@
+// database_manager_order.cpp - 订单(Order)相关数据库操作
 #include "database_manager.h"
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
 
+// 新建订单，成功返回自增 orderId
 std::optional<int> DatabaseManager::createOrder(const OrderRecord &order) {
     QSqlQuery q(QSqlDatabase::database(m_connectionName));
+    // Order 是 SQL 关键字，表名必须加引号
     q.prepare("INSERT INTO \"Order\"(userId,tripId,passengerName,travelDate,purchaseTime,price,status) "
               "VALUES(:uid,:tid,:name,:date,:pt,:pr,:st)");
     q.bindValue(":uid", order.userId);
@@ -18,6 +21,7 @@ std::optional<int> DatabaseManager::createOrder(const OrderRecord &order) {
     return q.lastInsertId().toInt();
 }
 
+// 查询某用户的全部订单，按购买时间倒序（最新在前）
 QList<OrderRecord> DatabaseManager::findOrdersByUser(int userId) const {
     m_lastError.clear();
     QSqlQuery q(QSqlDatabase::database(m_connectionName));
@@ -37,6 +41,7 @@ QList<OrderRecord> DatabaseManager::findOrdersByUser(int userId) const {
     return rs;
 }
 
+// 更新订单状态（如已支付/已退票）
 bool DatabaseManager::updateOrderStatus(int orderId, int status) {
     m_lastError.clear();
     QSqlQuery q(QSqlDatabase::database(m_connectionName));
@@ -44,5 +49,6 @@ bool DatabaseManager::updateOrderStatus(int orderId, int status) {
     q.bindValue(":id", orderId);
     q.bindValue(":st", status);
     if (!q.exec()) { m_lastError = q.lastError().text(); return false; }
+    // 影响行数为 0 说明订单不存在
     return q.numRowsAffected() > 0;
 }

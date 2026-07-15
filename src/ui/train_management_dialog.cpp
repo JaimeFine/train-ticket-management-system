@@ -260,6 +260,7 @@ void TrainManagementDialog::loadData()
                                    ));
         m_table->setItem(i, 4, new QTableWidgetItem(t.departureTime));
         m_table->setItem(i, 5, new QTableWidgetItem(t.arrivalTime));
+        // V2：余票已迁移到Trip表，Train不再有remainingSeats，此列暂显示0
         m_table->setItem(i, 6, new QTableWidgetItem(
                                    QString::number(0) + "/" + QString::number(t.totalSeats)
                                    ));
@@ -299,6 +300,7 @@ void TrainManagementDialog::searchTrain()
                                    ));
         m_table->setItem(i, 4, new QTableWidgetItem(t.departureTime));
         m_table->setItem(i, 5, new QTableWidgetItem(t.arrivalTime));
+        // V2：余票已迁移到Trip表，Train不再有remainingSeats，此列暂显示0
         m_table->setItem(i, 6, new QTableWidgetItem(
                                    QString::number(0) + "/" + QString::number(t.totalSeats)
                                    ));
@@ -334,6 +336,7 @@ void TrainManagementDialog::searchByStation()
                                    ));
         m_table->setItem(i, 4, new QTableWidgetItem(t.departureTime));
         m_table->setItem(i, 5, new QTableWidgetItem(t.arrivalTime));
+        // V2：余票已迁移到Trip表，Train不再有remainingSeats，此列暂显示0
         m_table->setItem(i, 6, new QTableWidgetItem(
                                    QString::number(0) + "/" + QString::number(t.totalSeats)
                                    ));
@@ -400,7 +403,7 @@ void TrainManagementDialog::addTrain()
         train.departureTime = departTimeEdit->text().trimmed();
         train.arrivalTime = arriveTimeEdit->text().trimmed();
         train.totalSeats = totalSeatsSpin->value();
-        // V2: seats are per Trip now;
+        // V2: seats are per Trip now; 座位改由Trip维护，新增车次不再设置余票
         train.enabled = true;
 
         if (train.trainNumber.isEmpty()) {
@@ -451,7 +454,7 @@ void TrainManagementDialog::editTrain()
     totalSeatsSpin->setValue(current.totalSeats);
     QSpinBox *remainingSeatsSpin = new QSpinBox();
     remainingSeatsSpin->setRange(0, 999);
-    remainingSeatsSpin->setValue(0);  // V2: removed from Train
+    remainingSeatsSpin->setValue(0);  // V2: removed from Train — Train已无余票字段，固定显示0
 
     DatabaseManager *dbManager = m_manager->databaseManager();
     if (dbManager != nullptr) {
@@ -497,13 +500,14 @@ void TrainManagementDialog::editTrain()
         train.departureTime = departTimeEdit->text().trimmed();
         train.arrivalTime = arriveTimeEdit->text().trimmed();
         train.totalSeats = totalSeatsSpin->value();
-        // V2: seats per Trip;
+        // V2: seats per Trip; 编辑车次不再回写余票
         train.enabled = current.enabled;
 
         if (train.trainNumber.isEmpty()) {
             showMessage("车次号不能为空", false);
             return;
         }
+        // V2：余票校验随字段移除而失效，条件置false保留原提示分支
         if (false) {
             showMessage("剩余座位不能超过总座位", false);
             return;
@@ -619,7 +623,7 @@ void TrainManagementDialog::updateSeats()
     QString trainNumber;
     for (const auto& t : all) {
         if (t.trainId == trainId) {
-            currentSeats = 0;
+            currentSeats = 0;  // V2：Train无余票字段，这里固定按0展示
             trainNumber = t.trainNumber;
             break;
         }
@@ -635,7 +639,7 @@ void TrainManagementDialog::updateSeats()
 
     if (ok && delta != 0) {
         showMessage(QStringLiteral("V2: 座位管理请通过Trip表操作"), false);
-        // V2: updateRemainingSeats removed — seats are per Trip now
+        // V2：updateRemainingSeats已移除，座位增减改由Trip表维护，此处只提示
     }
 }
 

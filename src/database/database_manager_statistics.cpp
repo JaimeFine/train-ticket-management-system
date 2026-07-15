@@ -1,6 +1,6 @@
 /**
  * @file database_manager_statistics.cpp - Issue 11: 订单历史 + 统计
- * Implements aggregate queries that StatisticsManager and TicketManager delegate to.
+ * 实现 StatisticsManager 和 TicketManager 委托调用的聚合查询。
  */
 #include "database_manager.h"
 
@@ -9,12 +9,14 @@
 #include <QSqlQuery>
 
 // ── Issue 11: findAllOrdersWithDetails ──────────────────────────────────
+// 查询全部订单及关联明细（车次号、起讫站名），供订单历史页展示
 QList<DatabaseManager::OrderWithDetails>
 DatabaseManager::findAllOrdersWithDetails() const
 {
     m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
+    // 订单 -> Trip -> Train -> Station（出发/到达各连一次），把外键翻译成可读名称
     query.prepare(QStringLiteral(
         "SELECT o.orderId, o.userId, o.tripId, o.status, "
         "       t.trainId, t.trainNumber, o.passengerName, o.purchaseTime, "
@@ -52,6 +54,7 @@ DatabaseManager::findAllOrdersWithDetails() const
 }
 
 // ── Issue 11: countAllOrders ────────────────────────────────────────────
+// 统计订单总数（含已退票）；查询失败返回 -1
 int DatabaseManager::countAllOrders() const
 {
     m_lastError.clear();
@@ -65,6 +68,7 @@ int DatabaseManager::countAllOrders() const
 }
 
 // ── Issue 11: countOrdersByStatus ───────────────────────────────────────
+// 按状态统计订单数（0=已购票，1=已退票）；查询失败返回 -1
 int DatabaseManager::countOrdersByStatus(int status) const
 {
     m_lastError.clear();
@@ -83,12 +87,14 @@ int DatabaseManager::countOrdersByStatus(int status) const
 }
 
 // ── Issue 11: popularRoutes ─────────────────────────────────────────────
+// 热门线路 Top N：按起讫站分组统计有效订单数，降序取前 limit 条
 QList<DatabaseManager::RouteStat>
 DatabaseManager::popularRoutes(int limit) const
 {
     m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
+    // 只统计 status=0（已购票）的订单，退票不计入热度；按站点ID分组避免重名站混淆
     query.prepare(QStringLiteral(
         "SELECT ds.stationName, a_s.stationName, COUNT(*) AS cnt "
         "FROM \"Order\" o "
@@ -120,12 +126,14 @@ DatabaseManager::popularRoutes(int limit) const
 }
 
 // ── Issue 11: monthlyPassengerFlow ──────────────────────────────────────
+// 月度客流统计：按购票时间的年月分组，分别汇总总量、购票数和退票数
 QList<DatabaseManager::MonthlyStat>
 DatabaseManager::monthlyPassengerFlow() const
 {
     m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
+    // strftime 取 purchaseTime 的 'YYYY-MM'；SUM(CASE...) 按状态分列计数（0=已购，1=已退）
     if (!query.exec(QStringLiteral(
         "SELECT strftime('%Y-%m', purchaseTime) AS month, "
         "       COUNT(*) AS total, "

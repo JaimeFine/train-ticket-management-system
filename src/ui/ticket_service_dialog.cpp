@@ -249,6 +249,7 @@ void TicketServiceDialog::setupSearchTab()
     formLayout->addRow(QStringLiteral("出行日期"), dateLayout);
 
     auto *searchButton = new QPushButton(QStringLiteral("开始查询"), searchGroup);
+    // V2：查询入口由searchTrains改为searchTrips（按班次查询）
     connect(searchButton, &QPushButton::clicked, this, [this]() { searchTrips(); });
 
     searchLayout->addLayout(formLayout);
@@ -389,6 +390,7 @@ void TicketServiceDialog::setupQueryTab()
     m_tabWidget->addTab(tab, QStringLiteral("订单查询"));
 }
 
+// V2：原searchTrains改名，查询对象从车次变为班次(Trip)，余票取自Trip
 void TicketServiceDialog::searchTrips()
 {
     m_searchResultsTable->setRowCount(0);
@@ -410,6 +412,7 @@ void TicketServiceDialog::searchTrips()
             results = filteredResults;
         }
     } else {
+        // V2：按出发/到达站搜索班次（原为searchTrains）
         results = m_ticketManager->searchTrips(m_departureEdit->text().trimmed(),
                                                m_arrivalEdit->text().trimmed(),
                                                travelDate);
