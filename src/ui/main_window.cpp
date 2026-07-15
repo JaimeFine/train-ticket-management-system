@@ -10,7 +10,6 @@
 #include "route_manager.h"
 
 #include <QFrame>
-#include <QDebug>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -293,19 +292,14 @@ MainWindow::MainWindow(const LoginResult &loginResult,
     headerLayout->addLayout(accountBlock);
 
     auto showTrainStationMessage = [this]() {
-        qDebug() << "=== showTrainStationMessage called ===";
         if (m_trainManager == nullptr) {
-            qDebug() << "m_trainManager is NULL!";
             QMessageBox::warning(this,
                                  QStringLiteral("车次管理"),
                                  QStringLiteral("车次管理服务尚未初始化。"));
             return;
         }
-        qDebug() << "Creating TrainManagementDialog...";
         TrainManagementDialog dialog(m_trainManager, this);
-        qDebug() << "Executing TrainManagementDialog...";
         dialog.exec();
-        qDebug() << "TrainManagementDialog closed.";
     };
 
     auto showStatisticsDialog = [this]() {
@@ -430,19 +424,7 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       QStringLiteral("进入查询"),
                       true,
                       [this]() {
-                          if (m_trainManager == nullptr) {
-                              QMessageBox::warning(this, QStringLiteral("换乘查询"),
-                                                   QStringLiteral("车次服务尚未初始化，请稍后重试。"));
-                              return;
-                          }
-                          RouteManager routeManager(m_trainManager->databaseManager());
-                          if (!routeManager.buildGraph()) {
-                              QMessageBox::warning(this, QStringLiteral("换乘查询"),
-                                                   QStringLiteral("无法构建路线图：%1").arg(routeManager.lastError()));
-                              return;
-                          }
-                          TransferDialog dialog(&routeManager, this);
-                          dialog.exec();
+                          openTransferDialog();
                       });
 
     } else if (m_loginResult.role == UserRole::User) {
@@ -478,19 +460,7 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       QStringLiteral("进入查询"),
                       true,
                       [this]() {
-                          if (m_trainManager == nullptr) {
-                              QMessageBox::warning(this, QStringLiteral("换乘查询"),
-                                                   QStringLiteral("车次服务尚未初始化，请稍后重试。"));
-                              return;
-                          }
-                          RouteManager routeManager(m_trainManager->databaseManager());
-                          if (!routeManager.buildGraph()) {
-                              QMessageBox::warning(this, QStringLiteral("换乘查询"),
-                                                   QStringLiteral("无法构建路线图：%1").arg(routeManager.lastError()));
-                              return;
-                          }
-                          TransferDialog dialog(&routeManager, this);
-                          dialog.exec();
+                          openTransferDialog();
                       });
 
     } else if (m_loginResult.role == UserRole::Seller) {
@@ -527,19 +497,7 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       QStringLiteral("进入查询"),
                       true,
                       [this]() {
-                          if (m_trainManager == nullptr) {
-                              QMessageBox::warning(this, QStringLiteral("换乘查询"),
-                                                   QStringLiteral("车次服务尚未初始化，请稍后重试。"));
-                              return;
-                          }
-                          RouteManager routeManager(m_trainManager->databaseManager());
-                          if (!routeManager.buildGraph()) {
-                              QMessageBox::warning(this, QStringLiteral("换乘查询"),
-                                                   QStringLiteral("无法构建路线图：%1").arg(routeManager.lastError()));
-                              return;
-                          }
-                          TransferDialog dialog(&routeManager, this);
-                          dialog.exec();
+                          openTransferDialog();
                       });
 
     } else if (m_loginResult.role == UserRole::Guest) {
@@ -567,19 +525,7 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       QStringLiteral("进入查询"),
                       true,
                       [this]() {
-                          if (m_trainManager == nullptr) {
-                              QMessageBox::warning(this, QStringLiteral("换乘查询"),
-                                                   QStringLiteral("车次服务尚未初始化，请稍后重试。"));
-                              return;
-                          }
-                          RouteManager routeManager(m_trainManager->databaseManager());
-                          if (!routeManager.buildGraph()) {
-                              QMessageBox::warning(this, QStringLiteral("换乘查询"),
-                                                   QStringLiteral("无法构建路线图：%1").arg(routeManager.lastError()));
-                              return;
-                          }
-                          TransferDialog dialog(&routeManager, this);
-                          dialog.exec();
+                          openTransferDialog();
                       });
     }
 
@@ -609,4 +555,25 @@ MainWindow::MainWindow(const LoginResult &loginResult,
 bool MainWindow::logoutRequested() const
 {
     return m_logoutRequested;
+}
+
+void MainWindow::openTransferDialog()
+{
+    if (m_trainManager == nullptr) {
+        QMessageBox::warning(this,
+                             QStringLiteral("换乘查询"),
+                             QStringLiteral("车次服务尚未初始化，请稍后重试。"));
+        return;
+    }
+
+    RouteManager routeManager(m_trainManager->databaseManager());
+    if (!routeManager.buildGraph()) {
+        QMessageBox::warning(this,
+                             QStringLiteral("换乘查询"),
+                             QStringLiteral("无法构建路线图：%1").arg(routeManager.lastError()));
+        return;
+    }
+
+    TransferDialog dialog(&routeManager, this);
+    dialog.exec();
 }

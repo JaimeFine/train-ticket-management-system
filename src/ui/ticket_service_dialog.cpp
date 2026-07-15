@@ -486,9 +486,12 @@ void TicketServiceDialog::setupQueryTab()
     });
     QHeaderView *queryHeader = m_queryResultsTable->horizontalHeader();
     queryHeader->setStretchLastSection(false);
-    queryHeader->setSectionResizeMode(QHeaderView::ResizeToContents);
+    queryHeader->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    queryHeader->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    queryHeader->setSectionResizeMode(2, QHeaderView::ResizeToContents);
     queryHeader->setSectionResizeMode(3, QHeaderView::Stretch);
     queryHeader->setSectionResizeMode(4, QHeaderView::Stretch);
+    queryHeader->setSectionResizeMode(5, QHeaderView::ResizeToContents);
     queryHeader->setMinimumSectionSize(72);
 
     if (m_loginResult.role == UserRole::User) {
@@ -769,8 +772,13 @@ void TicketServiceDialog::refreshOrderQueryTable(const QVector<QVariantMap> &res
         m_queryResultsTable->setItem(row, 3, new QTableWidgetItem(order.value(QStringLiteral("passengerName")).toString()));
         m_queryResultsTable->setItem(row, 4, new QTableWidgetItem(order.value(QStringLiteral("purchaseTime")).toString()));
         m_queryResultsTable->setItem(row, 5, new QTableWidgetItem(statusText(order.value(QStringLiteral("status")).toInt())));
+
+        for (int column : {0, 1, 2, 3, 4, 5}) {
+            if (QTableWidgetItem *item = m_queryResultsTable->item(row, column)) {
+                item->setTextAlignment(Qt::AlignCenter);
+            }
+        }
     }
-    m_queryResultsTable->resizeColumnsToContents();
 }
 
 QString TicketServiceDialog::statusText(int status) const

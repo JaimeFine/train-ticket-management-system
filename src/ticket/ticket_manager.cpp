@@ -56,16 +56,6 @@ int calculateTravelMinutes(const QString &departureTime, const QString &arrivalT
     return seconds / 60;
 }
 
-QDateTime readTripDepartureDateTime(const QString &travelDate, const QString &departureTime)
-{
-    const QDate date = QDate::fromString(travelDate, QStringLiteral("yyyy-MM-dd"));
-    const QTime time = readTime(departureTime);
-    if (!date.isValid() || !time.isValid()) {
-        return QDateTime();
-    }
-    return QDateTime(date, time);
-}
-
 struct FareProfile
 {
     double averageSpeed = 100.0;

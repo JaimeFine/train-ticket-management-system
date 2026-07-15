@@ -1,6 +1,4 @@
 #include "transfer_dialog.h"
-#include "database_manager.h"
-#include "database/station_record.h"
 
 #include <QComboBox>
 #include <QHBoxLayout>
@@ -10,9 +8,6 @@
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QVBoxLayout>
-#include <QSqlDatabase>
-#include <QSqlQuery>
-#include <QSqlError>
 
 namespace {
 QString formatMinutes(int minutes)
@@ -271,24 +266,21 @@ void TransferDialog::loadStations()
     m_fromCombo->clear();
     m_toCombo->clear();
 
-    QSqlDatabase db = QSqlDatabase::database("train_ticket_connection");
-    if (!db.isOpen()) {
-        showError("数据库未连接");
+    if (m_routeManager == nullptr) {
+        showError(QStringLiteral("站点数据加载失败。"));
         return;
     }
 
-    QSqlQuery query(db);
-    if (!query.exec("SELECT stationId, stationName FROM Station ORDER BY stationName")) {
-        showError("加载站点失败: " + query.lastError().text());
+    const auto stations = m_routeManager->stationOptions();
+    if (stations.isEmpty()) {
+        showError(QStringLiteral("站点数据加载失败。"));
         return;
     }
 
-    while (query.next()) {
-        int id = query.value("stationId").toInt();
-        QString name = query.value("stationName").toString();
-        m_fromCombo->addItem(name, id);
-        m_toCombo->addItem(name, id);
-        m_stationNameMap[id] = name;
+    for (const auto &station : stations) {
+        m_fromCombo->addItem(station.second, station.first);
+        m_toCombo->addItem(station.second, station.first);
+        m_stationNameMap[station.first] = station.second;
     }
 
     // 默认选中第一个和第二个站点
