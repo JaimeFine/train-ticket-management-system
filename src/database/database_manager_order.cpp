@@ -1,3 +1,4 @@
+// database_manager_order.cpp - 订单(Order)相关数据库操作
 #include "database_manager.h"
 
 #include <QDate>
@@ -14,6 +15,7 @@ std::optional<int> DatabaseManager::createOrder(const OrderRecord &order)
     QString travelDate = order.travelDate;
     double price = order.price;
 
+    // 兼容旧调用：只传 trainId 时，按日期查找/创建对应的 Trip，再转成 V2 tripId 下单
     if (tripId <= 0 && order.trainId > 0) {
         const auto train = findTrainById(order.trainId);
         if (!train.has_value()) {
@@ -29,6 +31,7 @@ std::optional<int> DatabaseManager::createOrder(const OrderRecord &order)
             }
         }
 
+        // 惰性建班次：当天班次不存在时按 Train 模板创建一条 Trip
         const auto trip = findOrCreateTrip(order.trainId, travelDate, train->totalSeats);
         if (!trip.has_value()) {
             return std::nullopt;
@@ -36,6 +39,7 @@ std::optional<int> DatabaseManager::createOrder(const OrderRecord &order)
 
         tripId = trip->tripId;
         if (price <= 0.0) {
+            // 没有显式传价时，默认使用班次基础票价
             price = trip->basePrice;
         }
     }
@@ -45,6 +49,7 @@ std::optional<int> DatabaseManager::createOrder(const OrderRecord &order)
         return std::nullopt;
     }
 
+    // travelDate 允许冗余存储在订单中，查询订单时可少做一次 JOIN
     if (travelDate.isEmpty()) {
         const auto trip = findTripById(tripId);
         if (!trip.has_value()) {
@@ -83,6 +88,7 @@ std::optional<int> DatabaseManager::createOrder(const OrderRecord &order)
 QList<OrderRecord> DatabaseManager::findOrdersByUser(int userId) const
 {
     m_lastError.clear();
+    // 订单表通过 Trip 反查 trainId，方便前端列表直接展示车次相关信息
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
     query.prepare(QStringLiteral(
         "SELECT o.orderId, o.userId, tr.trainId, o.tripId, o.passengerName, "
