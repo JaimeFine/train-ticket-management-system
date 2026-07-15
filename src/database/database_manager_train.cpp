@@ -25,6 +25,7 @@ int loadRepresentativeRemainingSeats(const QString &connectionName,
 }
 
 bool DatabaseManager::addTrain(const TrainRecord &train) {
+    // V2: 新增 Train 只写车次模板，不直接写余票；余票在 Trip 中按日维护
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     query.prepare(QStringLiteral(

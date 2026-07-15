@@ -27,7 +27,7 @@ public:
     // - creates the Version 1 tables if they do not already exist
     bool initialize();
 
-    // Utility methods:
+    // 连接状态 / 数据库路径 / 最近错误信息
     bool isOpen() const;
     bool wasCreated() const;
     QString databasePath() const;
@@ -50,27 +50,28 @@ public:
     QList<StationRecord> getAllStations() const;
     bool deleteStation(int stationId);
 
-    // >>> Train APIs
+    // >>> Train APIs（V2：车次仅作模板，余票下沉到 Trip）
     bool addTrain(const TrainRecord &train);
     std::optional<TrainRecord> findTrainById(int trainId) const;
     std::optional<TrainRecord> findTrainByNumber(const QString &trainNumber) const;
     bool updateTrain(const TrainRecord &train);
 
-    // >>> Trip APIs
+    // >>> Trip APIs（V2 新增：每日班次 = 车次+日期，余票在此维护）
     std::optional<int> createTrip(int trainId, const QString &travelDate, int totalSeats);
     std::optional<TripRecord> findTripById(int tripId) const;
     std::optional<TripRecord> findOrCreateTrip(int trainId,
                                                const QString &travelDate,
-                                               int totalSeats);
-    bool adjustTripSeats(int tripId, int delta);
+                                               int totalSeats);   // 不存在则按车次模板惰性创建
+    bool adjustTripSeats(int tripId, int delta);   // 增减余票（购票-1/退票+1），扣票时校验余票充足
     QList<TripRecord> findTripsByTrain(int trainId) const;
 
-    // >>> Order APIs
-    std::optional<int> createOrder(const OrderRecord &order);
+    // >>> Order APIs（V2：订单经 tripId 关联班次）
+    std::optional<int> createOrder(const OrderRecord &order);   // 成功返回新订单ID
     QList<OrderRecord> findOrdersByUser(int userId) const;
     bool updateOrderStatus(int orderId, int status);
 
-    // ── Issue 9: 订票 + 余票查询 + 车次搜索 ─────────────────
+    // ── Issue 9：车票查询 ────────────────────────────────────
+    // 联查结果：车次 + 当日班次 + 站名（一行即一条可展示的查询结果）
     bool adjustTrainSeats(int trainId, int delta);
     bool beginTransaction();
     bool commitTransaction();
@@ -83,14 +84,15 @@ public:
         int tripId = 0;
         bool enabled=true;
     };
+    // 按出发站/到达站/日期联查可售班次
     QList<TrainWithStations> searchTripsByStation(
         const QString &dep,const QString &arr,const QString &date) const;
     QList<TrainWithStations> searchTrainsByStation(
         const QString &dep,const QString &arr,const QString &date) const;
 
-    // ── Issue 10: 退票 + 改签 + 订单查询 ──────────────────
+    // ── Issue 10：退票 / 改签 / 订单查询 ─────────────────────
     std::optional<OrderRecord> findOrderById(int orderId) const;
-    QList<OrderRecord> findOrdersByPassenger(const QString &name) const;
+    QList<OrderRecord> findOrdersByPassenger(const QString &name) const;   // 按乘车人姓名查订单
 
     // >>> Jaime added for CharlesSmartWang, issue 7 & 8:
     QList<TrainRecord> getAllTrains(bool onlyEnabled = true) const;
@@ -114,6 +116,7 @@ public:
     struct MonthlyStat { QString month; int total=0,booked=0,refunded=0; };   // 月度客流：总量/预订/退票
     QList<MonthlyStat> monthlyPassengerFlow() const;
 
+    // 单条操作日志（操作人、动作、详情、时间）
     struct OperationLogRecord {
         int logId = 0;
         QString operatorUsername;
@@ -131,7 +134,7 @@ private:
     // openDatabase() only worries about creating & opening the SQLite file.
     // createTables() only worries about running CREATE TABLE statements.
     
-    bool openDatabase();
+    bool openDatabase();       // 建立 SQLite 连接
     void closeDatabase();
     bool createTables();       // V1 建表
     bool seedDemoData();       // 写入演示数据
@@ -141,8 +144,8 @@ private:
     // * This block
     // we store these as class state so initialization can be called cleanly and
     // later modules can ask what happened without doing SQL themselves.
-    QString m_connectionName;
-    QString m_databasePath;
-    mutable QString m_lastError;
-    bool m_wasCreated = false;
+    QString m_connectionName;      // Qt 数据库连接名
+    QString m_databasePath;        // 数据库文件路径
+    mutable QString m_lastError;   // 最近一次错误信息
+    bool m_wasCreated = false;     // 本次运行是否新建了数据库文件
 };

@@ -327,6 +327,7 @@ void TicketServiceDialog::setupSearchTab()
 
     auto *searchButton = new QPushButton(QStringLiteral("开始查询"), searchGroup);
     auto *showAllButton = new QPushButton(QStringLiteral("显示全部"), searchGroup);
+    // V2：查询入口由 searchTrains 改为 searchTrips（按班次查询）
     connect(searchButton, &QPushButton::clicked, this, [this]() { searchTrips(); });
     connect(showAllButton, &QPushButton::clicked, this, [this]() {
         m_departureEdit->clear();
