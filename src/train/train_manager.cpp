@@ -105,23 +105,26 @@ bool TrainManager::addTrain(const Train& train)
         return false;
     }
     // 校验日期时间格式（yyyy-MM-dd HH:mm）
-    QRegularExpression dateTimeRegex(R"(^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$)");
-    if (!dateTimeRegex.match(train.departureTime).hasMatch()) {
-        setStatus("出发时间格式无效，请使用 yyyy-MM-dd HH:mm 格式");
+    QRegularExpression timeRegex(R"(^([0-1][0-9]|2[0-3]):[0-5][0-9]$)");
+    if (!timeRegex.match(train.departureTime).hasMatch()) {
+        setStatus("出发时间格式无效，请使用 HH:mm 格式");
         return false;
     }
-    if (!dateTimeRegex.match(train.arrivalTime).hasMatch()) {
-        setStatus("出发时间格式无效，请使用 yyyy-MM-dd HH:mm 格式");
-        return false;
-    }
-
-    QDateTime dep = QDateTime::fromString(train.departureTime, "yyyy-MM-dd HH:mm");
-    QDateTime arr = QDateTime::fromString(train.arrivalTime, "yyyy-MM-dd HH:mm");
-    if (!dep.isValid() || !arr.isValid() || dep >= arr) {
-        setStatus("出发时间必须早于到达时间，且格式正确");
+    if (!timeRegex.match(train.arrivalTime).hasMatch()) {
+        setStatus("到达时间格式无效，请使用 HH:mm 格式");
         return false;
     }
 
+    QTime dep = QTime::fromString(train.departureTime, "HH:mm");
+    QTime arr = QTime::fromString(train.arrivalTime, "HH:mm");
+    if (!dep.isValid() || !arr.isValid()) {
+        setStatus("时间格式无效");
+        return false;
+    }
+    if (dep == arr) {
+        setStatus("出发时间和到达时间不能相同");
+        return false;
+    }
     if (train.totalSeats <= 0) {
         setStatus("总座位数必须大于 0");
         return false;
@@ -177,21 +180,24 @@ bool TrainManager::updateTrain(const Train& train)
         setStatus("出发站和到达站不能相同");
         return false;
     }
-
-    QRegularExpression dateTimeRegex(R"(^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$)");
-    if (!dateTimeRegex.match(train.departureTime).hasMatch()) {
-        setStatus("出发时间格式无效，请使用 yyyy-MM-dd HH:mm 格式");
+    QRegularExpression timeRegex(R"(^([0-1][0-9]|2[0-3]):[0-5][0-9]$)");
+    if (!timeRegex.match(train.departureTime).hasMatch()) {
+        setStatus("出发时间格式无效，请使用 HH:mm 格式");
         return false;
     }
-    if (!dateTimeRegex.match(train.arrivalTime).hasMatch()) {
-        setStatus("出发时间格式无效，请使用 yyyy-MM-dd HH:mm 格式");
+    if (!timeRegex.match(train.arrivalTime).hasMatch()) {
+        setStatus("到达时间格式无效，请使用 HH:mm 格式");
         return false;
     }
 
-    QDateTime dep = QDateTime::fromString(train.departureTime, "yyyy-MM-dd HH:mm");
-    QDateTime arr = QDateTime::fromString(train.arrivalTime, "yyyy-MM-dd HH:mm");
-    if (!dep.isValid() || !arr.isValid() || dep >= arr) {
-        setStatus("出发时间必须早于到达时间，且格式正确");
+    QTime dep = QTime::fromString(train.departureTime, "HH:mm");
+    QTime arr = QTime::fromString(train.arrivalTime, "HH:mm");
+    if (!dep.isValid() || !arr.isValid()) {
+        setStatus("时间格式无效");
+        return false;
+    }
+    if (dep == arr) {
+        setStatus("出发时间和到达时间不能相同");
         return false;
     }
 

@@ -39,8 +39,8 @@ set(SOURCES
     src/database/database_manager_ticket.cpp
     src/ui/train_management_dialog.cpp
     src/ui/station_management_dialog.cpp
-    src/ui/app_style.cpp
     src/database/database_manager_statistics.cpp
+    src/ui/app_style.cpp
 )
 
 set(HEADERS
@@ -68,7 +68,7 @@ set(RESOURCES
     resources/resources.qrc
 )
 
-# Windows 资源文件不依赖 Qt 头文件，单独编译可以避免带空格路径被 windres 拆开。
+# Windows 图标资源不依赖 Qt 头文件，单独编译可避免带空格的项目路径被拆开。
 if(WIN32)
     add_library(AppIconResource OBJECT resources/app_icon.rc)
     set_target_properties(AppIconResource PROPERTIES
@@ -85,7 +85,6 @@ add_executable(${PROJECT_NAME}
     ${SOURCES}
     ${HEADERS}
     ${RESOURCES}
-
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE

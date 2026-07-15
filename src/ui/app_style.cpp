@@ -9,8 +9,6 @@
 
 namespace {
 
-// Qt 默认只把表头居中，单元格仍按各自数据类型决定位置。
-// 用代理统一绘制后，所有业务表格都能保持相同的文字对齐方式。
 class CenteredItemDelegate : public QStyledItemDelegate
 {
 public:
@@ -36,8 +34,7 @@ namespace UiStyle {
 
 QString dialogStyleSheet()
 {
-    // 公共样式只负责项目中反复出现的基础控件。
-    // 个别页面需要特殊颜色时，仍可通过 objectName 单独覆盖。
+    // 页面里重复使用的基础控件都放在这里，颜色和状态只改一处。
     return QStringLiteral(R"QSS(
         QDialog {
             background: #eef2f3;
@@ -119,6 +116,31 @@ QString dialogStyleSheet()
             padding: 7px;
             font-weight: 700;
         }
+        QTabWidget::pane {
+            background: #ffffff;
+            border: 1px solid #cbd8d2;
+            border-radius: 8px;
+            top: -1px;
+        }
+        QTabBar::tab {
+            min-width: 92px;
+            min-height: 34px;
+            padding: 4px 16px;
+            color: #42514b;
+            background: #e8efec;
+            border: 1px solid #cbd8d2;
+            border-bottom: none;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+        QTabBar::tab:selected {
+            color: #ffffff;
+            background: #176b5b;
+            border-color: #176b5b;
+        }
+        QTabBar::tab:hover:!selected {
+            background: #dbe7e2;
+        }
         QPushButton {
             min-height: 34px;
             border-radius: 8px;
@@ -148,6 +170,14 @@ QString dialogStyleSheet()
             color: #f3f6f5;
             background: #c5a0a0;
         }
+        QPushButton#secondaryButton {
+            color: #33433d;
+            background: #eef5f1;
+            border: 1px solid #cbd8d2;
+        }
+        QPushButton#secondaryButton:hover {
+            background: #dbe7e2;
+        }
     )QSS");
 }
 
@@ -157,8 +187,6 @@ void prepareTable(QTableWidget *table)
         return;
     }
 
-    // 这些表格用于展示和选择记录，数据修改由页面上的操作按钮完成。
-    // 禁止直接编辑单元格可以避免界面显示已改、数据库实际未改的情况。
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -166,7 +194,6 @@ void prepareTable(QTableWidget *table)
     table->verticalHeader()->setVisible(false);
     table->verticalHeader()->setDefaultSectionSize(38);
     table->horizontalHeader()->setDefaultAlignment(Qt::AlignCenter);
-    // table 作为代理的父对象，表格销毁时代理也会一起释放。
     table->setItemDelegate(new CenteredItemDelegate(table));
 }
 

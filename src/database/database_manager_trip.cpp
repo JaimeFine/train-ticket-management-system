@@ -176,3 +176,42 @@ QList<TripRecord> DatabaseManager::findTripsByTrain(int trainId) const
 
     return results;
 }
+
+bool DatabaseManager::updateTrip(const TripRecord &trip)
+{
+    m_lastError.clear();
+    QSqlQuery query(QSqlDatabase::database(m_connectionName));
+
+    query.prepare(QStringLiteral(
+        "UPDATE Trip SET "
+        "travelDate = :travelDate, "
+        "departureTime = :departureTime, "
+        "arrivalTime = :arrivalTime, "
+        "totalSeats = :totalSeats, "
+        "remainingSeats = :remainingSeats, "
+        "basePrice = :basePrice, "
+        "enabled = :enabled "
+        "WHERE tripId = :tripId"
+        ));
+
+    query.bindValue(":tripId", trip.tripId);
+    query.bindValue(":travelDate", trip.travelDate);
+    query.bindValue(":departureTime", trip.departureTime);
+    query.bindValue(":arrivalTime", trip.arrivalTime);
+    query.bindValue(":totalSeats", trip.totalSeats);
+    query.bindValue(":remainingSeats", trip.remainingSeats);
+    query.bindValue(":basePrice", trip.basePrice);
+    query.bindValue(":enabled", trip.enabled ? 1 : 0);
+
+    if (!query.exec()) {
+        m_lastError = query.lastError().text();
+        return false;
+    }
+
+    if (query.numRowsAffected() == 0) {
+        m_lastError = QStringLiteral("No trip found for the given tripId.");
+        return false;
+    }
+
+    return true;
+}

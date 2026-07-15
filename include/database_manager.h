@@ -64,6 +64,7 @@ public:
                                                int totalSeats);   // 不存在则按车次模板惰性创建
     bool adjustTripSeats(int tripId, int delta);   // 增减余票（购票-1/退票+1），扣票时校验余票充足
     QList<TripRecord> findTripsByTrain(int trainId) const;
+    bool updateTrip(const TripRecord &trip);
 
     // >>> Order APIs（V2：订单经 tripId 关联班次）
     std::optional<int> createOrder(const OrderRecord &order);   // 成功返回新订单ID
