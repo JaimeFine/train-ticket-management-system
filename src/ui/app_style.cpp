@@ -9,6 +9,8 @@
 
 namespace {
 
+// Qt 默认只把表头居中，单元格仍按各自数据类型决定位置。
+// 用代理统一绘制后，所有业务表格都能保持相同的文字对齐方式。
 class CenteredItemDelegate : public QStyledItemDelegate
 {
 public:
@@ -34,6 +36,8 @@ namespace UiStyle {
 
 QString dialogStyleSheet()
 {
+    // 公共样式只负责项目中反复出现的基础控件。
+    // 个别页面需要特殊颜色时，仍可通过 objectName 单独覆盖。
     return QStringLiteral(R"QSS(
         QDialog {
             background: #eef2f3;
@@ -153,6 +157,8 @@ void prepareTable(QTableWidget *table)
         return;
     }
 
+    // 这些表格用于展示和选择记录，数据修改由页面上的操作按钮完成。
+    // 禁止直接编辑单元格可以避免界面显示已改、数据库实际未改的情况。
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
     table->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -160,6 +166,7 @@ void prepareTable(QTableWidget *table)
     table->verticalHeader()->setVisible(false);
     table->verticalHeader()->setDefaultSectionSize(38);
     table->horizontalHeader()->setDefaultAlignment(Qt::AlignCenter);
+    // table 作为代理的父对象，表格销毁时代理也会一起释放。
     table->setItemDelegate(new CenteredItemDelegate(table));
 }
 

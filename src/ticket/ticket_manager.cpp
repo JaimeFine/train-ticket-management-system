@@ -36,6 +36,8 @@ QTime readTime(const QString &text)
 
 int calculateTravelMinutes(const QString &departureTime, const QString &arrivalTime)
 {
+    // 数据库中既可能保存完整日期时间，也可能只保存 HH:mm。
+    // 先按完整时间计算，失败后再退回到时刻计算，兼容两种已有数据。
     const QDateTime departure = readDateTime(departureTime);
     const QDateTime arrival = readDateTime(arrivalTime);
     if (departure.isValid() && arrival.isValid()) {
@@ -51,6 +53,7 @@ int calculateTravelMinutes(const QString &departureTime, const QString &arrivalT
 
     int seconds = departureClock.secsTo(arrivalClock);
     if (seconds <= 0) {
+        // 到达时刻小于出发时刻时，按跨天车次处理。
         seconds += 24 * 60 * 60;
     }
     return seconds / 60;
@@ -91,6 +94,9 @@ double estimateBasePrice(const QString &trainNumber, int travelMinutes)
 
 double calculateBasePrice(const DatabaseManager::TrainWithStations &trip, int travelMinutes)
 {
+    // Trip.basePrice 是正式基础票价，动态票价优先使用数据库中的值。
+    // 旧数据库中的基础票价可能还是 0，此时才根据车型和时长估算，
+    // 这样旧数据仍能显示票价，也给数据库模块保留了正式接入位置。
     if (trip.basePrice > 0.0) {
         return trip.basePrice;
     }
@@ -143,6 +149,8 @@ double holidayDemandFactor(const QDate &travelDate)
 double calculateDynamicPrice(const DatabaseManager::TrainWithStations &trip,
                              int travelMinutes)
 {
+    // 计算顺序为：基础价 × 余票系数 × 时段系数 × 日期系数 × 临近发车系数。
+    // 各部分分开计算，后续调整某一项规则时不会影响其他规则。
     const double basePrice = calculateBasePrice(trip, travelMinutes);
     if (basePrice <= 0.0) {
         return 0.0;
@@ -156,6 +164,8 @@ double calculateDynamicPrice(const DatabaseManager::TrainWithStations &trip,
                                    0.0,
                                    1.0);
         const double soldRate = 1.0 - remainingRate;
+        // 余票越少，说明当前班次需求越高。这里只分成三档，
+        // 避免余票每变化一张，界面上的价格就频繁跳动。
         if (soldRate >= 0.8) {
             seatFactor = 1.25;
         } else if (soldRate >= 0.5) {
@@ -167,6 +177,7 @@ double calculateDynamicPrice(const DatabaseManager::TrainWithStations &trip,
     const QTime departureClock = readTime(trip.departureTime);
     if (departureClock.isValid()) {
         const int hour = departureClock.hour();
+        // 早晚通勤时段使用同一档系数，普通时段保持原价。
         if ((hour >= 7 && hour < 10) || (hour >= 17 && hour < 20)) {
             timeFactor = 1.10;
         }
@@ -177,6 +188,7 @@ double calculateDynamicPrice(const DatabaseManager::TrainWithStations &trip,
 
     QDateTime departure;
     if (travelDate.isValid() && departureClock.isValid()) {
+        // Trip 将出行日期和发车时刻分开保存，计算临近发车时间前需要先合并。
         departure = QDateTime(travelDate, departureClock);
     } else {
         departure = readDateTime(trip.departureTime);
@@ -204,12 +216,15 @@ double calculateDynamicPrice(const DatabaseManager::TrainWithStations &trip,
 
     const double result = basePrice * seatFactor * timeFactor
                           * holidayFactor * lastMinuteFactor;
+    // 多个折扣叠加后仍不能低于基础票价的七成。
     const double protectedPrice = std::max(basePrice * 0.70, result);
     return std::round(protectedPrice);
 }
 
 QVariantMap tripToMap(const DatabaseManager::TrainWithStations &trip)
 {
+    // Manager 在这里把数据库记录整理成 UI 需要的字段。
+    // 界面只读取 basePrice 和 dynamicPrice，不接触数据库，也不重复票价算法。
     QVariantMap map;
     map[QStringLiteral("trainId")] = trip.trainId;
     map[QStringLiteral("tripId")] = trip.tripId;

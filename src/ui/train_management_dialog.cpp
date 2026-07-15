@@ -20,6 +20,8 @@
 #include <QVBoxLayout>
 
 namespace {
+// Windows 下 QComboBox 的系统箭头会受 Qt 样式影响，曾出现图标消失和位置偏移。
+// 这里保留 QComboBox 原有的下拉功能，只接管右侧箭头区域的绘制。
 class StationComboBox : public QComboBox
 {
 protected:
@@ -27,12 +29,14 @@ protected:
     {
         QComboBox::paintEvent(event);
 
-        // 右侧区域和外框一起绘制，获得焦点时边框不会在中间断开。
+        // 先让 Qt 画文字和控件状态，再盖上统一的箭头背景。
+        // 外框最后绘制，获得焦点时边框就不会在右侧接缝处断开。
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
         const qreal arrowAreaWidth = 36.0;
 
         QPainterPath clipPath;
+        // 背景按控件圆角裁剪，右上角和右下角不会溢出方块。
         clipPath.addRoundedRect(QRectF(0.5, 0.5, width() - 1.0, height() - 1.0),
                                 8.0, 8.0);
         painter.setClipPath(clipPath);
