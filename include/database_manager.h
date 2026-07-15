@@ -24,7 +24,7 @@ public:
     // Main functionality of initialization:
     // - open SQLite
     // - enables foreign key support
-    // - creates the Version 1 tables if they do not already exist
+    // - creates the current schema tables if they do not already exist
     bool initialize();
 
     // 连接状态 / 数据库路径 / 最近错误信息
@@ -50,13 +50,13 @@ public:
     QList<StationRecord> getAllStations() const;
     bool deleteStation(int stationId);
 
-    // >>> Train APIs（V2：车次仅作模板，余票下沉到 Trip）
+    // >>> Train APIs：车次模板维护
     bool addTrain(const TrainRecord &train);
     std::optional<TrainRecord> findTrainById(int trainId) const;
     std::optional<TrainRecord> findTrainByNumber(const QString &trainNumber) const;
     bool updateTrain(const TrainRecord &train);
 
-    // >>> Trip APIs（V2 新增：每日班次 = 车次+日期，余票在此维护）
+    // >>> Trip APIs：每日班次 = 车次 + 日期，余票在此维护
     std::optional<int> createTrip(int trainId, const QString &travelDate, int totalSeats);
     std::optional<TripRecord> findTripById(int tripId) const;
     std::optional<TripRecord> findOrCreateTrip(int trainId,
@@ -66,7 +66,7 @@ public:
     QList<TripRecord> findTripsByTrain(int trainId) const;
     bool updateTrip(const TripRecord &trip);
 
-    // >>> Order APIs（V2：订单经 tripId 关联班次）
+    // >>> Order APIs：订单经 tripId 关联班次
     std::optional<int> createOrder(const OrderRecord &order);   // 成功返回新订单ID
     QList<OrderRecord> findOrdersByUser(int userId) const;
     bool updateOrderStatus(int orderId, int status);
@@ -131,20 +131,15 @@ public:
     QList<OperationLogRecord> findAllOperationLogs() const;
 
 private:
-    // * This block connect helpers
-    // openDatabase() only worries about creating & opening the SQLite file.
-    // createTables() only worries about running CREATE TABLE statements.
-    
+    // openDatabase() 负责创建并打开 SQLite 连接。
+    // createTables() 负责执行 schema 建表语句。
     bool openDatabase();       // 建立 SQLite 连接
     void closeDatabase();
-    bool createTables();       // V1 建表
+    bool createTables();       // 按当前 schema 建表
     bool seedDemoData();       // 写入演示数据
     bool executeStatement(const QString &sql);   // 执行单条 SQL 语句
     QString resolveDatabasePath() const;         // 解析数据库文件存放路径
 
-    // * This block
-    // we store these as class state so initialization can be called cleanly and
-    // later modules can ask what happened without doing SQL themselves.
     QString m_connectionName;      // Qt 数据库连接名
     QString m_databasePath;        // 数据库文件路径
     mutable QString m_lastError;   // 最近一次错误信息
