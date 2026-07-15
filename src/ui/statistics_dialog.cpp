@@ -1,6 +1,7 @@
 #include "statistics_dialog.h"
 
 #include "statistics_manager.h"
+#include "app_style.h"
 
 #include <QHeaderView>
 #include <QHBoxLayout>
@@ -113,9 +114,11 @@ StatisticsDialog::StatisticsDialog(const StatisticsManager &statisticsManager,
 
         auto *titleLabel = new QLabel(titleText, card);
         titleLabel->setObjectName(QStringLiteral("metricTitle"));
+        titleLabel->setAlignment(Qt::AlignCenter);
 
         valueLabel = createMetricValueLabel();
         valueLabel->setParent(card);
+        valueLabel->setAlignment(Qt::AlignCenter);
 
         layout->addWidget(titleLabel);
         layout->addWidget(valueLabel);
@@ -140,12 +143,8 @@ StatisticsDialog::StatisticsDialog(const StatisticsManager &statisticsManager,
         QStringLiteral("到达站"),
         QStringLiteral("订单数")
     });
-    m_popularRoutesTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_popularRoutesTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-    m_popularRoutesTable->setSelectionMode(QAbstractItemView::SingleSelection);
-    m_popularRoutesTable->setAlternatingRowColors(true);
-    m_popularRoutesTable->verticalHeader()->setVisible(false);
-    m_popularRoutesTable->horizontalHeader()->setStretchLastSection(true);
+    UiStyle::prepareTable(m_popularRoutesTable);
+    m_popularRoutesTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     rootLayout->addWidget(m_popularRoutesTable);
 
     auto *monthlyTitleLabel = new QLabel(QStringLiteral("月度客流"), this);
@@ -160,12 +159,8 @@ StatisticsDialog::StatisticsDialog(const StatisticsManager &statisticsManager,
         QStringLiteral("已订票"),
         QStringLiteral("已退票")
     });
-    m_monthlyFlowTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_monthlyFlowTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-    m_monthlyFlowTable->setSelectionMode(QAbstractItemView::SingleSelection);
-    m_monthlyFlowTable->setAlternatingRowColors(true);
-    m_monthlyFlowTable->verticalHeader()->setVisible(false);
-    m_monthlyFlowTable->horizontalHeader()->setStretchLastSection(true);
+    UiStyle::prepareTable(m_monthlyFlowTable);
+    m_monthlyFlowTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     rootLayout->addWidget(m_monthlyFlowTable);
 
     auto *closeButton = new QPushButton(QStringLiteral("关闭"), this);
@@ -212,8 +207,6 @@ void StatisticsDialog::loadData()
                                     new QTableWidgetItem(QString::number(stat.value(QStringLiteral("refunded")).toInt())));
     }
 
-    m_popularRoutesTable->resizeColumnsToContents();
-    m_monthlyFlowTable->resizeColumnsToContents();
 }
 
 QLabel *StatisticsDialog::createMetricValueLabel()

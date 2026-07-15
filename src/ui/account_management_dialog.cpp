@@ -1,4 +1,5 @@
 #include "account_management_dialog.h"
+#include "app_style.h"
 
 #include <QAbstractItemView>
 #include <QFormLayout>
@@ -256,11 +257,8 @@ AccountManagementDialog::AccountManagementDialog(const LoginManager &loginManage
             QStringLiteral("售票员用户名"),
             QStringLiteral("账号状态")
         });
-        m_sellerTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
-        m_sellerTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-        m_sellerTable->setSelectionMode(QAbstractItemView::SingleSelection);
-        m_sellerTable->verticalHeader()->setVisible(false);
-        m_sellerTable->horizontalHeader()->setStretchLastSection(true);
+        UiStyle::prepareTable(m_sellerTable);
+        m_sellerTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
         m_sellerTable->setMinimumHeight(150);
 
         auto *manageButtonLayout = new QHBoxLayout;
@@ -576,7 +574,7 @@ void AccountManagementDialog::refreshSellerTable()
                                                     ? QStringLiteral("启用中")
                                                     : QStringLiteral("已禁用"));
 
-        usernameItem->setTextAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+        usernameItem->setTextAlignment(Qt::AlignCenter);
         statusItem->setTextAlignment(Qt::AlignCenter);
 
         m_sellerTable->setItem(row, 0, usernameItem);

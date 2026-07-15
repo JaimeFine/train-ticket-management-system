@@ -69,15 +69,39 @@ int main(int argc, char *argv[])
     TrainRecord busyTrain = normalTrain;
     busyTrain.trainNumber = uniqueName(QStringLiteral("G_PRICE_BUSY"));
 
+    TrainRecord holidayTrain = normalTrain;
+    holidayTrain.trainNumber = uniqueName(QStringLiteral("G_PRICE_HOLIDAY"));
+    holidayTrain.departureTime = QStringLiteral("11:00:00");
+    holidayTrain.arrivalTime = QStringLiteral("13:00:00");
+
+    TrainRecord ordinaryTrain = holidayTrain;
+    ordinaryTrain.trainNumber = uniqueName(QStringLiteral("G_PRICE_ORDINARY"));
+    ordinaryTrain.departureTime = QStringLiteral("11:00:00");
+    ordinaryTrain.arrivalTime = QStringLiteral("13:00:00");
+
+    TrainRecord lastMinuteTrain = normalTrain;
+    lastMinuteTrain.trainNumber = uniqueName(QStringLiteral("G_PRICE_LAST_MINUTE"));
+    const QDateTime nearDeparture = QDateTime::currentDateTime().addSecs(3 * 60 * 60);
+    lastMinuteTrain.departureTime = nearDeparture.time().toString(QStringLiteral("HH:mm:ss"));
+    lastMinuteTrain.arrivalTime = nearDeparture.addSecs(2 * 60 * 60)
+                                      .time().toString(QStringLiteral("HH:mm:ss"));
+
     if (!databaseManager.addTrain(normalTrain)
-        || !databaseManager.addTrain(busyTrain)) {
+        || !databaseManager.addTrain(busyTrain)
+        || !databaseManager.addTrain(holidayTrain)
+        || !databaseManager.addTrain(ordinaryTrain)
+        || !databaseManager.addTrain(lastMinuteTrain)) {
         qCritical() << "Could not create pricing test trains:" << databaseManager.lastError();
         return 1;
     }
 
     const auto storedNormalTrain = databaseManager.findTrainByNumber(normalTrain.trainNumber);
     const auto storedBusyTrain = databaseManager.findTrainByNumber(busyTrain.trainNumber);
-    if (!storedNormalTrain || !storedBusyTrain) {
+    const auto storedHolidayTrain = databaseManager.findTrainByNumber(holidayTrain.trainNumber);
+    const auto storedOrdinaryTrain = databaseManager.findTrainByNumber(ordinaryTrain.trainNumber);
+    const auto storedLastMinuteTrain = databaseManager.findTrainByNumber(lastMinuteTrain.trainNumber);
+    if (!storedNormalTrain || !storedBusyTrain || !storedHolidayTrain
+        || !storedOrdinaryTrain || !storedLastMinuteTrain) {
         qCritical() << "Could not reload pricing test trains.";
         return 1;
     }
@@ -86,7 +110,16 @@ int main(int argc, char *argv[])
         databaseManager.createTrip(storedNormalTrain->trainId, travelDate, 100);
     const auto busyTripId =
         databaseManager.createTrip(storedBusyTrain->trainId, travelDate, 100);
-    if (!normalTripId || !busyTripId) {
+    const auto holidayTripId = databaseManager.createTrip(
+        storedHolidayTrain->trainId, QStringLiteral("2026-10-02"), 100);
+    const auto ordinaryTripId = databaseManager.createTrip(
+        storedOrdinaryTrain->trainId, QStringLiteral("2026-10-12"), 100);
+    const auto lastMinuteTripId = databaseManager.createTrip(
+        storedLastMinuteTrain->trainId,
+        nearDeparture.date().toString(QStringLiteral("yyyy-MM-dd")),
+        100);
+    if (!normalTripId || !busyTripId || !holidayTripId
+        || !ordinaryTripId || !lastMinuteTripId) {
         qCritical() << "Could not create pricing test trips:" << databaseManager.lastError();
         return 1;
     }
@@ -136,6 +169,35 @@ int main(int argc, char *argv[])
     if (normalPrice <= 0.0 || busyPrice <= normalPrice) {
         qCritical() << "Dynamic price did not increase when seats became scarce:"
                     << normalPrice << busyPrice;
+        return 1;
+    }
+
+    const QVariantMap holidayResult = findResult(
+        ticketManager.searchByTrainNumber(holidayTrain.trainNumber),
+        holidayTrain.trainNumber);
+    const QVariantMap ordinaryResult = findResult(
+        ticketManager.searchByTrainNumber(ordinaryTrain.trainNumber),
+        ordinaryTrain.trainNumber);
+    if (holidayResult.isEmpty() || ordinaryResult.isEmpty()) {
+        qCritical() << "Could not reload holiday pricing test trains.";
+        return 1;
+    }
+    if (holidayResult.value(QStringLiteral("dynamicPrice")).toDouble()
+        <= ordinaryResult.value(QStringLiteral("dynamicPrice")).toDouble()) {
+        qCritical() << "Holiday fare did not apply a holiday demand factor.";
+        return 1;
+    }
+
+    const QVariantMap lastMinuteResult = findResult(
+        ticketManager.searchByTrainNumber(lastMinuteTrain.trainNumber),
+        lastMinuteTrain.trainNumber);
+    if (lastMinuteResult.isEmpty()) {
+        qCritical() << "Could not reload the last-minute pricing test train.";
+        return 1;
+    }
+    if (lastMinuteResult.value(QStringLiteral("dynamicPrice")).toDouble()
+        >= lastMinuteResult.value(QStringLiteral("basePrice")).toDouble()) {
+        qCritical() << "Last-minute fare was not discounted with many seats left.";
         return 1;
     }
 

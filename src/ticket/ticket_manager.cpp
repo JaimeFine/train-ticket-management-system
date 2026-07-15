@@ -68,13 +68,22 @@ FareProfile fareProfileForTrain(const QString &trainNumber)
     return {100.0, 0.15};
 }
 
-double calculateBasePrice(const QString &trainNumber, int travelMinutes)
+double calculateBasePrice(const DatabaseManager::TrainWithStations &trip,
+                          int travelMinutes,
+                          double storedBasePrice)
 {
+    // 数据库提供基础票价后直接使用，动态票价只在这个数值上计算浮动。
+    if (storedBasePrice > 0.0) {
+        return storedBasePrice;
+    }
+
     if (travelMinutes <= 0) {
         return 0.0;
     }
 
-    const FareProfile profile = fareProfileForTrain(trainNumber);
+    // 基础票价字段还没有数据时，用下面的旧算法保证当前车次仍能显示价格。
+    // 等数据库完成接入后，这段代码只会作为历史数据的兼容处理。
+    const FareProfile profile = fareProfileForTrain(trip.trainNumber);
     const double travelHours = travelMinutes / 60.0;
     const double estimatedDistance = travelHours * profile.averageSpeed;
     const double basePrice = std::max(20.0,
@@ -82,18 +91,71 @@ double calculateBasePrice(const QString &trainNumber, int travelMinutes)
     return std::round(basePrice);
 }
 
-double calculateDynamicPrice(const DatabaseManager::TrainWithStations &trip,
-                             int travelMinutes)
+struct HolidayPeriod
 {
-    const double basePrice = calculateBasePrice(trip.trainNumber, travelMinutes);
+    QDate startDate;
+    QDate endDate;
+    double factor = 1.0;
+};
+
+double holidayDemandFactor(const QDate &travelDate)
+{
+    if (!travelDate.isValid()) {
+        return 1.0;
+    }
+
+    // 2026 年日期按照国务院办公厅公布的放假安排填写。
+    // 以后更新年份时只需要继续补充这个数组，不用改票价计算过程。
+    static const HolidayPeriod holidayPeriods[] = {
+        {QDate(2026, 1, 1), QDate(2026, 1, 3), 1.10},
+        {QDate(2026, 2, 15), QDate(2026, 2, 23), 1.20},
+        {QDate(2026, 4, 4), QDate(2026, 4, 6), 1.10},
+        {QDate(2026, 5, 1), QDate(2026, 5, 5), 1.15},
+        {QDate(2026, 6, 19), QDate(2026, 6, 21), 1.10},
+        {QDate(2026, 9, 25), QDate(2026, 9, 27), 1.12},
+        {QDate(2026, 10, 1), QDate(2026, 10, 7), 1.20}
+    };
+
+    for (const HolidayPeriod &period : holidayPeriods) {
+        if (travelDate >= period.startDate && travelDate <= period.endDate) {
+            return period.factor;
+        }
+    }
+
+    // 调休上班日虽然在周末，但不按周末客流计算。
+    static const QDate workingWeekends[] = {
+        QDate(2026, 1, 4), QDate(2026, 2, 14), QDate(2026, 2, 28),
+        QDate(2026, 5, 9), QDate(2026, 9, 20), QDate(2026, 10, 10)
+    };
+    for (const QDate &workingDate : workingWeekends) {
+        if (travelDate == workingDate) {
+            return 1.0;
+        }
+    }
+
+    if (travelDate.dayOfWeek() == Qt::Saturday
+        || travelDate.dayOfWeek() == Qt::Sunday) {
+        return 1.05;
+    }
+    return 1.0;
+}
+
+double calculateDynamicPrice(const DatabaseManager::TrainWithStations &trip,
+                             int travelMinutes,
+                             double basePrice)
+{
     if (basePrice <= 0.0) {
         return 0.0;
     }
 
     double seatFactor = 1.0;
+    double remainingRate = 0.0;
     if (trip.totalSeats > 0) {
-        const double soldRate = 1.0
-            - static_cast<double>(trip.remainingSeats) / trip.totalSeats;
+        remainingRate = std::clamp(static_cast<double>(trip.remainingSeats)
+                                       / trip.totalSeats,
+                                   0.0,
+                                   1.0);
+        const double soldRate = 1.0 - remainingRate;
         if (soldRate >= 0.8) {
             seatFactor = 1.25;
         } else if (soldRate >= 0.5) {
@@ -110,21 +172,44 @@ double calculateDynamicPrice(const DatabaseManager::TrainWithStations &trip,
         }
     }
 
-    double dateFactor = 1.0;
     const QDate travelDate = QDate::fromString(trip.travelDate, QStringLiteral("yyyy-MM-dd"));
-    if (travelDate.isValid()) {
-        const int daysBeforeTravel = QDate::currentDate().daysTo(travelDate);
-        if (daysBeforeTravel >= 0 && daysBeforeTravel <= 1) {
-            dateFactor = 1.15;
-        } else if (daysBeforeTravel > 1 && daysBeforeTravel <= 3) {
-            dateFactor = 1.08;
+    const double holidayFactor = holidayDemandFactor(travelDate);
+
+    QDateTime departure;
+    if (travelDate.isValid() && departureClock.isValid()) {
+        departure = QDateTime(travelDate, departureClock);
+    } else {
+        departure = readDateTime(trip.departureTime);
+    }
+
+    // 临近发车但余票仍超过六成时，用分档折扣促进余票销售。
+    // 节假日需求系数仍会参与计算，最终票价最低保留基础票价的七成。
+    double lastMinuteFactor = 1.0;
+    if (departure.isValid()) {
+        const qint64 secondsBeforeDeparture =
+            QDateTime::currentDateTime().secsTo(departure);
+        const double hoursBeforeDeparture = secondsBeforeDeparture / 3600.0;
+        const bool canDiscount = remainingRate >= 0.60;
+
+        if (canDiscount && hoursBeforeDeparture >= 0.0) {
+            if (hoursBeforeDeparture <= 6.0) {
+                lastMinuteFactor = 0.75;
+            } else if (hoursBeforeDeparture <= 24.0) {
+                lastMinuteFactor = 0.84;
+            } else if (hoursBeforeDeparture <= 48.0) {
+                lastMinuteFactor = 0.92;
+            }
         }
     }
 
-    return std::round(basePrice * seatFactor * timeFactor * dateFactor);
+    const double result = basePrice * seatFactor * timeFactor
+                          * holidayFactor * lastMinuteFactor;
+    const double protectedPrice = std::max(basePrice * 0.70, result);
+    return std::round(protectedPrice);
 }
 
-QVariantMap tripToMap(const DatabaseManager::TrainWithStations &trip)
+QVariantMap tripToMap(const DatabaseManager::TrainWithStations &trip,
+                      double storedBasePrice)
 {
     QVariantMap map;
     map[QStringLiteral("trainId")] = trip.trainId;
@@ -140,9 +225,12 @@ QVariantMap tripToMap(const DatabaseManager::TrainWithStations &trip)
 
     const int travelMinutes = calculateTravelMinutes(trip.departureTime,
                                                      trip.arrivalTime);
+    const double basePrice = calculateBasePrice(trip, travelMinutes, storedBasePrice);
     map[QStringLiteral("travelMinutes")] = travelMinutes;
-    map[QStringLiteral("basePrice")] = calculateBasePrice(trip.trainNumber, travelMinutes);
-    map[QStringLiteral("dynamicPrice")] = calculateDynamicPrice(trip, travelMinutes);
+    map[QStringLiteral("basePrice")] = basePrice;
+    map[QStringLiteral("dynamicPrice")] = calculateDynamicPrice(trip,
+                                                                  travelMinutes,
+                                                                  basePrice);
     return map;
 }
 }
@@ -220,7 +308,11 @@ QVector<QVariantMap> TicketManager::searchTrips(const QString &dep,
 {
     QVector<QVariantMap> results;
     for (const auto &trip : m_db.searchTripsByStation(dep, arr, date)) {
-        results.append(tripToMap(trip));
+        const auto tripRecord = m_db.findTripById(trip.tripId);
+        const double storedBasePrice = tripRecord.has_value()
+                                           ? tripRecord->basePrice
+                                           : 0.0;
+        results.append(tripToMap(trip, storedBasePrice));
     }
     return results;
 }
@@ -258,7 +350,7 @@ QVector<QVariantMap> TicketManager::searchByTrainNumber(const QString &number) c
         trip.totalSeats = tripRecord.totalSeats;
         trip.remainingSeats = tripRecord.remainingSeats;
         trip.enabled = tripRecord.enabled;
-        results.append(tripToMap(trip));
+        results.append(tripToMap(trip, tripRecord.basePrice));
     }
 
     return results;

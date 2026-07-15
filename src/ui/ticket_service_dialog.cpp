@@ -2,6 +2,7 @@
 
 #include "ticket_manager.h"
 #include "database_manager.h"
+#include "app_style.h"
 
 #include <QAbstractItemView>
 #include <QCheckBox>
@@ -27,12 +28,7 @@ QTableWidget *createTable(QWidget *parent, const QStringList &headers)
     auto *table = new QTableWidget(parent);
     table->setColumnCount(headers.size());
     table->setHorizontalHeaderLabels(headers);
-    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    table->setSelectionBehavior(QAbstractItemView::SelectRows);
-    table->setSelectionMode(QAbstractItemView::SingleSelection);
-    table->setAlternatingRowColors(true);
-    table->verticalHeader()->setVisible(false);
-    table->horizontalHeader()->setStretchLastSection(true);
+    UiStyle::prepareTable(table);
     return table;
 }
 
@@ -474,13 +470,18 @@ void TicketServiceDialog::setupQueryTab()
         QStringLiteral("购票时间"),
         QStringLiteral("状态")
     });
+    QHeaderView *queryHeader = m_queryResultsTable->horizontalHeader();
+    queryHeader->setStretchLastSection(false);
+    queryHeader->setSectionResizeMode(QHeaderView::ResizeToContents);
+    queryHeader->setSectionResizeMode(3, QHeaderView::Stretch);
+    queryHeader->setSectionResizeMode(4, QHeaderView::Stretch);
 
     if (m_loginResult.role == UserRole::User) {
         m_queryPassengerEdit->setEnabled(false);
     }
 
     layout->addWidget(queryGroup);
-    layout->addWidget(m_queryResultsTable);
+    layout->addWidget(m_queryResultsTable, 1);
 
     m_tabWidget->addTab(tab, QStringLiteral("订单查询"));
 }
@@ -721,8 +722,6 @@ void TicketServiceDialog::runOrderQuery()
         m_queryResultsTable->setItem(row, 4, new QTableWidgetItem(order.value(QStringLiteral("purchaseTime")).toString()));
         m_queryResultsTable->setItem(row, 5, new QTableWidgetItem(statusText(order.value(QStringLiteral("status")).toInt())));
     }
-    m_queryResultsTable->resizeColumnsToContents();
-
     showMessage(true, results.isEmpty() ? QStringLiteral("没有查询到订单。")
                                         : QStringLiteral("订单查询完成，共 %1 条结果。").arg(results.size()));
 }
