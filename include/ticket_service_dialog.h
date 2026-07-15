@@ -32,6 +32,7 @@ private:
     void runOrderQuery();
     void loadOwnOrders();
     void showMessage(bool success, const QString &message);
+    void refreshOrderQueryTable(const QVector<QVariantMap> &results);
     QString statusText(int status) const;
     int selectedTripId() const;
     void writeOperationLog(const QString &action, const QString &detail);

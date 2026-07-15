@@ -21,7 +21,6 @@
 #include <QVBoxLayout>
 
 namespace {
-
 class StationComboBox : public QComboBox
 {
 protected:
@@ -72,6 +71,53 @@ protected:
     }
 };
 
+void styleTrainEditDialog(QDialog &dialog)
+{
+    dialog.setStyleSheet(
+        "QDialog {"
+        "    background: #eef2f3;"
+        "    color: #1f2933;"
+        "    font-family: \"Microsoft YaHei UI\", \"Microsoft YaHei\", \"Segoe UI\";"
+        "    font-size: 14px;"
+        "}"
+        "QLabel {"
+        "    color: #33433d;"
+        "}"
+        "QLineEdit, QComboBox, QSpinBox {"
+        "    color: #1f2933;"
+        "    background-color: #ffffff;"
+        "    border: 1px solid #cbd8d2;"
+        "    border-radius: 6px;"
+        "    padding: 4px 8px;"
+        "    min-height: 28px;"
+        "}"
+        "QLineEdit::placeholder {"
+        "    color: #8b9490;"
+        "}"
+        "QComboBox::drop-down, QSpinBox::up-button, QSpinBox::down-button {"
+        "    border: none;"
+        "    background: #eef5f1;"
+        "}"
+        "QComboBox QAbstractItemView {"
+        "    color: #1f2933;"
+        "    background-color: #ffffff;"
+        "    border: 1px solid #cbd8d2;"
+        "    selection-background-color: #d9f99d;"
+        "    selection-color: #153832;"
+        "}"
+        "QPushButton {"
+        "    background-color: #176b5b;"
+        "    color: white;"
+        "    border: none;"
+        "    border-radius: 8px;"
+        "    padding: 8px 14px;"
+        "    font-weight: 700;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: #0f5749;"
+        "}"
+    );
+}
 }
 
 TrainManagementDialog::TrainManagementDialog(TrainManager* manager, QWidget *parent)
@@ -323,6 +369,7 @@ void TrainManagementDialog::addTrain()
     QDialog dialog(this);
     dialog.setWindowTitle("添加车次");
     dialog.resize(400, 350);
+    styleTrainEditDialog(dialog);
 
     QFormLayout *form = new QFormLayout(&dialog);
 
@@ -411,6 +458,7 @@ void TrainManagementDialog::editTrain()
     QDialog dialog(this);
     dialog.setWindowTitle("编辑车次 - " + current.trainNumber);
     dialog.resize(400, 380);
+    styleTrainEditDialog(dialog);
 
     QFormLayout *form = new QFormLayout(&dialog);
 

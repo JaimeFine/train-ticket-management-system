@@ -5,6 +5,8 @@
 #include <QDate>
 #include <QDateTime>
 #include <QDebug>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 
 #include <cmath>
 
@@ -25,6 +27,29 @@ QVariantMap findResult(const QVector<QVariantMap> &results,
         }
     }
     return {};
+}
+
+QDate nextWeekdayDate()
+{
+    QDate date = QDate::currentDate().addDays(7);
+    while (date.dayOfWeek() == Qt::Saturday || date.dayOfWeek() == Qt::Sunday) {
+        date = date.addDays(1);
+    }
+    return date;
+}
+
+QString timeText(const QDateTime &dateTime)
+{
+    return dateTime.time().toString(QStringLiteral("HH:mm"));
+}
+
+bool setTripBasePrice(int tripId, double basePrice)
+{
+    QSqlQuery query(QSqlDatabase::database(QStringLiteral("train_ticket_connection")));
+    query.prepare(QStringLiteral("UPDATE Trip SET basePrice = :basePrice WHERE tripId = :tripId"));
+    query.bindValue(QStringLiteral(":basePrice"), basePrice);
+    query.bindValue(QStringLiteral(":tripId"), tripId);
+    return query.exec() && query.numRowsAffected() == 1;
 }
 }
 
@@ -55,15 +80,21 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    const QString travelDate = QDate::currentDate().addDays(1)
-                                   .toString(QStringLiteral("yyyy-MM-dd"));
+    const QDate weekdayDate = nextWeekdayDate();
+    const QString weekdayDateText = weekdayDate.toString(QStringLiteral("yyyy-MM-dd"));
+    const QDate holidayDate(QDate::currentDate().year(), 10, 1);
+    const QString holidayDateText = holidayDate.toString(QStringLiteral("yyyy-MM-dd"));
+    const QDateTime nearDeparture = QDateTime::currentDateTime().addSecs(2 * 60 * 60);
+    const QString nearDepartureDateText = nearDeparture.date().toString(QStringLiteral("yyyy-MM-dd"));
+    const QString nearDepartureTimeText = timeText(nearDeparture);
+    const QString nearArrivalTimeText = timeText(nearDeparture.addSecs(2 * 60 * 60));
 
     TrainRecord normalTrain;
     normalTrain.trainNumber = uniqueName(QStringLiteral("G_PRICE_NORMAL"));
     normalTrain.departureStationId = storedDeparture->stationId;
     normalTrain.arrivalStationId = storedArrival->stationId;
-    normalTrain.departureTime = QStringLiteral("11:00:00");
-    normalTrain.arrivalTime = QStringLiteral("13:00:00");
+    normalTrain.departureTime = QStringLiteral("11:00");
+    normalTrain.arrivalTime = QStringLiteral("13:00");
     normalTrain.totalSeats = 100;
 
     TrainRecord busyTrain = normalTrain;
@@ -71,26 +102,16 @@ int main(int argc, char *argv[])
 
     TrainRecord holidayTrain = normalTrain;
     holidayTrain.trainNumber = uniqueName(QStringLiteral("G_PRICE_HOLIDAY"));
-    holidayTrain.departureTime = QStringLiteral("11:00:00");
-    holidayTrain.arrivalTime = QStringLiteral("13:00:00");
 
-    TrainRecord ordinaryTrain = holidayTrain;
-    ordinaryTrain.trainNumber = uniqueName(QStringLiteral("G_PRICE_ORDINARY"));
-    ordinaryTrain.departureTime = QStringLiteral("11:00:00");
-    ordinaryTrain.arrivalTime = QStringLiteral("13:00:00");
-
-    TrainRecord lastMinuteTrain = normalTrain;
-    lastMinuteTrain.trainNumber = uniqueName(QStringLiteral("G_PRICE_LAST_MINUTE"));
-    const QDateTime nearDeparture = QDateTime::currentDateTime().addSecs(3 * 60 * 60);
-    lastMinuteTrain.departureTime = nearDeparture.time().toString(QStringLiteral("HH:mm:ss"));
-    lastMinuteTrain.arrivalTime = nearDeparture.addSecs(2 * 60 * 60)
-                                      .time().toString(QStringLiteral("HH:mm:ss"));
+    TrainRecord nearDepartureTrain = normalTrain;
+    nearDepartureTrain.trainNumber = uniqueName(QStringLiteral("G_PRICE_NEAR"));
+    nearDepartureTrain.departureTime = nearDepartureTimeText;
+    nearDepartureTrain.arrivalTime = nearArrivalTimeText;
 
     if (!databaseManager.addTrain(normalTrain)
         || !databaseManager.addTrain(busyTrain)
         || !databaseManager.addTrain(holidayTrain)
-        || !databaseManager.addTrain(ordinaryTrain)
-        || !databaseManager.addTrain(lastMinuteTrain)) {
+        || !databaseManager.addTrain(nearDepartureTrain)) {
         qCritical() << "Could not create pricing test trains:" << databaseManager.lastError();
         return 1;
     }
@@ -98,28 +119,21 @@ int main(int argc, char *argv[])
     const auto storedNormalTrain = databaseManager.findTrainByNumber(normalTrain.trainNumber);
     const auto storedBusyTrain = databaseManager.findTrainByNumber(busyTrain.trainNumber);
     const auto storedHolidayTrain = databaseManager.findTrainByNumber(holidayTrain.trainNumber);
-    const auto storedOrdinaryTrain = databaseManager.findTrainByNumber(ordinaryTrain.trainNumber);
-    const auto storedLastMinuteTrain = databaseManager.findTrainByNumber(lastMinuteTrain.trainNumber);
-    if (!storedNormalTrain || !storedBusyTrain || !storedHolidayTrain
-        || !storedOrdinaryTrain || !storedLastMinuteTrain) {
+    const auto storedNearDepartureTrain = databaseManager.findTrainByNumber(nearDepartureTrain.trainNumber);
+    if (!storedNormalTrain || !storedBusyTrain || !storedHolidayTrain || !storedNearDepartureTrain) {
         qCritical() << "Could not reload pricing test trains.";
         return 1;
     }
 
     const auto normalTripId =
-        databaseManager.createTrip(storedNormalTrain->trainId, travelDate, 100);
+        databaseManager.createTrip(storedNormalTrain->trainId, weekdayDateText, 100);
     const auto busyTripId =
-        databaseManager.createTrip(storedBusyTrain->trainId, travelDate, 100);
-    const auto holidayTripId = databaseManager.createTrip(
-        storedHolidayTrain->trainId, QStringLiteral("2026-10-02"), 100);
-    const auto ordinaryTripId = databaseManager.createTrip(
-        storedOrdinaryTrain->trainId, QStringLiteral("2026-10-12"), 100);
-    const auto lastMinuteTripId = databaseManager.createTrip(
-        storedLastMinuteTrain->trainId,
-        nearDeparture.date().toString(QStringLiteral("yyyy-MM-dd")),
-        100);
-    if (!normalTripId || !busyTripId || !holidayTripId
-        || !ordinaryTripId || !lastMinuteTripId) {
+        databaseManager.createTrip(storedBusyTrain->trainId, weekdayDateText, 100);
+    const auto holidayTripId =
+        databaseManager.createTrip(storedHolidayTrain->trainId, holidayDateText, 100);
+    const auto nearDepartureTripId =
+        databaseManager.createTrip(storedNearDepartureTrain->trainId, nearDepartureDateText, 100);
+    if (!normalTripId || !busyTripId || !holidayTripId || !nearDepartureTripId) {
         qCritical() << "Could not create pricing test trips:" << databaseManager.lastError();
         return 1;
     }
@@ -128,17 +142,31 @@ int main(int argc, char *argv[])
         qCritical() << "Could not reduce busy-trip seats:" << databaseManager.lastError();
         return 1;
     }
+    if (!databaseManager.adjustTripSeats(*nearDepartureTripId, -10)) {
+        qCritical() << "Could not reduce near-departure trip seats:" << databaseManager.lastError();
+        return 1;
+    }
+    if (!setTripBasePrice(*normalTripId, 300.0)
+        || !setTripBasePrice(*busyTripId, 300.0)
+        || !setTripBasePrice(*holidayTripId, 300.0)
+        || !setTripBasePrice(*nearDepartureTripId, 300.0)) {
+        qCritical() << "Could not set pricing test base fares.";
+        return 1;
+    }
 
     TicketManager ticketManager(databaseManager);
     const QVector<QVariantMap> results = ticketManager.searchTrips(
         departure.stationName,
         arrival.stationName,
-        travelDate);
+        QString());
 
     const QVariantMap normalResult = findResult(results, normalTrain.trainNumber);
     const QVariantMap busyResult = findResult(results, busyTrain.trainNumber);
-    if (normalResult.isEmpty() || busyResult.isEmpty()) {
-        qCritical() << "Pricing search did not return both test trains.";
+    const QVariantMap holidayResult = findResult(results, holidayTrain.trainNumber);
+    const QVariantMap nearDepartureResult = findResult(results, nearDepartureTrain.trainNumber);
+    if (normalResult.isEmpty() || busyResult.isEmpty()
+        || holidayResult.isEmpty() || nearDepartureResult.isEmpty()) {
+        qCritical() << "Pricing search did not return all pricing test trains.";
         return 1;
     }
 
@@ -150,54 +178,45 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    if (normalResult.value(QStringLiteral("travelMinutes")).toInt() != 120) {
+    if (normalResult.value(QStringLiteral("travelMinutes")).toInt() != 120
+        || nearDepartureResult.value(QStringLiteral("travelMinutes")).toInt() != 120) {
         qCritical() << "Travel duration was not calculated correctly.";
         return 1;
     }
 
     const double basePrice = normalResult.value(QStringLiteral("basePrice")).toDouble();
-    if (std::abs(basePrice - 221.0) > 0.001
-        || std::abs(busyResult.value(QStringLiteral("basePrice")).toDouble()
-                    - basePrice) > 0.001) {
-        qCritical() << "Base fare was not calculated from the train type correctly:"
+    if (std::abs(basePrice - 300.0) > 0.001
+        || std::abs(busyResult.value(QStringLiteral("basePrice")).toDouble() - basePrice) > 0.001
+        || std::abs(holidayResult.value(QStringLiteral("basePrice")).toDouble() - basePrice) > 0.001
+        || std::abs(nearDepartureResult.value(QStringLiteral("basePrice")).toDouble() - basePrice) > 0.001) {
+        qCritical() << "Base fare was not sourced from the trip database value correctly:"
                     << basePrice;
         return 1;
     }
 
     const double normalPrice = normalResult.value(QStringLiteral("dynamicPrice")).toDouble();
     const double busyPrice = busyResult.value(QStringLiteral("dynamicPrice")).toDouble();
+    const double holidayPrice = holidayResult.value(QStringLiteral("dynamicPrice")).toDouble();
+    const double nearDeparturePrice = nearDepartureResult.value(QStringLiteral("dynamicPrice")).toDouble();
+
     if (normalPrice <= 0.0 || busyPrice <= normalPrice) {
         qCritical() << "Dynamic price did not increase when seats became scarce:"
                     << normalPrice << busyPrice;
         return 1;
     }
-
-    const QVariantMap holidayResult = findResult(
-        ticketManager.searchByTrainNumber(holidayTrain.trainNumber),
-        holidayTrain.trainNumber);
-    const QVariantMap ordinaryResult = findResult(
-        ticketManager.searchByTrainNumber(ordinaryTrain.trainNumber),
-        ordinaryTrain.trainNumber);
-    if (holidayResult.isEmpty() || ordinaryResult.isEmpty()) {
-        qCritical() << "Could not reload holiday pricing test trains.";
+    if (holidayPrice <= normalPrice) {
+        qCritical() << "Holiday travel did not price above a normal weekday:"
+                    << normalPrice << holidayPrice;
         return 1;
     }
-    if (holidayResult.value(QStringLiteral("dynamicPrice")).toDouble()
-        <= ordinaryResult.value(QStringLiteral("dynamicPrice")).toDouble()) {
-        qCritical() << "Holiday fare did not apply a holiday demand factor.";
+    if (nearDeparturePrice >= normalPrice) {
+        qCritical() << "Near-departure trip with high remaining seats was not discounted:"
+                    << normalPrice << nearDeparturePrice;
         return 1;
     }
-
-    const QVariantMap lastMinuteResult = findResult(
-        ticketManager.searchByTrainNumber(lastMinuteTrain.trainNumber),
-        lastMinuteTrain.trainNumber);
-    if (lastMinuteResult.isEmpty()) {
-        qCritical() << "Could not reload the last-minute pricing test train.";
-        return 1;
-    }
-    if (lastMinuteResult.value(QStringLiteral("dynamicPrice")).toDouble()
-        >= lastMinuteResult.value(QStringLiteral("basePrice")).toDouble()) {
-        qCritical() << "Last-minute fare was not discounted with many seats left.";
+    if (nearDeparturePrice < 210.0) {
+        qCritical() << "Near-departure price broke the 70% base-fare floor:"
+                    << nearDeparturePrice;
         return 1;
     }
 
@@ -212,6 +231,7 @@ int main(int argc, char *argv[])
     }
 
     qDebug() << "Dynamic pricing smoke test passed.";
-    qDebug() << "Normal price:" << normalPrice << "Busy price:" << busyPrice;
+    qDebug() << "Normal/Buzzy/Holiday/Near prices:"
+             << normalPrice << busyPrice << holidayPrice << nearDeparturePrice;
     return 0;
 }

@@ -76,6 +76,7 @@ public:
     bool rollbackTransaction();
     struct TrainWithStations {
         int trainId=0,totalSeats=0,remainingSeats=0;
+        double basePrice = 0.0;
         QString trainNumber,departureStationName,arrivalStationName;
         QString departureTime,arrivalTime,travelDate;
         int tripId = 0;

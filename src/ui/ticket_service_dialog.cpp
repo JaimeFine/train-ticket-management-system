@@ -140,6 +140,9 @@ TicketServiceDialog::TicketServiceDialog(TicketManager &ticketManager,
             selection-background-color: #d9f99d;
             selection-color: #153832;
         }
+        QHeaderView {
+            background: #eef5f1;
+        }
         QHeaderView::section {
             background: #eef5f1;
             color: #33433d;
@@ -176,6 +179,7 @@ TicketServiceDialog::TicketServiceDialog(TicketManager &ticketManager,
             border-radius: 7px;
             padding: 2px 8px;
             background: #ffffff;
+            color: #1f2933;
         }
         QGroupBox#compactSearchGroup QDateEdit {
             padding: 2px 32px 2px 8px;
@@ -192,6 +196,16 @@ TicketServiceDialog::TicketServiceDialog(TicketManager &ticketManager,
         QGroupBox#compactSearchGroup QDateEdit:disabled {
             color: #7b8983;
             background: #edf1ef;
+        }
+        QGroupBox#compactSearchGroup QLabel {
+            color: #33433d;
+        }
+        QGroupBox#compactSearchGroup QCheckBox {
+            color: #33433d;
+            spacing: 6px;
+        }
+        QGroupBox#compactSearchGroup QCheckBox:disabled {
+            color: #7b8983;
         }
         QLabel#dateArrowLabel {
             color: #42514b;
@@ -475,6 +489,7 @@ void TicketServiceDialog::setupQueryTab()
     queryHeader->setSectionResizeMode(QHeaderView::ResizeToContents);
     queryHeader->setSectionResizeMode(3, QHeaderView::Stretch);
     queryHeader->setSectionResizeMode(4, QHeaderView::Stretch);
+    queryHeader->setMinimumSectionSize(72);
 
     if (m_loginResult.role == UserRole::User) {
         m_queryPassengerEdit->setEnabled(false);
@@ -712,16 +727,8 @@ void TicketServiceDialog::runOrderQuery()
         results = m_ticketManager->queryAllOrders();
     }
 
-    m_queryResultsTable->setRowCount(results.size());
-    for (int row = 0; row < results.size(); ++row) {
-        const QVariantMap &order = results[row];
-        m_queryResultsTable->setItem(row, 0, new QTableWidgetItem(QString::number(order.value(QStringLiteral("orderId")).toInt())));
-        m_queryResultsTable->setItem(row, 1, new QTableWidgetItem(QString::number(order.value(QStringLiteral("userId")).toInt())));
-        m_queryResultsTable->setItem(row, 2, new QTableWidgetItem(QString::number(order.value(QStringLiteral("trainId")).toInt())));
-        m_queryResultsTable->setItem(row, 3, new QTableWidgetItem(order.value(QStringLiteral("passengerName")).toString()));
-        m_queryResultsTable->setItem(row, 4, new QTableWidgetItem(order.value(QStringLiteral("purchaseTime")).toString()));
-        m_queryResultsTable->setItem(row, 5, new QTableWidgetItem(statusText(order.value(QStringLiteral("status")).toInt())));
-    }
+    refreshOrderQueryTable(results);
+
     showMessage(true, results.isEmpty() ? QStringLiteral("没有查询到订单。")
                                         : QStringLiteral("订单查询完成，共 %1 条结果。").arg(results.size()));
 }
@@ -735,7 +742,8 @@ void TicketServiceDialog::loadOwnOrders()
     if (m_tabWidget->count() > 2 && m_loginResult.role == UserRole::User) {
         m_tabWidget->setCurrentIndex(m_tabWidget->currentIndex());
     }
-    runOrderQuery();
+    const QVector<QVariantMap> results = m_ticketManager->queryOrdersByUser(m_loginResult.userId);
+    refreshOrderQueryTable(results);
 }
 
 void TicketServiceDialog::showMessage(bool success, const QString &message)
@@ -748,6 +756,21 @@ void TicketServiceDialog::showMessage(bool success, const QString &message)
             "color: #9f1239; background: #fff1f2; border: 1px solid #fecdd3;"));
     }
     m_messageLabel->setText(message);
+}
+
+void TicketServiceDialog::refreshOrderQueryTable(const QVector<QVariantMap> &results)
+{
+    m_queryResultsTable->setRowCount(results.size());
+    for (int row = 0; row < results.size(); ++row) {
+        const QVariantMap &order = results[row];
+        m_queryResultsTable->setItem(row, 0, new QTableWidgetItem(QString::number(order.value(QStringLiteral("orderId")).toInt())));
+        m_queryResultsTable->setItem(row, 1, new QTableWidgetItem(QString::number(order.value(QStringLiteral("userId")).toInt())));
+        m_queryResultsTable->setItem(row, 2, new QTableWidgetItem(QString::number(order.value(QStringLiteral("trainId")).toInt())));
+        m_queryResultsTable->setItem(row, 3, new QTableWidgetItem(order.value(QStringLiteral("passengerName")).toString()));
+        m_queryResultsTable->setItem(row, 4, new QTableWidgetItem(order.value(QStringLiteral("purchaseTime")).toString()));
+        m_queryResultsTable->setItem(row, 5, new QTableWidgetItem(statusText(order.value(QStringLiteral("status")).toInt())));
+    }
+    m_queryResultsTable->resizeColumnsToContents();
 }
 
 QString TicketServiceDialog::statusText(int status) const
