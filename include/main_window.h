@@ -20,6 +20,8 @@ public:
     bool logoutRequested() const;
 
 private:
+    void openTransferDialog();
+
     LoginResult m_loginResult;
     const LoginManager *m_loginManager = nullptr;
     TrainManager* m_trainManager = nullptr;
