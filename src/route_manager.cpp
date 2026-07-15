@@ -5,7 +5,6 @@
 
 #include <algorithm>
 #include <QDateTime>
-#include <QDebug>
 #include <QHash>
 #include <QSet>
 #include <QStringList>
@@ -79,7 +78,6 @@ QString RoutePath::timeString() const
 void RouteGraph::buildFromDatabase(DatabaseManager* dbManager)
 {
     if (dbManager == nullptr) {
-        qDebug() << "RouteGraph: DatabaseManager is null";
         return;
     }
 
@@ -94,13 +92,11 @@ void RouteGraph::buildFromDatabase(DatabaseManager* dbManager)
 
     // 2. 加载车次并构建边
     QList<TrainRecord> trains = dbManager->getAllTrains(true);
-    int edgeCount = 0;
     for (const TrainRecord& train : trains) {
         // 计算乘车时间（分钟）
         QDateTime dep = parseRouteDateTime(train.departureTime);
         QDateTime arr = parseRouteDateTime(train.arrivalTime);
         if (!dep.isValid() || !arr.isValid()) {
-            qDebug() << "RouteGraph: 时间格式无效:" << train.departureTime << train.arrivalTime;
             continue;
         }
 
@@ -119,11 +115,7 @@ void RouteGraph::buildFromDatabase(DatabaseManager* dbManager)
         edge.remainingSeats = train.remainingSeats;
 
         m_adjacency[train.departureStationId].append(edge);
-        ++edgeCount;
     }
-
-    qDebug() << "RouteGraph: 构建完成，站点数=" << m_stationNames.size()
-             << ", 边数=" << edgeCount;
 }
 
 QList<RouteEdge> RouteGraph::getEdgesFrom(int stationId) const
@@ -447,19 +439,19 @@ int RouteManager::stationCount() const
     return m_graph.getStationCount();
 }
 
-QList<int> RouteManager::stationIds() const
+QList<QPair<int, QString>> RouteManager::stationOptions() const
 {
-    QList<int> ids = m_graph.getAllStationIds();
-    std::sort(ids.begin(), ids.end(), [this](int left, int right) {
-        return m_graph.getStationName(left).localeAwareCompare(
-                   m_graph.getStationName(right)) < 0;
-    });
-    return ids;
-}
+    QList<QPair<int, QString>> stations;
+    if (m_dbManager == nullptr) {
+        return stations;
+    }
 
-QString RouteManager::stationName(int stationId) const
-{
-    return m_graph.getStationName(stationId);
+    const QList<StationRecord> records = m_dbManager->getAllStations();
+    for (const StationRecord &record : records) {
+        stations.append(qMakePair(record.stationId, record.stationName));
+    }
+
+    return stations;
 }
 
 void RouteManager::setError(const QString& msg) const

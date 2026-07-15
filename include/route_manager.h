@@ -3,6 +3,7 @@
 
 #include <QList>
 #include <QMap>
+#include <QPair>
 #include <QString>
 #include <QDateTime>
 #include <QVector>
@@ -82,8 +83,7 @@ public:
     bool isGraphReady() const;
     QString lastError() const;
     int stationCount() const;
-    QList<int> stationIds() const;
-    QString stationName(int stationId) const;
+    QList<QPair<int, QString>> stationOptions() const;
 
 private:
     DatabaseManager* m_dbManager;
