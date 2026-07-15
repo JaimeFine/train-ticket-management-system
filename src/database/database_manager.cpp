@@ -1,11 +1,11 @@
 #include "database_manager.h"
 
-// This file implements database connection
-// ! Notes
-// - QSqpDatabase represents the connection itself
-// - QSqlQuery runs SQL statements through an open connection
-// - QSqlError gives us the failure message
-// - QCoreApplication / QDir / QFileInfo help us buils a safe path
+// 本文件实现数据库连接管理（打开/建表/种子数据）
+// ! 说明
+// - QSqlDatabase 表示连接本身
+// - QSqlQuery 通过已打开的连接执行 SQL
+// - QSqlError 提供失败信息
+// - QCoreApplication / QDir / QFileInfo 用于构造安全路径
 
 #include <QCoreApplication>
 #include <QDir>
@@ -19,8 +19,9 @@
 #include <QTextStream>
 
 namespace {
-    // This block load SQL from the schema file
+    // 本匿名命名空间：从 schema 文件加载 SQL 的辅助函数
 
+    // 解析 schema 文件路径（可执行文件目录下的 database/schema_v2.sql）
     QString resolveSchemaPath() {
         QDir baseDir(QCoreApplication::applicationDirPath());
 
@@ -31,6 +32,7 @@ namespace {
         return fullPath;
     }
 
+    // 把整段 SQL 文本按分号拆成独立语句，并剔除 -- 注释行
     QStringList parseSqlStatements(const QString &sqlText) {
         QStringList statements;
         const QStringList rawParts = sqlText.split(';', Qt::SkipEmptyParts);
@@ -41,7 +43,7 @@ namespace {
                 continue;
             }
 
-            // Removing comment lines:
+            // 去掉 -- 开头的注释行：
             QStringList filteredLines;
             const QStringList lines = statement.split('\n');
             for (const QString &line : lines) {
@@ -61,6 +63,7 @@ namespace {
         return statements;
     }
 
+    // 执行带参数绑定的预编译 SQL，失败时把错误写入 lastError
     bool execPrepared(QSqlDatabase &database,
                       QString *lastError,
                       const QString &sql,
@@ -92,25 +95,25 @@ namespace {
     }
 }   // namespace
 
+// 构造函数：设定固定的命名连接名
 DatabaseManager::DatabaseManager() : m_connectionName(QStringLiteral(
-    "train_ticket_connection"   // ! This is default
+    "train_ticket_connection"   // ! 默认连接名
 )) {
-    // We used a named connection instead of an anonymous default connection so
-    // this class stays predictable if the project later grows more windows or
-    // more test.
+    // 用命名连接而非匿名默认连接，将来多窗口/多测试并存时行为更可控
 }
 
+// 析构函数：关闭并移除数据库连接
 DatabaseManager::~DatabaseManager() {
     closeDatabase();
 }
 
+// 初始化数据库：打开连接、建表、写入演示数据
 bool DatabaseManager::initialize() {
-    // This is the complete implementation of initialize()
-    // ! What it does:
-    // 1. opens SQLite,
-    // 2. turns on foreign key checking,
-    // 3. creates all required tables,
-    // 4. returns true only if everything succeeded.
+    // ! 步骤：
+    // 1. 打开 SQLite，
+    // 2. 启用外键检查，
+    // 3. 创建所有必需的表，
+    // 4. 全部成功才返回 true。
 
     m_lastError.clear();
 
@@ -125,6 +128,7 @@ bool DatabaseManager::initialize() {
     return seedDemoData();
 }
 
+// 判断命名连接是否存在且已打开
 bool DatabaseManager::isOpen() const {
     if (!QSqlDatabase::contains(m_connectionName)) {
         return false;
@@ -133,6 +137,7 @@ bool DatabaseManager::isOpen() const {
     return QSqlDatabase::database(m_connectionName).isOpen();
 }
 
+// 直接执行一条 SQL 语句，失败时记录错误信息
 bool DatabaseManager::executeStatement(const QString &sql) {
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
     if (!query.exec(sql)) {
@@ -143,21 +148,26 @@ bool DatabaseManager::executeStatement(const QString &sql) {
     return true;
 }
 
+// 返回数据库文件路径
 QString DatabaseManager::databasePath() const {
     return m_databasePath;
 }
 
+// 返回最近一次错误信息
 QString DatabaseManager::lastError() const {
     return m_lastError;
 }
 
+// 返回数据库文件是否为本次运行新建
 bool DatabaseManager::wasCreated() const {
     return m_wasCreated;
 }
 
+// 打开（或复用）SQLite 连接，并启用外键约束
 bool DatabaseManager::openDatabase() {
     m_databasePath = resolveDatabasePath();
 
+    // 记录文件是否已存在，用于区分"新建"和"复用"数据库
     const bool databaseFileAlreadyExists = QFileInfo::exists(m_databasePath);
 
     QSqlDatabase database;
@@ -180,7 +190,7 @@ bool DatabaseManager::openDatabase() {
         m_wasCreated = true;
     }
 
-    // Handling foreign keys:
+    // 启用外键：SQLite 默认关闭，必须每个连接手动打开
     QSqlQuery pragmaQuery(database);
     if (!pragmaQuery.exec(QStringLiteral("PRAGMA foreign_keys = ON;"))) {
         m_lastError = pragmaQuery.lastError().text();
@@ -190,11 +200,13 @@ bool DatabaseManager::openDatabase() {
     return true;
 }
 
+// 关闭并移除命名连接
 void DatabaseManager::closeDatabase() {
     if (!QSqlDatabase::contains(m_connectionName)) {
         return;
     }
 
+    // 局部作用域让 QSqlDatabase 对象先析构，removeDatabase 才不会警告"连接仍在使用"
     {
         QSqlDatabase database = QSqlDatabase::database(m_connectionName);
         if (database.isOpen()) {
@@ -205,6 +217,7 @@ void DatabaseManager::closeDatabase() {
     QSqlDatabase::removeDatabase(m_connectionName);
 }
 
+// 读取 schema 文件并在事务中执行建表语句
 bool DatabaseManager::createTables() {
     if (!QSqlDatabase::contains(m_connectionName)) {
         m_lastError = QStringLiteral("Database connection does not exist.");
@@ -219,8 +232,8 @@ bool DatabaseManager::createTables() {
         return false;
     }
 
-    // ! If one CREATE TABLE fails, we roll back so
-    // ! initialization does not end in a half-finished state.
+    // ! 建表放在事务中：任一 CREATE TABLE 失败就整体回滚，
+    // ! 避免初始化停在"建了一半"的状态。
     if (!database.transaction()) {
         m_lastError = database.lastError().text();
         return false;
@@ -268,6 +281,7 @@ bool DatabaseManager::createTables() {
     return true;
 }
 
+// 写入演示数据（用户/车站/车次/班次），INSERT OR IGNORE 保证可重复执行
 bool DatabaseManager::seedDemoData() {
     if (!QSqlDatabase::contains(m_connectionName)) {
         m_lastError = QStringLiteral("Database connection does not exist.");
@@ -293,6 +307,7 @@ bool DatabaseManager::seedDemoData() {
         return false;
     }
 
+    // 演示用户：管理员/售票员/普通用户
     const struct DemoUserSeed {
         QString username;
         QString password;
@@ -319,6 +334,7 @@ bool DatabaseManager::seedDemoData() {
         }
     }
 
+    // 演示车站
     const QStringList demoStations = {
         QStringLiteral("北京南"),
         QStringLiteral("南京南"),
@@ -338,6 +354,7 @@ bool DatabaseManager::seedDemoData() {
         }
     }
 
+    // 演示车次：站名在插入时通过子查询转换为 stationId
     const struct DemoTrainSeed {
         QString trainNumber;
         QString departureStationName;
@@ -418,16 +435,17 @@ bool DatabaseManager::seedDemoData() {
     return true;
 }
 
+// 解析数据库文件存放路径
 QString DatabaseManager::resolveDatabasePath() const {
-    // * Trying to place the database file in a project-style "database" folder.
+    // * 尽量把数据库文件放进项目风格的 "database" 目录。
     //
-    // We support three common run locations:
-    // 1. executable launched from the repository root
-    // 2. executable launched from the build folder
-    // 3. executable launched somewhere else
+    // 支持三种常见运行位置：
+    // 1. 从仓库根目录启动可执行文件
+    // 2. 从 build 目录启动
+    // 3. 从其他位置启动
     //
-    // ! In case (3), we still create a local "database" folder so
-    // ! initialization works instead of failing.
+    // ! 情况(3)下也会在可执行文件旁新建 "database" 目录，
+    // ! 保证初始化不会因目录缺失而失败。
 
     QDir baseDir(QCoreApplication::applicationDirPath());
 
@@ -440,7 +458,7 @@ QString DatabaseManager::resolveDatabasePath() const {
         return parentDir.filePath(QStringLiteral("database/train_ticket_v2.db"));
     }
 
-    // If neither directory exists, create one beside the executable.
+    // 两处都没有时，在可执行文件旁新建 database 目录。
     baseDir.mkpath(QStringLiteral("database"));
     return baseDir.filePath(QStringLiteral("database/train_ticket_v2.db"));
 }

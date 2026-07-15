@@ -7,6 +7,7 @@
 
 bool DatabaseManager::beginTransaction()
 {
+    // 购票/退票/改签都需要事务，确保“改状态”和“改余票”要么同时成功，要么同时回滚
     return QSqlDatabase::database(m_connectionName).transaction();
 }
 
@@ -30,6 +31,7 @@ bool DatabaseManager::adjustTrainSeats(int trainId, int delta)
         return false;
     }
 
+    // V2 下 Train 不再直接存余票，这里保留旧接口并映射到“今天”的 Trip
     const QString travelDate =
         QDate::currentDate().toString(QStringLiteral("yyyy-MM-dd"));
     const auto trip = findOrCreateTrip(trainId, travelDate, train->totalSeats);
@@ -46,6 +48,7 @@ QList<DatabaseManager::TrainWithStations> DatabaseManager::searchTripsByStation(
     m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
+    // V2 查询对象是 Trip：同一 Train 在不同日期会返回多条班次记录
     QString sql = QStringLiteral(
         "SELECT t.trainId, t.trainNumber, tr.totalSeats, tr.remainingSeats, tr.basePrice, "
         "tr.departureTime, tr.arrivalTime, t.enabled, ds.stationName, as2.stationName, "
@@ -57,6 +60,7 @@ QList<DatabaseManager::TrainWithStations> DatabaseManager::searchTripsByStation(
         "WHERE t.enabled = 1 AND tr.enabled = 1"
     );
 
+    // 条件为空则表示“不限”，因此只有有输入时才拼过滤条件
     if (!dep.isEmpty()) {
         sql += QStringLiteral(" AND ds.stationName LIKE :dep");
     }
@@ -86,6 +90,7 @@ QList<DatabaseManager::TrainWithStations> DatabaseManager::searchTripsByStation(
         return results;
     }
 
+    // 每行结果同时带回车次模板信息、班次信息和站名，供 TicketManager 直接组装 UI 数据
     while (query.next()) {
         TrainWithStations record;
         record.trainId = query.value(0).toInt();
@@ -146,6 +151,7 @@ std::optional<OrderRecord> DatabaseManager::findOrderById(int orderId) const
     return record;
 }
 
+// 按乘客姓名模糊查询订单，按购票时间倒序
 QList<OrderRecord> DatabaseManager::findOrdersByPassenger(const QString &name) const
 {
     m_lastError.clear();

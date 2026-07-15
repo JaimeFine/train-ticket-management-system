@@ -246,6 +246,7 @@ QVariantMap tripToMap(const DatabaseManager::TrainWithStations &trip)
 }
 }
 
+// 构造函数：保存数据库管理器引用，所有数据操作都经由它完成
 TicketManager::TicketManager(DatabaseManager &db) : m_db(db) {}
 
 int TicketManager::bookTicket(int userId, int tripId, const QString &passengerName)
@@ -270,6 +271,7 @@ int TicketManager::bookTicket(int userId, int tripId, const QString &passengerNa
         return -1;
     }
 
+    // 扣座和建单放在同一事务：任一步失败整体回滚，防止超卖或丢单
     if (!m_db.beginTransaction()) {
         m_lastError = QStringLiteral("无法开启事务");
         return -1;
@@ -289,7 +291,7 @@ int TicketManager::bookTicket(int userId, int tripId, const QString &passengerNa
     order.purchaseTime = QDateTime::currentDateTime()
                              .toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"));
     order.price = trip->basePrice;
-    order.status = 0;
+    order.status = 0;  // 状态0=已预订
 
     const auto orderId = m_db.createOrder(order);
     if (!orderId.has_value()) {
@@ -309,6 +311,7 @@ int TicketManager::bookTicket(int userId, int tripId, const QString &passengerNa
 
 int TicketManager::remainingSeats(int tripId) const
 {
+    // 查询指定班次的余票数；班次不存在时返回-1
     const auto trip = m_db.findTripById(tripId);
     return trip.has_value() ? trip->remainingSeats : -1;
 }
@@ -317,6 +320,7 @@ QVector<QVariantMap> TicketManager::searchTrips(const QString &dep,
                                                 const QString &arr,
                                                 const QString &date) const
 {
+    // 按出发站/到达站（可选出行日期）模糊搜索班次
     QVector<QVariantMap> results;
     for (const auto &trip : m_db.searchTripsByStation(dep, arr, date)) {
         results.append(tripToMap(trip));
@@ -326,6 +330,7 @@ QVector<QVariantMap> TicketManager::searchTrips(const QString &dep,
 
 QVector<QVariantMap> TicketManager::searchByTrainNumber(const QString &number) const
 {
+    // 按车次号精确查询，返回该车次下所有班次；车次不存在或停运时返回空
     const auto train = m_db.findTrainByNumber(number);
     if (!train.has_value() || !train->enabled) {
         return {};
@@ -366,16 +371,19 @@ QVector<QVariantMap> TicketManager::searchByTrainNumber(const QString &number) c
 
 QString TicketManager::lastError() const
 {
+    // 返回最近一次操作失败的错误信息
     return m_lastError;
 }
 
 bool TicketManager::refundTicket(int orderId)
 {
+    // 退票：订单状态改为1=已退票，并回补班次座位；事务保证状态与座位一致
     const auto order = m_db.findOrderById(orderId);
     if (!order.has_value()) {
         m_lastError = QStringLiteral("订单不存在");
         return false;
     }
+    // 仅状态0(已预订)或3的订单可退，已退票/已改签的旧单不能重复退
     if (order->status != 0 && order->status != 3) {
         m_lastError = QStringLiteral("该订单无法退票（已退票或已改签）");
         return false;
@@ -392,6 +400,7 @@ bool TicketManager::refundTicket(int orderId)
         return false;
     }
 
+    // 回补座位：退票后余票+1，须与状态更新同事务
     if (!m_db.adjustTripSeats(order->tripId, +1)) {
         m_db.rollbackTransaction();
         m_lastError = QStringLiteral("恢复座位失败");
@@ -407,6 +416,7 @@ bool TicketManager::refundTicket(int orderId)
     return true;
 }
 
+// 改签：旧订单标记为2=已改签、回补旧班次座位，再扣新班次座位并生成新订单（同一事务）
 bool TicketManager::changeTicket(int orderId, int newTripId)
 {
     const auto oldOrder = m_db.findOrderById(orderId);
@@ -434,11 +444,14 @@ bool TicketManager::changeTicket(int orderId, int newTripId)
         return false;
     }
 
+    // 旧单置为2=已改签（保留记录不删除），便于追溯
     if (!m_db.updateOrderStatus(orderId, 2)) {
         m_db.rollbackTransaction();
         m_lastError = QStringLiteral("更新旧订单失败");
         return false;
     }
+    // 座位转移：旧班次+1、新班次-1，任一失败全部回滚，保证不超卖不丢座
+    // 座位转移：旧班次+1、新班次-1，任一失败全部回滚，保证不超卖不丢座
     if (!m_db.adjustTripSeats(oldOrder->tripId, +1)) {
         m_db.rollbackTransaction();
         m_lastError = QStringLiteral("恢复旧座位失败");
@@ -450,6 +463,7 @@ bool TicketManager::changeTicket(int orderId, int newTripId)
         return false;
     }
 
+    // 用新班次信息生成一张新订单，乘客信息沿用旧单
     OrderRecord newOrder;
     newOrder.userId = oldOrder->userId;
     newOrder.trainId = newTrip->trainId;
@@ -458,8 +472,8 @@ bool TicketManager::changeTicket(int orderId, int newTripId)
     newOrder.travelDate = newTrip->travelDate;
     newOrder.purchaseTime = QDateTime::currentDateTime()
                                 .toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"));
-    newOrder.price = newTrip->basePrice;
-    newOrder.status = 0;
+    newOrder.price = newTrip->basePrice;   // 新单按新班次票价结算
+    newOrder.status = 0;  // 新单状态0=已预订
 
     if (!m_db.createOrder(newOrder).has_value()) {
         m_db.rollbackTransaction();
@@ -475,8 +489,10 @@ bool TicketManager::changeTicket(int orderId, int newTripId)
     return true;
 }
 
+// 把订单记录转成QVariantMap，供UI展示
 static QVariantMap orderToMap(const OrderRecord &order)
 {
+    // 把订单记录转成 QVariantMap，供 UI 展示
     QVariantMap map;
     map[QStringLiteral("orderId")] = order.orderId;
     map[QStringLiteral("userId")] = order.userId;
@@ -491,6 +507,7 @@ static QVariantMap orderToMap(const OrderRecord &order)
 
 QVector<QVariantMap> TicketManager::queryOrdersByUser(int userId) const
 {
+    // 按用户ID查询其全部订单
     QVector<QVariantMap> results;
     const auto orders = m_db.findOrdersByUser(userId);
     for (const auto &order : orders) {
@@ -501,6 +518,7 @@ QVector<QVariantMap> TicketManager::queryOrdersByUser(int userId) const
 
 QVector<QVariantMap> TicketManager::queryOrdersByPassenger(const QString &name) const
 {
+    // 按乘客姓名查询订单
     QVector<QVariantMap> results;
     const auto orders = m_db.findOrdersByPassenger(name);
     for (const auto &order : orders) {
@@ -511,6 +529,7 @@ QVector<QVariantMap> TicketManager::queryOrdersByPassenger(const QString &name) 
 
 QVector<QVariantMap> TicketManager::queryOrderByOrderId(int orderId) const
 {
+    // 按订单号精确查询，最多返回一条
     QVector<QVariantMap> results;
     const auto order = m_db.findOrderById(orderId);
     if (order.has_value()) {
@@ -521,6 +540,7 @@ QVector<QVariantMap> TicketManager::queryOrderByOrderId(int orderId) const
 
 QVector<QVariantMap> TicketManager::queryAllOrders() const
 {
+    // 查询全部订单（含车次、站名、日期等关联信息），供管理端汇总展示
     QVector<QVariantMap> results;
     const auto details = m_db.findAllOrdersWithDetails();
     for (const auto &detail : details) {
@@ -545,5 +565,6 @@ bool TicketManager::addOperationLog(const QString &operatorUsername,
                                     const QString &action,
                                     const QString &detail)
 {
+    // 写入一条操作日志（操作人、动作、详情）
     return m_db.addOperationLog(operatorUsername, action, detail);
 }
