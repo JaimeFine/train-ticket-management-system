@@ -63,6 +63,7 @@ public:
                                                int totalSeats);
     bool adjustTripSeats(int tripId, int delta);
     QList<TripRecord> findTripsByTrain(int trainId) const;
+    bool updateTrip(const TripRecord &trip);
 
     // >>> Order APIs
     std::optional<int> createOrder(const OrderRecord &order);

@@ -1,6 +1,7 @@
 #include "train_management_dialog.h"
 #include "database_manager.h"
 #include "station_management_dialog.h"
+#include "ticket_manager.h"
 
 #include <QComboBox>
 #include <QFormLayout>
@@ -16,6 +17,8 @@
 #include <QTableWidgetItem>
 #include <QVBoxLayout>
 #include <QTime>
+#include <QDoubleSpinBox>
+#include <QDebug>   // 用于调试双击
 
 namespace {
 void styleTrainEditDialog(QDialog &dialog)
@@ -63,7 +66,7 @@ void styleTrainEditDialog(QDialog &dialog)
         "QPushButton:hover {"
         "    background-color: #0f5749;"
         "}"
-    );
+        );
 }
 }
 
@@ -151,7 +154,6 @@ void TrainManagementDialog::setupUI()
         );
     m_searchStationBtn = new QPushButton("按出发站查询");
     m_searchStationBtn->setStyleSheet("background-color: #176b5b; color: white; border-radius: 6px; padding: 6px 12px;");
-    // 站点管理按钮 - 正确文本和功能
     QPushButton *stationBtn = new QPushButton("站点管理");
     stationBtn->setStyleSheet("background-color: #17a2b8; color: white; border-radius: 6px; padding: 6px 12px;");
     connect(stationBtn, &QPushButton::clicked, [this]() {
@@ -176,7 +178,7 @@ void TrainManagementDialog::setupUI()
     m_table->setColumnCount(8);
     m_table->setHorizontalHeaderLabels({
         "ID", "车次号", "出发站", "到达站",
-        "出发时间", "到达时间", "余票/总座", "状态"
+        "出发时间", "到达时间", "总座位", "状态"
     });
     m_table->verticalHeader()->setVisible(false);
 
@@ -207,9 +209,120 @@ void TrainManagementDialog::setupUI()
     m_table->setSelectionMode(QAbstractItemView::SingleSelection);
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_table->setAlternatingRowColors(true);
-    mainLayout->addWidget(m_table);
 
-    // -------- 操作按钮 --------
+    // -------- 主内容区域（TabWidget） --------
+    m_tabWidget = new QTabWidget(this);
+
+    // Tab 1：车次信息（已有的表格）
+    auto *trainTab = new QWidget();
+    auto *trainLayout = new QVBoxLayout(trainTab);
+    trainLayout->addWidget(m_table);  // 现有的车次表格
+    m_tabWidget->addTab(trainTab, "车次信息");
+
+    // Tab 2：班次管理
+    auto *tripTab = new QWidget();
+    auto *tripLayout = new QVBoxLayout(tripTab);
+
+    // -------- 信息栏（车次信息 + 返回按钮） --------
+    QHBoxLayout *infoLayout = new QHBoxLayout();
+    infoLayout->setContentsMargins(0, 0, 0, 0);   // 去除多余边距，解决左侧白框
+
+    m_trainInfoLabel = new QLabel("请选择车次", tripTab);
+    m_trainInfoLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred); // 让标签填满空间
+    m_trainInfoLabel->setStyleSheet(
+        "QLabel {"
+        "    color: #153832;"
+        "    font-size: 14px;"
+        "    font-weight: bold;"
+        "    background-color: #dcfce7;"
+        "    border: 1px solid #86efac;"
+        "    border-radius: 8px;"
+        "    padding: 8px 16px;"
+        "}"
+        );
+    m_trainInfoLabel->setAlignment(Qt::AlignCenter);
+
+    m_backToTrainBtn = new QPushButton("← 返回车次列表", tripTab);
+    m_backToTrainBtn->setStyleSheet(
+        "QPushButton {"
+        "    background-color: #eef5f1;"
+        "    color: #33433d;"
+        "    border: 1px solid #cbd8d2;"
+        "    border-radius: 8px;"
+        "    padding: 6px 14px;"
+        "    font-weight: bold;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: #d8e0dc;"
+        "}"
+        );
+    connect(m_backToTrainBtn, &QPushButton::clicked, this, &TrainManagementDialog::goBackToTrainList);
+
+    infoLayout->addWidget(m_trainInfoLabel, 1);
+    infoLayout->addWidget(m_backToTrainBtn);
+    tripLayout->addLayout(infoLayout);
+
+    // 班次表格（只创建一次，删除重复创建）
+    m_tripTable = new QTableWidget(tripTab);
+    m_tripTable->setColumnCount(7);
+    m_tripTable->setHorizontalHeaderLabels({
+        "班次ID", "日期", "出发时间", "到达时间",
+        "余票/总座", "基础票价", "动态票价"
+    });
+    // 样式设置（与车次表格类似）
+    m_tripTable->setStyleSheet(
+        "QTableWidget {"
+        "    background-color: #ffffff;"
+        "    alternate-background-color: #f5f8f7;"
+        "    color: #1f2933;"
+        "    border: 1px solid #d8e0dc;"
+        "    border-radius: 8px;"
+        "    gridline-color: #e5ece8;"
+        "}"
+        "QHeaderView::section {"
+        "    background-color: #eef5f1;"
+        "    color: #33433d;"
+        "    padding: 6px;"
+        "    border: none;"
+        "    font-weight: bold;"
+        "    font-size: 13px;"
+        "}"
+        "QTableWidget::item {"
+        "    color: #1f2933;"
+        "    padding: 4px;"
+        "}"
+        );
+    m_tripTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    m_tripTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_tripTable->setSelectionMode(QAbstractItemView::SingleSelection);
+    m_tripTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_tripTable->setAlternatingRowColors(true);
+    tripLayout->addWidget(m_tripTable);
+
+    // 班次操作按钮
+    auto *tripActionLayout = new QHBoxLayout();
+
+    m_generateTripBtn = new QPushButton("生成班次");
+    m_editTripBtn = new QPushButton("编辑");
+    m_disableTripBtn = new QPushButton("停运");
+    m_historyToggleBtn = new QPushButton("📅 查看历史班次");
+    m_historyToggleBtn->setCheckable(false);
+    connect(m_historyToggleBtn, &QPushButton::clicked, this, &TrainManagementDialog::toggleHistoryMode);
+
+    tripActionLayout->addWidget(m_generateTripBtn);
+    tripActionLayout->addWidget(m_editTripBtn);
+    tripActionLayout->addWidget(m_disableTripBtn);
+    tripActionLayout->addStretch();          // 将历史按钮推到右侧
+    tripActionLayout->addWidget(m_historyToggleBtn);
+
+    // 注意：此处删除了重复的 addWidget 和 addStretch，只保留上述一次添加
+
+    tripLayout->addLayout(tripActionLayout);
+
+    m_tabWidget->addTab(tripTab, "班次");
+    mainLayout->addWidget(m_tabWidget);
+
+    // -------- 操作按钮（车次列表下的按钮） --------
     QHBoxLayout *actionLayout = new QHBoxLayout();
 
     m_addBtn = new QPushButton("添加车次");
@@ -262,6 +375,12 @@ void TrainManagementDialog::setupUI()
     connect(m_seatBtn, &QPushButton::clicked, this, &TrainManagementDialog::updateSeats);
     connect(m_searchInput, &QLineEdit::returnPressed, this, &TrainManagementDialog::searchTrain);
     connect(m_table, &QTableWidget::itemSelectionChanged, this, &TrainManagementDialog::onTableRowClicked);
+    connect(m_editTripBtn, &QPushButton::clicked, this, &TrainManagementDialog::editTrip);
+    connect(m_disableTripBtn, &QPushButton::clicked, this, &TrainManagementDialog::disableTrip);
+    connect(m_generateTripBtn, &QPushButton::clicked, this, &TrainManagementDialog::generateTrips);
+    connect(m_table, &QTableWidget::doubleClicked,
+            this, &TrainManagementDialog::onTrainTableDoubleClicked);
+
 }
 
 void TrainManagementDialog::loadStations()
@@ -288,7 +407,6 @@ void TrainManagementDialog::loadStations()
     }
 }
 
-
 void TrainManagementDialog::loadData()
 {
     if (m_manager == nullptr) {
@@ -311,13 +429,11 @@ void TrainManagementDialog::loadData()
                                    ));
         m_table->setItem(i, 4, new QTableWidgetItem(t.departureTime));
         m_table->setItem(i, 5, new QTableWidgetItem(t.arrivalTime));
-        m_table->setItem(i, 6, new QTableWidgetItem(
-                                   QString::number(0) + "/" + QString::number(t.totalSeats)
-                                   ));
+        m_table->setItem(i, 6, new QTableWidgetItem(QString::number(t.totalSeats)));
         m_table->setItem(i, 7, new QTableWidgetItem(t.enabled ? "运营中" : "已停运"));
     }
 
-    m_countLabel->setText("共 " + QString::number(trains.size()) + " 条记录");
+    m_countLabel->setText("总车次 共 " + QString::number(trains.size()) + " 条记录");
     clearSelection();
     showMessage("列表已刷新", true);
 }
@@ -350,9 +466,7 @@ void TrainManagementDialog::searchTrain()
                                    ));
         m_table->setItem(i, 4, new QTableWidgetItem(t.departureTime));
         m_table->setItem(i, 5, new QTableWidgetItem(t.arrivalTime));
-        m_table->setItem(i, 6, new QTableWidgetItem(
-                                   QString::number(0) + "/" + QString::number(t.totalSeats)
-                                   ));
+        m_table->setItem(i, 6, new QTableWidgetItem(QString::number(t.totalSeats)));
         m_table->setItem(i, 7, new QTableWidgetItem(t.enabled ? "运营中" : "已停运"));
     }
 
@@ -385,9 +499,7 @@ void TrainManagementDialog::searchByStation()
                                    ));
         m_table->setItem(i, 4, new QTableWidgetItem(t.departureTime));
         m_table->setItem(i, 5, new QTableWidgetItem(t.arrivalTime));
-        m_table->setItem(i, 6, new QTableWidgetItem(
-                                   QString::number(0) + "/" + QString::number(t.totalSeats)
-                                   ));
+        m_table->setItem(i, 6, new QTableWidgetItem(QString::number(t.totalSeats)));
         m_table->setItem(i, 7, new QTableWidgetItem(t.enabled ? "运营中" : "已停运"));
     }
 
@@ -414,7 +526,7 @@ void TrainManagementDialog::addTrain()
     QLineEdit *arriveTimeEdit = new QLineEdit();
     arriveTimeEdit->setPlaceholderText("如 12:30");
     QSpinBox *totalSeatsSpin = new QSpinBox();
-    totalSeatsSpin->setRange(1, 999);
+    totalSeatsSpin->setRange(1, 99999);
     totalSeatsSpin->setValue(100);
 
     DatabaseManager *dbManager = m_manager->databaseManager();
@@ -465,7 +577,6 @@ void TrainManagementDialog::addTrain()
             return;
         }
 
-        // 校验时间格式（HH:mm）
         QRegularExpression timeRegex(R"(^([0-1][0-9]|2[0-3]):[0-5][0-9]$)");
         if (!timeRegex.match(train.departureTime).hasMatch()) {
             showMessage("出发时间格式无效，请使用 HH:mm 格式", false);
@@ -476,7 +587,6 @@ void TrainManagementDialog::addTrain()
             return;
         }
 
-        // 校验出发时间是否早于到达时间（支持跨天）
         QTime dep = QTime::fromString(train.departureTime, "HH:mm");
         QTime arr = QTime::fromString(train.arrivalTime, "HH:mm");
         if (!dep.isValid() || !arr.isValid()) {
@@ -484,9 +594,6 @@ void TrainManagementDialog::addTrain()
             return;
         }
 
-        // 跨天处理：如果出发时间 >= 到达时间，则视为跨天（允许）
-        // 例如 23:00 → 01:00 是有效的跨天车次
-        // 只有完全相同才报错
         if (dep == arr) {
             showMessage("出发时间和到达时间不能相同", false);
             return;
@@ -500,7 +607,19 @@ void TrainManagementDialog::addTrain()
         if (m_manager->addTrain(train)) {
             showMessage(m_manager->statusMessage(), true);
             loadData();
-        } else {
+
+            QMessageBox msgBox(this);
+            msgBox.setWindowTitle("车次添加成功");
+            msgBox.setText("车次 " + train.trainNumber + " 添加成功！\n\n是否为该车次生成班次？");
+            msgBox.addButton("生成班次", QMessageBox::AcceptRole);
+            msgBox.addButton("稍后添加", QMessageBox::RejectRole);
+
+            if (msgBox.exec() == QMessageBox::Accepted) {
+                selectTrainByNumber(train.trainNumber);
+                generateTrips();
+            }
+        }
+        else {
             showMessage(m_manager->statusMessage(), false);
         }
     }
@@ -537,7 +656,7 @@ void TrainManagementDialog::editTrain()
     QLineEdit *departTimeEdit = new QLineEdit(current.departureTime);
     QLineEdit *arriveTimeEdit = new QLineEdit(current.arrivalTime);
     QSpinBox *totalSeatsSpin = new QSpinBox();
-    totalSeatsSpin->setRange(1, 999);
+    totalSeatsSpin->setRange(1, 99999);
     totalSeatsSpin->setValue(current.totalSeats);
 
     DatabaseManager *dbManager = m_manager->databaseManager();
@@ -585,7 +704,6 @@ void TrainManagementDialog::editTrain()
         train.totalSeats = totalSeatsSpin->value();
         train.enabled = current.enabled;
 
-        // ---- 参数校验 ----
         if (train.trainNumber.isEmpty()) {
             showMessage("车次号不能为空", false);
             return;
@@ -596,7 +714,6 @@ void TrainManagementDialog::editTrain()
             return;
         }
 
-        // 校验时间格式（HH:mm）
         QRegularExpression timeRegex(R"(^([0-1][0-9]|2[0-3]):[0-5][0-9]$)");
         if (!timeRegex.match(train.departureTime).hasMatch()) {
             showMessage("出发时间格式无效，请使用 HH:mm 格式", false);
@@ -710,7 +827,7 @@ void TrainManagementDialog::deleteTrainPermanently()
     QMessageBox::StandardButton reply = QMessageBox::warning(
         this, "确认物理删除",
         "物理删除会彻底移除车次 " + trainNumber + "。\n"
-        "只有没有关联订单的车次才能删除。\n\n确定继续吗？",
+                                                  "只有没有关联订单的车次才能删除。\n\n确定继续吗？",
         QMessageBox::Yes | QMessageBox::No
         );
 
@@ -745,12 +862,11 @@ void TrainManagementDialog::updateSeats()
         this, "座位管理 - " + trainNumber,
         "当前余票: " + QString::number(currentSeats) + "\n\n"
                                                        "输入变动数量（负数=售票，正数=退票）:",
-        0, -999, 999, 1, &ok
+        0, -99999, 99999, 1, &ok
         );
 
     if (ok && delta != 0) {
         showMessage(QStringLiteral("V2: 座位管理请通过Trip表操作"), false);
-        // V2: updateRemainingSeats removed — seats are per Trip now
     }
 }
 
@@ -763,6 +879,236 @@ void TrainManagementDialog::onTableRowClicked()
     m_resumeBtn->setEnabled(hasSelection);
     m_purgeBtn->setEnabled(hasSelection);
     m_seatBtn->setEnabled(hasSelection);
+
+    int trainId = getSelectedTrainId();
+    if (trainId > 0) {
+        loadTripsForTrain(trainId);
+    }
+}
+
+void TrainManagementDialog::toggleHistoryMode()
+{
+    m_showHistory = !m_showHistory;
+    if (m_showHistory) {
+        m_historyToggleBtn->setText("📅 查看未发车班次");
+        showMessage("切换到历史班次模式（按时间倒序）", true);
+    } else {
+        m_historyToggleBtn->setText("📅 查看历史班次");
+        showMessage("切换到未发车班次模式", true);
+    }
+    int trainId = getSelectedTrainId();
+    if (trainId > 0) {
+        loadTripsForTrain(trainId);
+    }
+}
+
+void TrainManagementDialog::loadTripsForTrain(int trainId)
+{
+    if (m_manager == nullptr) return;
+    auto dbManager = m_manager->databaseManager();
+    if (dbManager == nullptr) return;
+
+    auto trainOpt = dbManager->findTrainById(trainId);
+    if (!trainOpt.has_value()) {
+        showMessage("未找到车次", false);
+        return;
+    }
+
+    auto depStation = dbManager->findStationById(trainOpt->departureStationId);
+    auto arrStation = dbManager->findStationById(trainOpt->arrivalStationId);
+    QString depName = depStation.has_value() ? depStation->stationName : "未知";
+    QString arrName = arrStation.has_value() ? arrStation->stationName : "未知";
+
+    // 更新标签
+    if (m_trainInfoLabel) {
+        m_trainInfoLabel->setText(
+            QString("🚆 %1  |  %2 → %3  |  %4 → %5  |  总座位: %6")
+                .arg(trainOpt->trainNumber)
+                .arg(depName)
+                .arg(arrName)
+                .arg(trainOpt->departureTime)
+                .arg(trainOpt->arrivalTime)
+                .arg(trainOpt->totalSeats)
+            );
+    }
+
+    auto trips = dbManager->findTripsByTrain(trainId);
+
+    QList<TripRecord> filteredTrips;
+    QDateTime now = QDateTime::currentDateTime();
+    for (const TripRecord& trip : trips) {
+        QDateTime depDateTime = QDateTime::fromString(
+            trip.travelDate + " " + trip.departureTime,
+            "yyyy-MM-dd HH:mm"
+            );
+        bool isDeparted = depDateTime.isValid() && depDateTime < now;
+        if (m_showHistory) {
+            if (isDeparted) filteredTrips.append(trip);
+        } else {
+            if (!isDeparted) filteredTrips.append(trip);
+        }
+    }
+
+    if (m_showHistory) {
+        std::sort(filteredTrips.begin(), filteredTrips.end(),
+                  [](const TripRecord& a, const TripRecord& b) {
+                      return (a.travelDate + a.departureTime) > (b.travelDate + b.departureTime);
+                  });
+    }
+
+    m_tripTable->setRowCount(filteredTrips.size());
+
+    // 确保列数正确（已在初始化时设置，此处可省略，但保留以防）
+    // m_tripTable->setColumnCount(7);
+    // 表头已在初始化时设置，无需重复
+
+    TicketManager ticketManager(*dbManager);
+
+    for (int i = 0; i < filteredTrips.size(); ++i) {
+        const TripRecord& trip = filteredTrips[i];
+
+        double dynamicPrice = 0.0;
+        QVector<QVariantMap> results = ticketManager.searchTrips(depName, arrName, trip.travelDate);
+        for (const QVariantMap& result : results) {
+            if (result.value("tripId").toInt() == trip.tripId) {
+                dynamicPrice = result.value("dynamicPrice").toDouble();
+                break;
+            }
+        }
+
+        m_tripTable->setItem(i, 0, new QTableWidgetItem(QString::number(trip.tripId)));
+        m_tripTable->setItem(i, 1, new QTableWidgetItem(trip.travelDate));
+        m_tripTable->setItem(i, 2, new QTableWidgetItem(trip.departureTime));
+        m_tripTable->setItem(i, 3, new QTableWidgetItem(trip.arrivalTime));
+        m_tripTable->setItem(i, 4, new QTableWidgetItem(
+                                       QString::number(trip.remainingSeats) + "/" + QString::number(trip.totalSeats)
+                                       ));
+        m_tripTable->setItem(i, 5, new QTableWidgetItem(
+                                       trip.basePrice > 0
+                                           ? QString::number(trip.basePrice, 'f', 0) + " 元"
+                                           : "未设置"
+                                       ));
+        m_tripTable->setItem(i, 6, new QTableWidgetItem(
+                                       dynamicPrice > 0
+                                           ? QString::number(dynamicPrice, 'f', 0) + " 元"
+                                           : "计算中"
+                                       ));
+    }
+
+    m_tripTable->resizeColumnsToContents();
+
+    QString modeText = m_showHistory ? "历史班次" : "未发车班次";
+    showMessage(QString("%1 共 %2 条记录").arg(modeText).arg(filteredTrips.size()), true);
+}
+
+void TrainManagementDialog::generateTrips()
+{
+    int trainId = getSelectedTrainId();
+    if (trainId == 0) {
+        showMessage("请先选择车次", false);
+        return;
+    }
+
+    auto dbManager = m_manager->databaseManager();
+    if (dbManager == nullptr) {
+        showMessage("数据库管理器未初始化", false);
+        return;
+    }
+
+    const auto train = dbManager->findTrainById(trainId);
+    if (!train.has_value()) {
+        showMessage("未找到车次", false);
+        return;
+    }
+
+    bool ok;
+
+    int days = QInputDialog::getInt(this, "生成班次",
+                                    "添加未来多少天的班次？", 7, 1, 30, 1, &ok);
+    if (!ok) return;
+
+    auto existingTrips = dbManager->findTripsByTrain(trainId);
+    QDate startDate = QDate::currentDate();
+
+    if (!existingTrips.isEmpty()) {
+        QDate maxDate;
+        for (const auto& trip : existingTrips) {
+            QDate tripDate = QDate::fromString(trip.travelDate, "yyyy-MM-dd");
+            if (tripDate.isValid() && (!maxDate.isValid() || tripDate > maxDate)) {
+                maxDate = tripDate;
+            }
+        }
+        if (maxDate.isValid()) {
+            startDate = maxDate.addDays(1);
+        }
+    }
+
+    double existingPrice = 0.0;
+    for (const auto& trip : existingTrips) {
+        if (trip.basePrice > 0) {
+            existingPrice = trip.basePrice;
+            break;
+        }
+    }
+
+    double defaultPrice = 0.0;
+
+    if (existingPrice > 0) {
+        QMessageBox msgBox(this);
+        msgBox.setWindowTitle("生成班次");
+        msgBox.setText(QString("已有班次的基础票价为 ¥%1\n\n是否继承该票价？")
+                           .arg(existingPrice, 0, 'f', 0));
+
+        QPushButton *inheritBtn = msgBox.addButton("继承已有票价", QMessageBox::AcceptRole);
+        QPushButton *manualBtn = msgBox.addButton("手动修改", QMessageBox::RejectRole);
+        QPushButton *cancelBtn = msgBox.addButton("取消", QMessageBox::RejectRole);
+
+        msgBox.exec();
+
+        if (msgBox.clickedButton() == cancelBtn) {
+            return;
+        }
+
+        if (msgBox.clickedButton() == inheritBtn) {
+            defaultPrice = existingPrice;
+        } else {
+            double inputPrice = QInputDialog::getDouble(
+                this, "生成班次",
+                "请输入基础票价（元）:",
+                existingPrice, 0, 9999, 1, &ok
+                );
+            if (!ok) return;
+            defaultPrice = inputPrice;
+        }
+    } else {
+        double inputPrice = QInputDialog::getDouble(
+            this, "生成班次",
+            "该车次暂无班次，请输入基础票价（元）:",
+            100, 0, 9999, 1, &ok
+            );
+        if (!ok) return;
+        defaultPrice = inputPrice;
+    }
+
+    int created = 0;
+    for (int i = 0; i < days; ++i) {
+        QDate date = startDate.addDays(i);
+        QString dateStr = date.toString("yyyy-MM-dd");
+
+        auto existing = dbManager->findOrCreateTrip(trainId, dateStr, train->totalSeats);
+        if (existing.has_value()) {
+            TripRecord toUpdate = existing.value();
+            toUpdate.basePrice = defaultPrice;
+            if (dbManager->updateTrip(toUpdate)) {
+                created++;
+            }
+        }
+    }
+
+    showMessage(QString("成功添加 %1 个班次，基础票价 ¥%2")
+                    .arg(created)
+                    .arg(defaultPrice, 0, 'f', 0), true);
+    loadTripsForTrain(trainId);
 }
 
 int TrainManagementDialog::getSelectedTrainId()
@@ -791,4 +1137,222 @@ void TrainManagementDialog::showMessage(const QString &msg, bool success)
 {
     m_messageLabel->setText(msg);
     m_messageLabel->setStyleSheet(success ? "color: #28a745;" : "color: #dc3545;");
+}
+
+void TrainManagementDialog::editTrip()
+{
+    int row = m_tripTable->currentRow();
+    if (row < 0) {
+        showMessage("请先选择一个班次", false);
+        return;
+    }
+
+    int tripId = m_tripTable->item(row, 0)->text().toInt();
+    auto dbManager = m_manager->databaseManager();
+    if (dbManager == nullptr) {
+        showMessage("数据库管理器未初始化", false);
+        return;
+    }
+
+    auto tripOpt = dbManager->findTripById(tripId);
+    if (!tripOpt.has_value()) {
+        showMessage("未找到该班次", false);
+        return;
+    }
+
+    TripRecord trip = tripOpt.value();
+
+    QDialog dialog(this);
+    dialog.setWindowTitle("编辑班次 - " + trip.travelDate);
+    dialog.resize(400, 350);
+    styleTrainEditDialog(dialog);
+
+    QFormLayout *form = new QFormLayout(&dialog);
+
+    QLineEdit *travelDateEdit = new QLineEdit(trip.travelDate);
+    travelDateEdit->setPlaceholderText("如 2026-07-16");
+    QLineEdit *departTimeEdit = new QLineEdit(trip.departureTime);
+    departTimeEdit->setPlaceholderText("如 08:00");
+    QLineEdit *arriveTimeEdit = new QLineEdit(trip.arrivalTime);
+    arriveTimeEdit->setPlaceholderText("如 12:38");
+    QSpinBox *totalSeatsSpin = new QSpinBox();
+    totalSeatsSpin->setRange(1, 99999);
+    totalSeatsSpin->setValue(trip.totalSeats);
+    QSpinBox *remainingSeatsSpin = new QSpinBox();
+    remainingSeatsSpin->setRange(0, 99999);
+    remainingSeatsSpin->setValue(trip.remainingSeats);
+    QDoubleSpinBox *priceSpin = new QDoubleSpinBox();
+    priceSpin->setRange(0, 9999);
+    priceSpin->setValue(trip.basePrice);
+    priceSpin->setPrefix("¥");
+    priceSpin->setDecimals(0);
+
+    form->addRow("出行日期:", travelDateEdit);
+    form->addRow("出发时间:", departTimeEdit);
+    form->addRow("到达时间:", arriveTimeEdit);
+    form->addRow("总座位数:", totalSeatsSpin);
+    form->addRow("剩余座位:", remainingSeatsSpin);
+    form->addRow("票价:", priceSpin);
+
+    QHBoxLayout *btnLayout = new QHBoxLayout();
+    QPushButton *okBtn = new QPushButton("确定");
+    QPushButton *cancelBtn = new QPushButton("取消");
+    btnLayout->addStretch();
+    btnLayout->addWidget(okBtn);
+    btnLayout->addWidget(cancelBtn);
+    form->addRow(btnLayout);
+
+    connect(okBtn, &QPushButton::clicked, &dialog, &QDialog::accept);
+    connect(cancelBtn, &QPushButton::clicked, &dialog, &QDialog::reject);
+
+    if (dialog.exec() == QDialog::Accepted) {
+        QString travelDate = travelDateEdit->text().trimmed();
+        QString depTime = departTimeEdit->text().trimmed();
+        QString arrTime = arriveTimeEdit->text().trimmed();
+        int totalSeats = totalSeatsSpin->value();
+        int remainingSeats = remainingSeatsSpin->value();
+        double price = priceSpin->value();
+
+        QRegularExpression dateRegex(R"(^\d{4}-\d{2}-\d{2}$)");
+        if (!dateRegex.match(travelDate).hasMatch()) {
+            showMessage("日期格式无效，请使用 yyyy-MM-dd", false);
+            return;
+        }
+
+        QRegularExpression timeRegex(R"(^([0-1][0-9]|2[0-3]):[0-5][0-9]$)");
+        if (!timeRegex.match(depTime).hasMatch()) {
+            showMessage("出发时间格式无效，请使用 HH:mm", false);
+            return;
+        }
+        if (!timeRegex.match(arrTime).hasMatch()) {
+            showMessage("到达时间格式无效，请使用 HH:mm", false);
+            return;
+        }
+
+        if (remainingSeats < 0 || remainingSeats > totalSeats) {
+            showMessage("剩余座位数必须在 0 到总座位数之间", false);
+            return;
+        }
+
+        trip.travelDate = travelDate;
+        trip.departureTime = depTime;
+        trip.arrivalTime = arrTime;
+        trip.totalSeats = totalSeats;
+        trip.remainingSeats = remainingSeats;
+        trip.basePrice = price;
+
+        if (!dbManager->updateTrip(trip)) {
+            showMessage("更新班次失败: " + dbManager->lastError(), false);
+            return;
+        }
+
+        showMessage("班次更新成功", true);
+        loadTripsForTrain(getSelectedTrainId());
+    }
+}
+
+void TrainManagementDialog::disableTrip()
+{
+    int row = m_tripTable->currentRow();
+    if (row < 0) {
+        showMessage("请先选择一个班次", false);
+        return;
+    }
+
+    int tripId = m_tripTable->item(row, 0)->text().toInt();
+    auto dbManager = m_manager->databaseManager();
+    if (dbManager == nullptr) {
+        showMessage("数据库管理器未初始化", false);
+        return;
+    }
+
+    auto tripOpt = dbManager->findTripById(tripId);
+    if (!tripOpt.has_value()) {
+        showMessage("未找到该班次", false);
+        return;
+    }
+
+    TripRecord trip = tripOpt.value();
+    bool currentlyEnabled = trip.enabled;
+
+    QString action = currentlyEnabled ? "停运" : "恢复运营";
+    QString confirmMsg = currentlyEnabled
+                             ? QString("确定要停运 %1 的班次吗？").arg(trip.travelDate)
+                             : QString("确定要恢复 %1 的班次吗？").arg(trip.travelDate);
+
+    QMessageBox::StandardButton reply = QMessageBox::question(
+        this, "确认" + action,
+        confirmMsg,
+        QMessageBox::Yes | QMessageBox::No
+        );
+
+    if (reply != QMessageBox::Yes) return;
+
+    trip.enabled = !currentlyEnabled;
+    if (!dbManager->updateTrip(trip)) {
+        showMessage(action + "失败: " + dbManager->lastError(), false);
+        return;
+    }
+
+    showMessage(action + "成功", true);
+    loadTripsForTrain(getSelectedTrainId());
+}
+
+void TrainManagementDialog::selectTrainByNumber(const QString& trainNumber)
+{
+    for (int row = 0; row < m_table->rowCount(); ++row) {
+        QTableWidgetItem* item = m_table->item(row, 1);
+        if (item && item->text() == trainNumber) {
+            m_table->selectRow(row);
+            m_tabWidget->setCurrentIndex(1);
+            int trainId = m_table->item(row, 0)->text().toInt();
+            loadTripsForTrain(trainId);
+            return;
+        }
+    }
+}
+
+void TrainManagementDialog::onTrainTableDoubleClicked(const QModelIndex &index)
+{
+    if (!index.isValid()) return;
+    int row = index.row();
+    if (row < 0 || row >= m_table->rowCount()) return;
+
+    // 获取当前选中行的车次ID（调用现有函数）
+    int trainId = getSelectedTrainId();
+    if (trainId <= 0) return;
+
+    // 切换到“班次”标签页（索引1）
+    m_tabWidget->setCurrentIndex(1);
+
+    // 确保班次数据已加载（如果单击时已经加载，可省略，但为保险保留）
+    loadTripsForTrain(trainId);
+}
+
+void TrainManagementDialog::goBackToTrainList()
+{
+    // 切换到车次信息 Tab（索引0）
+    m_tabWidget->setCurrentIndex(0);
+
+    // 清除车次表格的选中状态
+    m_table->clearSelection();
+    m_table->setCurrentIndex(QModelIndex());
+
+    // 清空班次表格
+    m_tripTable->setRowCount(0);
+
+    // 重置右上角车次信息标签
+    if (m_trainInfoLabel) {
+        m_trainInfoLabel->setText("请选择车次");
+    }
+
+    // 如果当前处于历史模式，则重置为普通模式
+    if (m_showHistory) {
+        m_showHistory = false;
+        if (m_historyToggleBtn) {
+            m_historyToggleBtn->setText("📅 查看历史班次");
+        }
+    }
+
+    showMessage("已返回车次列表", true);
 }

@@ -312,7 +312,7 @@ bool DatabaseManager::seedDemoData() {
                               "INSERT OR IGNORE INTO User "
                               "(username, password, role, enabled) "
                               "VALUES (?, ?, ?, ?)"
-                          ),
+                              ),
                           {user.username, user.password, user.role, user.enabled})) {
             database.rollback();
             return false;
@@ -331,7 +331,7 @@ bool DatabaseManager::seedDemoData() {
                           &m_lastError,
                           QStringLiteral(
                               "INSERT OR IGNORE INTO Station (stationName) VALUES (?)"
-                          ),
+                              ),
                           {stationName})) {
             database.rollback();
             return false;
@@ -369,7 +369,7 @@ bool DatabaseManager::seedDemoData() {
                     "SELECT ?, dep.stationId, arr.stationId, ?, ?, ?, ? "
                     "FROM Station dep, Station arr "
                     "WHERE dep.stationName = ? AND arr.stationName = ?"
-                ),
+                    ),
                 {
                     train.trainNumber,
                     train.departureTime,
@@ -389,8 +389,21 @@ bool DatabaseManager::seedDemoData() {
     const QString tomorrow =
         QDateTime::currentDateTime().addDays(1).toString(QStringLiteral("yyyy-MM-dd"));
 
+    // ============================================================
+    // 修改：定义每个车次的基础票价
+    // ============================================================
+    const QMap<QString, double> trainPrices = {
+        {QStringLiteral("G1001"), 280.0},
+        {QStringLiteral("G1002"), 280.0},
+        {QStringLiteral("G2001"), 180.0},
+        {QStringLiteral("G2002"), 180.0}
+    };
+
     for (const QString &travelDate : {today, tomorrow}) {
         for (const DemoTrainSeed &train : demoTrains) {
+            // 获取该车次的票价
+            double basePrice = trainPrices.value(train.trainNumber, 100.0);
+
             if (!execPrepared(
                     database,
                     &m_lastError,
@@ -399,10 +412,10 @@ bool DatabaseManager::seedDemoData() {
                         "trainId, travelDate, departureTime, arrivalTime, "
                         "totalSeats, remainingSeats, basePrice, enabled"
                         ") "
-                        "SELECT trainId, ?, departureTime, arrivalTime, totalSeats, totalSeats, 0, 1 "
+                        "SELECT trainId, ?, departureTime, arrivalTime, totalSeats, totalSeats, ?, 1 "
                         "FROM Train WHERE trainNumber = ?"
-                    ),
-                    {travelDate, train.trainNumber})) {
+                        ),
+                    {travelDate, basePrice, train.trainNumber})) {
                 database.rollback();
                 return false;
             }
