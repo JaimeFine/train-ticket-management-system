@@ -2,7 +2,7 @@
 #include "database_manager.h"
 #include "station_management_dialog.h"
 #include "ticket_manager.h"
-#include "app_style.h"   // 使用统一的样式工具
+#include "app_style.h"
 
 #include <QComboBox>
 #include <QFormLayout>
@@ -25,7 +25,7 @@
 #include <QDebug>
 
 namespace {
-// 自定义 ComboBox，绘制圆角边框和右侧箭头区域（保持与他人样式一致）
+// 系统下拉箭头在 Windows 样式下容易偏移，这里只重画右侧箭头区域。
 class StationComboBox : public QComboBox
 {
 protected:
@@ -75,7 +75,7 @@ protected:
     }
 };
 
-// 编辑车次 / 班次对话框的样式（完全保留您原有的 styleTrainEditDialog）
+// 添加和编辑窗口使用同一套输入框、按钮样式。
 void styleTrainEditDialog(QDialog &dialog)
 {
     dialog.setStyleSheet(
@@ -129,33 +129,35 @@ TrainManagementDialog::TrainManagementDialog(TrainManager* manager, QWidget *par
     : QDialog(parent)
     , m_manager(manager)
 {
-    setStyleSheet(UiStyle::dialogStyleSheet());   // 使用统一样式（来自 app_style.h）
+    setStyleSheet(UiStyle::dialogStyleSheet());
     setupUI();
     loadStations();
     loadData();
     setWindowTitle("车次管理");
-    resize(1000, 550);
+    resize(1280, 760);
+    setMinimumSize(1100, 680);
 }
 
 void TrainManagementDialog::setupUI()
 {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    mainLayout->setContentsMargins(18, 16, 18, 14);
+    mainLayout->setSpacing(12);
 
     // -------- 搜索栏 --------
     QHBoxLayout *searchLayout = new QHBoxLayout();
 
     m_searchInput = new QLineEdit();
     m_searchInput->setPlaceholderText("输入车次号或站点名称...");
-    m_searchInput->setMinimumWidth(250);
-    // 不再单独设置样式，由全局样式表控制
+    m_searchInput->setMinimumWidth(300);
 
     m_searchBtn = new QPushButton("搜索");
     m_refreshBtn = new QPushButton("刷新");
 
-    // 使用自定义 StationComboBox（仿照别人样式）
     m_stationCombo = new StationComboBox();
     m_stationCombo->setObjectName(QStringLiteral("stationSearchCombo"));
     m_stationCombo->addItem("-- 选择出发站 --");
+    m_stationCombo->setMinimumWidth(210);
 
     m_searchStationBtn = new QPushButton("按出发站查询");
     QPushButton *stationBtn = new QPushButton("站点管理");
@@ -183,12 +185,8 @@ void TrainManagementDialog::setupUI()
         "ID", "车次号", "出发站", "到达站",
         "出发时间", "到达时间", "总座位", "状态"
     });
-    UiStyle::prepareTable(m_table);   // 统一表格样式（背景、边框、表头等）
+    UiStyle::prepareTable(m_table);
     m_table->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
-    m_table->setSelectionMode(QAbstractItemView::SingleSelection);
-    m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_table->setAlternatingRowColors(true);
 
     // -------- 主内容区域（TabWidget） --------
     m_tabWidget = new QTabWidget(this);
@@ -196,12 +194,16 @@ void TrainManagementDialog::setupUI()
     // Tab 1：车次信息
     auto *trainTab = new QWidget();
     auto *trainLayout = new QVBoxLayout(trainTab);
+    trainLayout->setContentsMargins(16, 16, 16, 14);
+    trainLayout->setSpacing(12);
     trainLayout->addWidget(m_table);
     m_tabWidget->addTab(trainTab, "车次信息");
 
     // Tab 2：班次管理
     auto *tripTab = new QWidget();
     auto *tripLayout = new QVBoxLayout(tripTab);
+    tripLayout->setContentsMargins(16, 16, 16, 14);
+    tripLayout->setSpacing(12);
 
     // 信息栏（车次信息 + 返回按钮）
     QHBoxLayout *infoLayout = new QHBoxLayout();
@@ -209,34 +211,21 @@ void TrainManagementDialog::setupUI()
 
     m_trainInfoLabel = new QLabel("请选择车次", tripTab);
     m_trainInfoLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    // 保留原有样式（与别人风格融合，也可由 UiStyle 统一，但此处保留特殊外观）
     m_trainInfoLabel->setStyleSheet(
         "QLabel {"
         "    color: #153832;"
         "    font-size: 14px;"
         "    font-weight: bold;"
-        "    background-color: #dcfce7;"
-        "    border: 1px solid #86efac;"
+        "    background-color: #eef5f1;"
+        "    border: 1px solid #cbd8d2;"
         "    border-radius: 8px;"
-        "    padding: 8px 16px;"
+        "    padding: 10px 16px;"
         "}"
         );
     m_trainInfoLabel->setAlignment(Qt::AlignCenter);
 
     m_backToTrainBtn = new QPushButton("← 返回车次列表", tripTab);
-    m_backToTrainBtn->setStyleSheet(
-        "QPushButton {"
-        "    background-color: #eef5f1;"
-        "    color: #33433d;"
-        "    border: 1px solid #cbd8d2;"
-        "    border-radius: 8px;"
-        "    padding: 6px 14px;"
-        "    font-weight: bold;"
-        "}"
-        "QPushButton:hover {"
-        "    background-color: #d8e0dc;"
-        "}"
-        );
+    m_backToTrainBtn->setObjectName(QStringLiteral("secondaryButton"));
     connect(m_backToTrainBtn, &QPushButton::clicked, this, &TrainManagementDialog::goBackToTrainList);
 
     infoLayout->addWidget(m_trainInfoLabel, 1);
@@ -252,11 +241,7 @@ void TrainManagementDialog::setupUI()
     });
     UiStyle::prepareTable(m_tripTable);
     m_tripTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    m_tripTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-    m_tripTable->setSelectionMode(QAbstractItemView::SingleSelection);
-    m_tripTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_tripTable->setAlternatingRowColors(true);
-    tripLayout->addWidget(m_tripTable);
+    tripLayout->addWidget(m_tripTable, 1);
 
     // 班次操作按钮
     auto *tripActionLayout = new QHBoxLayout();
@@ -264,7 +249,9 @@ void TrainManagementDialog::setupUI()
     m_generateTripBtn = new QPushButton("生成班次");
     m_editTripBtn = new QPushButton("编辑");
     m_disableTripBtn = new QPushButton("停运");
-    m_historyToggleBtn = new QPushButton("📅 查看历史班次");
+    m_disableTripBtn->setObjectName(QStringLiteral("dangerButton"));
+    m_historyToggleBtn = new QPushButton("查看历史班次");
+    m_historyToggleBtn->setObjectName(QStringLiteral("secondaryButton"));
     m_historyToggleBtn->setCheckable(false);
     connect(m_historyToggleBtn, &QPushButton::clicked, this, &TrainManagementDialog::toggleHistoryMode);
 
@@ -277,27 +264,26 @@ void TrainManagementDialog::setupUI()
     tripLayout->addLayout(tripActionLayout);
 
     m_tabWidget->addTab(tripTab, "班次");
-    mainLayout->addWidget(m_tabWidget);
+    mainLayout->addWidget(m_tabWidget, 1);
 
     // -------- 操作按钮（车次列表下方） --------
     QHBoxLayout *actionLayout = new QHBoxLayout();
 
     m_addBtn = new QPushButton("添加车次");
-    m_addBtn->setStyleSheet("background-color: #28a745; color: white; font-weight: bold;");
 
     m_editBtn = new QPushButton("编辑");
     m_editBtn->setEnabled(false);
 
     m_deleteBtn = new QPushButton("停运");
     m_deleteBtn->setEnabled(false);
-    m_deleteBtn->setStyleSheet("background-color: #dc3545; color: white;");
+    m_deleteBtn->setObjectName(QStringLiteral("dangerButton"));
 
     m_resumeBtn = new QPushButton("恢复运营");
     m_resumeBtn->setEnabled(false);
 
     m_purgeBtn = new QPushButton("物理删除");
     m_purgeBtn->setEnabled(false);
-    m_purgeBtn->setStyleSheet("background-color: #7f1d1d; color: white;");
+    m_purgeBtn->setObjectName(QStringLiteral("dangerButton"));
 
     m_seatBtn = new QPushButton("座位管理");
     m_seatBtn->setEnabled(false);
@@ -316,11 +302,10 @@ void TrainManagementDialog::setupUI()
     actionLayout->addWidget(m_seatBtn);
     actionLayout->addStretch();
     actionLayout->addWidget(m_countLabel);
-    actionLayout->addSpacing(20);
-    actionLayout->addWidget(m_messageLabel);
-    mainLayout->addLayout(actionLayout);
+    trainLayout->addLayout(actionLayout);
+    mainLayout->addWidget(m_messageLabel, 0, Qt::AlignRight);
 
-    // -------- 信号连接（完整保留您的功能） --------
+    // -------- 信号连接 --------
     connect(m_refreshBtn, &QPushButton::clicked, this, &TrainManagementDialog::refreshList);
     connect(m_searchBtn, &QPushButton::clicked, this, &TrainManagementDialog::searchTrain);
     connect(m_searchStationBtn, &QPushButton::clicked, this, &TrainManagementDialog::searchByStation);
@@ -846,10 +831,10 @@ void TrainManagementDialog::toggleHistoryMode()
 {
     m_showHistory = !m_showHistory;
     if (m_showHistory) {
-        m_historyToggleBtn->setText("📅 查看未发车班次");
+        m_historyToggleBtn->setText("查看未发车班次");
         showMessage("切换到历史班次模式（按时间倒序）", true);
     } else {
-        m_historyToggleBtn->setText("📅 查看历史班次");
+        m_historyToggleBtn->setText("查看历史班次");
         showMessage("切换到未发车班次模式", true);
     }
     int trainId = getSelectedTrainId();
@@ -878,7 +863,7 @@ void TrainManagementDialog::loadTripsForTrain(int trainId)
     // 更新标签
     if (m_trainInfoLabel) {
         m_trainInfoLabel->setText(
-            QString("🚆 %1  |  %2 → %3  |  %4 → %5  |  总座位: %6")
+            QString("当前车次：%1  |  %2 → %3  |  %4 → %5  |  总座位：%6")
                 .arg(trainOpt->trainNumber)
                 .arg(depName)
                 .arg(arrName)
@@ -914,10 +899,6 @@ void TrainManagementDialog::loadTripsForTrain(int trainId)
 
     m_tripTable->setRowCount(filteredTrips.size());
 
-    // 确保列数正确（已在初始化时设置，此处可省略，但保留以防）
-    // m_tripTable->setColumnCount(7);
-    // 表头已在初始化时设置，无需重复
-
     TicketManager ticketManager(*dbManager);
 
     for (int i = 0; i < filteredTrips.size(); ++i) {
@@ -949,9 +930,13 @@ void TrainManagementDialog::loadTripsForTrain(int trainId)
                                            ? QString::number(dynamicPrice, 'f', 0) + " 元"
                                            : "计算中"
                                        ));
-    }
 
-    m_tripTable->resizeColumnsToContents();
+        for (int column = 0; column < m_tripTable->columnCount(); ++column) {
+            if (QTableWidgetItem *item = m_tripTable->item(i, column)) {
+                item->setTextAlignment(Qt::AlignCenter);
+            }
+        }
+    }
 
     QString modeText = m_showHistory ? "历史班次" : "未发车班次";
     showMessage(QString("%1 共 %2 条记录").arg(modeText).arg(filteredTrips.size()), true);

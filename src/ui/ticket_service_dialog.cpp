@@ -2,6 +2,7 @@
 
 #include "ticket_manager.h"
 #include "database_manager.h"
+#include "app_style.h"
 
 #include <QAbstractItemView>
 #include <QCheckBox>
@@ -27,17 +28,14 @@ QTableWidget *createTable(QWidget *parent, const QStringList &headers)
     auto *table = new QTableWidget(parent);
     table->setColumnCount(headers.size());
     table->setHorizontalHeaderLabels(headers);
-    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    table->setSelectionBehavior(QAbstractItemView::SelectRows);
-    table->setSelectionMode(QAbstractItemView::SingleSelection);
-    table->setAlternatingRowColors(true);
-    table->verticalHeader()->setVisible(false);
-    table->horizontalHeader()->setStretchLastSection(true);
+    UiStyle::prepareTable(table);
     return table;
 }
 
 QString durationText(int totalMinutes)
 {
+    // Manager 返回统一的分钟数，界面再拆成“小时 + 分钟”，
+    // 这样时长计算只做一次，表格这里只负责中文显示。
     if (totalMinutes <= 0) {
         return QStringLiteral("待确认");
     }
@@ -352,6 +350,8 @@ void TicketServiceDialog::setupSearchTab()
     searchLayout->addLayout(conditionLayout);
 
     m_searchResultsTable = createTable(tab, {
+        // 订票操作使用的是某一天的 Trip，而不是只表示车次模板的 Train。
+        // 因此第一列保存班次 ID，选中表格行后可以直接交给 TicketManager。
         QStringLiteral("班次ID"),
         QStringLiteral("车次编号"),
         QStringLiteral("出行日期"),
@@ -385,6 +385,7 @@ void TicketServiceDialog::setupSearchTab()
     const bool canBook = m_loginResult.role == UserRole::User
                          || m_loginResult.role == UserRole::Seller
                          || m_loginResult.role == UserRole::Admin;
+    // 游客可以使用同一张时刻表，但没有真实 userId，界面先关闭订票入口。
     bookButton->setEnabled(canBook);
     if (!canBook) {
         scheduleHint->setText(QStringLiteral("游客可以查看时刻表，登录后可办理订票。"));
@@ -490,8 +491,12 @@ void TicketServiceDialog::setupQueryTab()
     });
     QHeaderView *queryHeader = m_queryResultsTable->horizontalHeader();
     queryHeader->setStretchLastSection(false);
-    queryHeader->setSectionResizeMode(QHeaderView::ResizeToContents);
+    queryHeader->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    queryHeader->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    queryHeader->setSectionResizeMode(2, QHeaderView::ResizeToContents);
     queryHeader->setSectionResizeMode(3, QHeaderView::Stretch);
+    queryHeader->setSectionResizeMode(4, QHeaderView::Stretch);
+    queryHeader->setSectionResizeMode(5, QHeaderView::ResizeToContents);
     queryHeader->setMinimumSectionSize(72);
 
     if (m_loginResult.role == UserRole::User) {
@@ -499,7 +504,7 @@ void TicketServiceDialog::setupQueryTab()
     }
 
     layout->addWidget(queryGroup);
-    layout->addWidget(m_queryResultsTable);
+    layout->addWidget(m_queryResultsTable, 1);
 
     m_tabWidget->addTab(tab, QStringLiteral("订单查询"));
 }
@@ -508,11 +513,15 @@ void TicketServiceDialog::searchTrips()
 {
     m_searchResultsTable->setRowCount(0);
 
+    // 空日期表示“不限日期”。这个约定会原样传给 TicketManager，
+    // 所以页面刚打开时可以直接返回所有正在运营的班次。
     const QString travelDate = m_allDatesCheckBox->isChecked()
                                    ? QString()
                                    : m_travelDateEdit->date().toString(QStringLiteral("yyyy-MM-dd"));
     QVector<QVariantMap> results;
     if (!m_trainNumberEdit->text().trimmed().isEmpty()) {
+        // 输入车次号时先精确查找该车次的所有 Trip，再按日期做一次筛选。
+        // 没有车次号时则把站点和日期一起交给 Manager 查询。
         results = m_ticketManager->searchByTrainNumber(m_trainNumberEdit->text().trimmed());
         if (!travelDate.isEmpty() && !results.isEmpty()) {
             QVector<QVariantMap> filteredResults;
@@ -531,6 +540,8 @@ void TicketServiceDialog::searchTrips()
 
     m_searchResultsTable->setRowCount(results.size());
     for (int row = 0; row < results.size(); ++row) {
+        // 每条结果已经由 TicketManager 整理好，包含站点、余票、时长和动态票价。
+        // UI 只把字段放入表格，不在这里访问数据库或重新计算票价。
         const QVariantMap &result = results[row];
         m_searchResultsTable->setItem(row, 0, new QTableWidgetItem(QString::number(result.value(QStringLiteral("tripId")).toInt())));
         m_searchResultsTable->setItem(row, 1, new QTableWidgetItem(result.value(QStringLiteral("trainNumber")).toString()));
@@ -558,11 +569,13 @@ void TicketServiceDialog::searchTrips()
 
 void TicketServiceDialog::bookSelectedTrain()
 {
+    // 游客的 userId 为 0，无法建立带用户外键的订单。
     if (m_loginResult.userId <= 0) {
         showMessage(false, QStringLiteral("请先登录真实账号后再订票。"));
         return;
     }
 
+    // 同一车次在不同日期会对应不同 Trip，余票和票价也各自独立。
     const int tripId = selectedTripId();
     if (tripId <= 0) {
         showMessage(false, QStringLiteral("请先在查询结果中选择一个班次。"));
@@ -650,6 +663,8 @@ void TicketServiceDialog::bookSelectedTrain()
         return;
     }
 
+    // TicketManager 会在同一事务中扣减 Trip 余票并创建订单。
+    // 任一步骤失败都会回滚，界面只根据返回值显示最终结果。
     const int orderId = m_ticketManager->bookTicket(m_loginResult.userId,
                                                     tripId,
                                                     passengerName);
@@ -772,8 +787,13 @@ void TicketServiceDialog::refreshOrderQueryTable(const QVector<QVariantMap> &res
         m_queryResultsTable->setItem(row, 3, new QTableWidgetItem(order.value(QStringLiteral("passengerName")).toString()));
         m_queryResultsTable->setItem(row, 4, new QTableWidgetItem(order.value(QStringLiteral("purchaseTime")).toString()));
         m_queryResultsTable->setItem(row, 5, new QTableWidgetItem(statusText(order.value(QStringLiteral("status")).toInt())));
+
+        for (int column : {0, 1, 2, 3, 4, 5}) {
+            if (QTableWidgetItem *item = m_queryResultsTable->item(row, column)) {
+                item->setTextAlignment(Qt::AlignCenter);
+            }
+        }
     }
-    m_queryResultsTable->resizeColumnsToContents();
 }
 
 QString TicketServiceDialog::statusText(int status) const
@@ -792,6 +812,7 @@ QString TicketServiceDialog::statusText(int status) const
 
 int TicketServiceDialog::selectedTripId() const
 {
+    // 查询表第一列保存 tripId，后续订票必须使用它定位具体日期的班次。
     const int row = m_searchResultsTable->currentRow();
     if (row < 0) {
         return 0;

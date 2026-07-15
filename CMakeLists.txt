@@ -66,8 +66,18 @@ set(HEADERS
 # ── Resources ────────────────────────────────────────────────────────────────
 set(RESOURCES
     resources/resources.qrc
-    resources/app_icon.rc
 )
+
+# Windows 图标资源不依赖 Qt 头文件，单独编译可避免带空格的项目路径被拆开。
+if(WIN32)
+    add_library(AppIconResource OBJECT resources/app_icon.rc)
+    set_target_properties(AppIconResource PROPERTIES
+        AUTOMOC OFF
+        AUTOUIC OFF
+        AUTORCC OFF
+    )
+    list(APPEND RESOURCES $<TARGET_OBJECTS:AppIconResource>)
+endif()
 
 # ── Executable ───────────────────────────────────────────────────────────────
 add_executable(${PROJECT_NAME}

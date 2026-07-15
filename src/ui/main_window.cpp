@@ -343,6 +343,26 @@ MainWindow::MainWindow(const LoginResult &loginResult,
         TicketServiceDialog dialog(*m_ticketManager, m_loginResult, initialTabIndex, this);
         dialog.exec();
     };
+
+    auto showTransferDialog = [this]() {
+        if (m_trainManager == nullptr) {
+            QMessageBox::warning(this,
+                                 QStringLiteral("换乘查询"),
+                                 QStringLiteral("车次服务尚未初始化，请稍后重试。"));
+            return;
+        }
+
+        RouteManager routeManager(m_trainManager->databaseManager());
+        if (!routeManager.buildGraph()) {
+            QMessageBox::warning(this,
+                                 QStringLiteral("换乘查询"),
+                                 QStringLiteral("无法构建路线图：%1").arg(routeManager.lastError()));
+            return;
+        }
+
+        TransferDialog dialog(&routeManager, this);
+        dialog.exec();
+    };
     // 工作台卡片的排版都一样，所以集中在这里创建。点击后的函数由调用处传入，
     // 以后车次、票务模块接入时，只需要把现在的提示函数换成真正的窗口入口，
     // 不用重新改整套主界面布局。
@@ -424,27 +444,6 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       true,
                       showOperationLogDialog);
 
-        addModuleCard(QStringLiteral("换乘查询"),
-                      QStringLiteral("查询两站之间的最优换乘路线，支持时间最短、换乘最少、综合平衡。"),
-                      QStringLiteral("智能推荐"),
-                      QStringLiteral("进入查询"),
-                      true,
-                      [this]() {
-                          if (m_trainManager == nullptr) {
-                              QMessageBox::warning(this, QStringLiteral("换乘查询"),
-                                                   QStringLiteral("车次服务尚未初始化，请稍后重试。"));
-                              return;
-                          }
-                          RouteManager routeManager(m_trainManager->databaseManager());
-                          if (!routeManager.buildGraph()) {
-                              QMessageBox::warning(this, QStringLiteral("换乘查询"),
-                                                   QStringLiteral("无法构建路线图：%1").arg(routeManager.lastError()));
-                              return;
-                          }
-                          TransferDialog dialog(&routeManager, this);
-                          dialog.exec();
-                      });
-
     } else if (m_loginResult.role == UserRole::User) {
         addModuleCard(QStringLiteral("车票查询"),
                       QStringLiteral("查询车次、余票，并可直接预订选中的车次。"),
@@ -477,21 +476,7 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       QStringLiteral("智能推荐"),
                       QStringLiteral("进入查询"),
                       true,
-                      [this]() {
-                          if (m_trainManager == nullptr) {
-                              QMessageBox::warning(this, QStringLiteral("换乘查询"),
-                                                   QStringLiteral("车次服务尚未初始化，请稍后重试。"));
-                              return;
-                          }
-                          RouteManager routeManager(m_trainManager->databaseManager());
-                          if (!routeManager.buildGraph()) {
-                              QMessageBox::warning(this, QStringLiteral("换乘查询"),
-                                                   QStringLiteral("无法构建路线图：%1").arg(routeManager.lastError()));
-                              return;
-                          }
-                          TransferDialog dialog(&routeManager, this);
-                          dialog.exec();
-                      });
+                      showTransferDialog);
 
     } else if (m_loginResult.role == UserRole::Seller) {
         addModuleCard(QStringLiteral("车票查询"),
@@ -526,21 +511,7 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                       QStringLiteral("智能推荐"),
                       QStringLiteral("进入查询"),
                       true,
-                      [this]() {
-                          if (m_trainManager == nullptr) {
-                              QMessageBox::warning(this, QStringLiteral("换乘查询"),
-                                                   QStringLiteral("车次服务尚未初始化，请稍后重试。"));
-                              return;
-                          }
-                          RouteManager routeManager(m_trainManager->databaseManager());
-                          if (!routeManager.buildGraph()) {
-                              QMessageBox::warning(this, QStringLiteral("换乘查询"),
-                                                   QStringLiteral("无法构建路线图：%1").arg(routeManager.lastError()));
-                              return;
-                          }
-                          TransferDialog dialog(&routeManager, this);
-                          dialog.exec();
-                      });
+                      showTransferDialog);
 
     } else if (m_loginResult.role == UserRole::Guest) {
         addModuleCard(QStringLiteral("车票查询"),
@@ -561,26 +532,6 @@ MainWindow::MainWindow(const LoginResult &loginResult,
                           openAccountDialog(true);
                       });
 
-        addModuleCard(QStringLiteral("换乘查询"),
-                      QStringLiteral("查询两站之间的最优换乘路线，支持时间最短、换乘最少、综合平衡。"),
-                      QStringLiteral("智能推荐"),
-                      QStringLiteral("进入查询"),
-                      true,
-                      [this]() {
-                          if (m_trainManager == nullptr) {
-                              QMessageBox::warning(this, QStringLiteral("换乘查询"),
-                                                   QStringLiteral("车次服务尚未初始化，请稍后重试。"));
-                              return;
-                          }
-                          RouteManager routeManager(m_trainManager->databaseManager());
-                          if (!routeManager.buildGraph()) {
-                              QMessageBox::warning(this, QStringLiteral("换乘查询"),
-                                                   QStringLiteral("无法构建路线图：%1").arg(routeManager.lastError()));
-                              return;
-                          }
-                          TransferDialog dialog(&routeManager, this);
-                          dialog.exec();
-                      });
     }
 
     pageLayout->addWidget(headerPanel);

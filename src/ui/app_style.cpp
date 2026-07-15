@@ -34,6 +34,7 @@ namespace UiStyle {
 
 QString dialogStyleSheet()
 {
+    // 页面里重复使用的基础控件都放在这里，颜色和状态只改一处。
     return QStringLiteral(R"QSS(
         QDialog {
             background: #eef2f3;
@@ -115,6 +116,31 @@ QString dialogStyleSheet()
             padding: 7px;
             font-weight: 700;
         }
+        QTabWidget::pane {
+            background: #ffffff;
+            border: 1px solid #cbd8d2;
+            border-radius: 8px;
+            top: -1px;
+        }
+        QTabBar::tab {
+            min-width: 92px;
+            min-height: 34px;
+            padding: 4px 16px;
+            color: #42514b;
+            background: #e8efec;
+            border: 1px solid #cbd8d2;
+            border-bottom: none;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+        QTabBar::tab:selected {
+            color: #ffffff;
+            background: #176b5b;
+            border-color: #176b5b;
+        }
+        QTabBar::tab:hover:!selected {
+            background: #dbe7e2;
+        }
         QPushButton {
             min-height: 34px;
             border-radius: 8px;
@@ -143,6 +169,14 @@ QString dialogStyleSheet()
         QPushButton#dangerButton:disabled {
             color: #f3f6f5;
             background: #c5a0a0;
+        }
+        QPushButton#secondaryButton {
+            color: #33433d;
+            background: #eef5f1;
+            border: 1px solid #cbd8d2;
+        }
+        QPushButton#secondaryButton:hover {
+            background: #dbe7e2;
         }
     )QSS");
 }

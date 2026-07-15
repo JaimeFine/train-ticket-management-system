@@ -447,6 +447,21 @@ int RouteManager::stationCount() const
     return m_graph.getStationCount();
 }
 
+QList<int> RouteManager::stationIds() const
+{
+    QList<int> ids = m_graph.getAllStationIds();
+    std::sort(ids.begin(), ids.end(), [this](int left, int right) {
+        return m_graph.getStationName(left).localeAwareCompare(
+                   m_graph.getStationName(right)) < 0;
+    });
+    return ids;
+}
+
+QString RouteManager::stationName(int stationId) const
+{
+    return m_graph.getStationName(stationId);
+}
+
 void RouteManager::setError(const QString& msg) const
 {
     m_lastError = msg;

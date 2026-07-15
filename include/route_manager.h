@@ -82,6 +82,8 @@ public:
     bool isGraphReady() const;
     QString lastError() const;
     int stationCount() const;
+    QList<int> stationIds() const;
+    QString stationName(int stationId) const;
 
 private:
     DatabaseManager* m_dbManager;
