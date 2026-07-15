@@ -40,6 +40,7 @@ set(SOURCES
     src/ui/train_management_dialog.cpp
     src/ui/station_management_dialog.cpp
     src/database/database_manager_statistics.cpp
+    src/ui/app_style.cpp
 )
 
 set(HEADERS
@@ -59,6 +60,7 @@ set(HEADERS
     include/transfer_dialog.h
     include/train_management_dialog.h
     include/station_management_dialog.h
+    include/app_style.h
 )
 
 # ── Resources ────────────────────────────────────────────────────────────────
@@ -73,7 +75,6 @@ add_executable(${PROJECT_NAME}
     ${SOURCES}
     ${HEADERS}
     ${RESOURCES}
-
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
