@@ -6,7 +6,6 @@
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
-#include <QInputDialog>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
@@ -228,7 +227,7 @@ void TrainManagementDialog::setupUI()
     m_purgeBtn->setEnabled(false);
     m_purgeBtn->setStyleSheet("background-color: #7f1d1d; color: white;");
 
-    m_seatBtn = new QPushButton("座位管理");
+    m_seatBtn = new QPushButton("Trip座位说明");
     m_seatBtn->setEnabled(false);
 
     m_countLabel = new QLabel("共 0 条记录");
@@ -501,9 +500,6 @@ void TrainManagementDialog::editTrain()
     QSpinBox *totalSeatsSpin = new QSpinBox();
     totalSeatsSpin->setRange(1, 999);
     totalSeatsSpin->setValue(current.totalSeats);
-    QSpinBox *remainingSeatsSpin = new QSpinBox();
-    remainingSeatsSpin->setRange(0, 999);
-    remainingSeatsSpin->setValue(0);  // V2: removed from Train
 
     DatabaseManager *dbManager = m_manager->databaseManager();
     if (dbManager != nullptr) {
@@ -527,7 +523,6 @@ void TrainManagementDialog::editTrain()
     form->addRow("出发时间:", departTimeEdit);
     form->addRow("到达时间:", arriveTimeEdit);
     form->addRow("总座位数:", totalSeatsSpin);
-    form->addRow("剩余座位:", remainingSeatsSpin);
 
     QHBoxLayout *btnLayout = new QHBoxLayout();
     QPushButton *okBtn = new QPushButton("确定");
@@ -554,10 +549,6 @@ void TrainManagementDialog::editTrain()
 
         if (train.trainNumber.isEmpty()) {
             showMessage("车次号不能为空", false);
-            return;
-        }
-        if (false) {
-            showMessage("剩余座位不能超过总座位", false);
             return;
         }
 
@@ -663,32 +654,7 @@ void TrainManagementDialog::deleteTrainPermanently()
 
 void TrainManagementDialog::updateSeats()
 {
-    int trainId = getSelectedTrainId();
-    if (trainId == 0) return;
-
-    auto all = m_manager->getAllTrains(false);
-    int currentSeats = 0;
-    QString trainNumber;
-    for (const auto& t : all) {
-        if (t.trainId == trainId) {
-            currentSeats = 0;
-            trainNumber = t.trainNumber;
-            break;
-        }
-    }
-
-    bool ok;
-    int delta = QInputDialog::getInt(
-        this, "座位管理 - " + trainNumber,
-        "当前余票: " + QString::number(currentSeats) + "\n\n"
-                                                       "输入变动数量（负数=售票，正数=退票）:",
-        0, -999, 999, 1, &ok
-        );
-
-    if (ok && delta != 0) {
-        showMessage(QStringLiteral("V2: 座位管理请通过Trip表操作"), false);
-        // V2: updateRemainingSeats removed — seats are per Trip now
-    }
+    showMessage(QStringLiteral("当前版本的座位余量由 Trip 数据维护。"), false);
 }
 
 void TrainManagementDialog::onTableRowClicked()
@@ -699,7 +665,7 @@ void TrainManagementDialog::onTableRowClicked()
     m_deleteBtn->setEnabled(hasSelection);
     m_resumeBtn->setEnabled(hasSelection);
     m_purgeBtn->setEnabled(hasSelection);
-    m_seatBtn->setEnabled(hasSelection);
+    m_seatBtn->setEnabled(false);
 }
 
 int TrainManagementDialog::getSelectedTrainId()
