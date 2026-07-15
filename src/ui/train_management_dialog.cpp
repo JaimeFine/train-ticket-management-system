@@ -15,6 +15,7 @@
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QVBoxLayout>
+#include <QTime>
 
 namespace {
 void styleTrainEditDialog(QDialog &dialog)
@@ -409,9 +410,9 @@ void TrainManagementDialog::addTrain()
     QComboBox *departCombo = new QComboBox();
     QComboBox *arriveCombo = new QComboBox();
     QLineEdit *departTimeEdit = new QLineEdit();
-    departTimeEdit->setPlaceholderText("如 2026-07-10 08:00");
+    departTimeEdit->setPlaceholderText("如 08:00");
     QLineEdit *arriveTimeEdit = new QLineEdit();
-    arriveTimeEdit->setPlaceholderText("如 2026-07-10 12:30");
+    arriveTimeEdit->setPlaceholderText("如 12:30");
     QSpinBox *totalSeatsSpin = new QSpinBox();
     totalSeatsSpin->setRange(1, 999);
     totalSeatsSpin->setValue(100);
@@ -451,11 +452,48 @@ void TrainManagementDialog::addTrain()
         train.departureTime = departTimeEdit->text().trimmed();
         train.arrivalTime = arriveTimeEdit->text().trimmed();
         train.totalSeats = totalSeatsSpin->value();
-        // V2: seats are per Trip now;
         train.enabled = true;
 
+        // ---- 参数校验 ----
         if (train.trainNumber.isEmpty()) {
             showMessage("车次号不能为空", false);
+            return;
+        }
+
+        if (train.departureStationId == train.arrivalStationId) {
+            showMessage("出发站和到达站不能相同", false);
+            return;
+        }
+
+        // 校验时间格式（HH:mm）
+        QRegularExpression timeRegex(R"(^([0-1][0-9]|2[0-3]):[0-5][0-9]$)");
+        if (!timeRegex.match(train.departureTime).hasMatch()) {
+            showMessage("出发时间格式无效，请使用 HH:mm 格式", false);
+            return;
+        }
+        if (!timeRegex.match(train.arrivalTime).hasMatch()) {
+            showMessage("到达时间格式无效，请使用 HH:mm 格式", false);
+            return;
+        }
+
+        // 校验出发时间是否早于到达时间（支持跨天）
+        QTime dep = QTime::fromString(train.departureTime, "HH:mm");
+        QTime arr = QTime::fromString(train.arrivalTime, "HH:mm");
+        if (!dep.isValid() || !arr.isValid()) {
+            showMessage("时间格式无效", false);
+            return;
+        }
+
+        // 跨天处理：如果出发时间 >= 到达时间，则视为跨天（允许）
+        // 例如 23:00 → 01:00 是有效的跨天车次
+        // 只有完全相同才报错
+        if (dep == arr) {
+            showMessage("出发时间和到达时间不能相同", false);
+            return;
+        }
+
+        if (train.totalSeats <= 0) {
+            showMessage("总座位数必须大于 0", false);
             return;
         }
 
@@ -501,9 +539,6 @@ void TrainManagementDialog::editTrain()
     QSpinBox *totalSeatsSpin = new QSpinBox();
     totalSeatsSpin->setRange(1, 999);
     totalSeatsSpin->setValue(current.totalSeats);
-    QSpinBox *remainingSeatsSpin = new QSpinBox();
-    remainingSeatsSpin->setRange(0, 999);
-    remainingSeatsSpin->setValue(0);  // V2: removed from Train
 
     DatabaseManager *dbManager = m_manager->databaseManager();
     if (dbManager != nullptr) {
@@ -527,7 +562,6 @@ void TrainManagementDialog::editTrain()
     form->addRow("出发时间:", departTimeEdit);
     form->addRow("到达时间:", arriveTimeEdit);
     form->addRow("总座位数:", totalSeatsSpin);
-    form->addRow("剩余座位:", remainingSeatsSpin);
 
     QHBoxLayout *btnLayout = new QHBoxLayout();
     QPushButton *okBtn = new QPushButton("确定");
@@ -549,15 +583,44 @@ void TrainManagementDialog::editTrain()
         train.departureTime = departTimeEdit->text().trimmed();
         train.arrivalTime = arriveTimeEdit->text().trimmed();
         train.totalSeats = totalSeatsSpin->value();
-        // V2: seats per Trip;
         train.enabled = current.enabled;
 
+        // ---- 参数校验 ----
         if (train.trainNumber.isEmpty()) {
             showMessage("车次号不能为空", false);
             return;
         }
-        if (false) {
-            showMessage("剩余座位不能超过总座位", false);
+
+        if (train.departureStationId == train.arrivalStationId) {
+            showMessage("出发站和到达站不能相同", false);
+            return;
+        }
+
+        // 校验时间格式（HH:mm）
+        QRegularExpression timeRegex(R"(^([0-1][0-9]|2[0-3]):[0-5][0-9]$)");
+        if (!timeRegex.match(train.departureTime).hasMatch()) {
+            showMessage("出发时间格式无效，请使用 HH:mm 格式", false);
+            return;
+        }
+        if (!timeRegex.match(train.arrivalTime).hasMatch()) {
+            showMessage("到达时间格式无效，请使用 HH:mm 格式", false);
+            return;
+        }
+
+        QTime dep = QTime::fromString(train.departureTime, "HH:mm");
+        QTime arr = QTime::fromString(train.arrivalTime, "HH:mm");
+        if (!dep.isValid() || !arr.isValid()) {
+            showMessage("时间格式无效", false);
+            return;
+        }
+
+        if (dep == arr) {
+            showMessage("出发时间和到达时间不能相同", false);
+            return;
+        }
+
+        if (train.totalSeats <= 0) {
+            showMessage("总座位数必须大于 0", false);
             return;
         }
 
