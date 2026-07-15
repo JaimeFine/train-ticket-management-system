@@ -25,6 +25,7 @@ int loadRepresentativeRemainingSeats(const QString &connectionName,
 }
 
 bool DatabaseManager::addTrain(const TrainRecord &train) {
+    // V2: 新增 Train 只写车次模板，不直接写余票；余票在 Trip 中按日维护
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
     query.prepare(QStringLiteral(
@@ -54,6 +55,7 @@ bool DatabaseManager::addTrain(const TrainRecord &train) {
     return true;
 }
 
+// 按车次ID查询，未找到返回 nullopt
 std::optional<TrainRecord> DatabaseManager::findTrainById(int trainId) const {
     m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
@@ -91,6 +93,7 @@ std::optional<TrainRecord> DatabaseManager::findTrainById(int trainId) const {
     return record;
 }
 
+// 按车次号（如 G101）查询，未找到返回 nullopt
 std::optional<TrainRecord> DatabaseManager::findTrainByNumber(
     const QString &trainNumber
 ) const {
@@ -130,6 +133,7 @@ std::optional<TrainRecord> DatabaseManager::findTrainByNumber(
     return record;
 }
 
+// 按ID整体更新车次信息，返回是否有行被修改
 bool DatabaseManager::updateTrain(const TrainRecord &train) {
     m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
@@ -168,6 +172,7 @@ bool DatabaseManager::updateTrain(const TrainRecord &train) {
     return true;
 }
 
+// 获取全部车次；onlyEnabled=true 时只返回启用（未软删除）的车次
 QList<TrainRecord> DatabaseManager::getAllTrains(bool onlyEnabled) const {
     m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
@@ -213,6 +218,7 @@ QList<TrainRecord> DatabaseManager::getAllTrains(bool onlyEnabled) const {
     return results;
 }
 
+// 软删除车次：仅置 enabled=0，保留数据以便订单等历史记录可追溯
 bool DatabaseManager::deleteTrain(int trainId) {
     m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
@@ -238,6 +244,7 @@ bool DatabaseManager::deleteTrain(int trainId) {
     return true;
 }
 
+// 设置车次启用/停用状态
 bool DatabaseManager::setTrainEnabled(int trainId, bool enabled) {
     m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
@@ -261,6 +268,7 @@ bool DatabaseManager::setTrainEnabled(int trainId, bool enabled) {
     return true;
 }
 
+// 永久删除车次：物理删除 Train 及其 Trip；有订单时拒绝，防止破坏历史数据
 bool DatabaseManager::deleteTrainPermanently(int trainId) {
     m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
@@ -312,6 +320,7 @@ bool DatabaseManager::deleteTrainPermanently(int trainId) {
     return true;
 }
 
+// 关键字模糊搜索启用中的车次（匹配车次号或起讫站名）
 QList<TrainRecord> DatabaseManager::searchTrains(const QString &keyword) const {
     m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));

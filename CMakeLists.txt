@@ -14,6 +14,11 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets Sql)
 message(STATUS "Using Qt ${QT_VERSION_MAJOR}.${QT_VERSION_MINOR}")
 
 # ── Source files grouped by module ────────────────────────────────────────────
+set(DATABASE_MANAGER_CORE_SOURCES
+    src/database/database_manager.cpp
+    src/database/database_manager_seed.cpp
+)
+
 set(SOURCES
     src/main.cpp
     src/login/login_dialog.cpp
@@ -21,7 +26,7 @@ set(SOURCES
     src/ticket/ticket_manager.cpp
     src/train/train_manager.cpp
     src/statistics/statistics_manager.cpp
-    src/database/database_manager.cpp
+    ${DATABASE_MANAGER_CORE_SOURCES}
     src/database/database_manager_user.cpp
     src/database/database_manager_station.cpp
     src/database/database_manager_train.cpp
@@ -38,8 +43,12 @@ set(SOURCES
     src/ui/transfer_dialog.cpp
     src/database/database_manager_ticket.cpp
     src/ui/train_management_dialog.cpp
+    src/ui/train_management_dialog_support.cpp
+    src/ui/train_management_dialog_train_ops.cpp
+    src/ui/train_management_dialog_trip_ops.cpp
     src/ui/station_management_dialog.cpp
     src/database/database_manager_statistics.cpp
+    src/ui/app_style.cpp
 )
 
 set(HEADERS
@@ -59,13 +68,24 @@ set(HEADERS
     include/transfer_dialog.h
     include/train_management_dialog.h
     include/station_management_dialog.h
+    include/app_style.h
 )
 
 # ── Resources ────────────────────────────────────────────────────────────────
 set(RESOURCES
     resources/resources.qrc
-    resources/app_icon.rc
 )
+
+# Windows 图标资源不依赖 Qt 头文件，单独编译可避免带空格的项目路径被拆开。
+if(WIN32)
+    add_library(AppIconResource OBJECT resources/app_icon.rc)
+    set_target_properties(AppIconResource PROPERTIES
+        AUTOMOC OFF
+        AUTOUIC OFF
+        AUTORCC OFF
+    )
+    list(APPEND RESOURCES $<TARGET_OBJECTS:AppIconResource>)
+endif()
 
 # ── Executable ───────────────────────────────────────────────────────────────
 add_executable(${PROJECT_NAME}
@@ -73,7 +93,6 @@ add_executable(${PROJECT_NAME}
     ${SOURCES}
     ${HEADERS}
     ${RESOURCES}
-
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -95,8 +114,12 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 
 # ── Tests (optional subdirectory) ────────────────────────────────────────────
 option(BUILD_TESTS "Build unit tests" OFF)
+option(BUILD_DEMOS "Build demo tools" OFF)
 if(BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
 
+if(BUILD_DEMOS)
+    add_subdirectory(demo)
+endif()

@@ -1,11 +1,6 @@
 #include "database_manager.h"
 
-// This file implements database connection
-// ! Notes
-// - QSqpDatabase represents the connection itself
-// - QSqlQuery runs SQL statements through an open connection
-// - QSqlError gives us the failure message
-// - QCoreApplication / QDir / QFileInfo help us buils a safe path
+// 数据库连接、schema 初始化与路径解析。
 
 #include <QCoreApplication>
 #include <QDir>
@@ -19,8 +14,6 @@
 #include <QTextStream>
 
 namespace {
-    // This block load SQL from the schema file
-
     QString resolveSchemaPath() {
         QDir baseDir(QCoreApplication::applicationDirPath());
 
@@ -41,7 +34,7 @@ namespace {
                 continue;
             }
 
-            // Removing comment lines:
+            // 去掉 -- 开头的注释行。
             QStringList filteredLines;
             const QStringList lines = statement.split('\n');
             for (const QString &line : lines) {
@@ -61,43 +54,12 @@ namespace {
         return statements;
     }
 
-    bool execPrepared(QSqlDatabase &database,
-                      QString *lastError,
-                      const QString &sql,
-                      const QList<QVariant> &values = {}) {
-        QSqlQuery query(database);
-        query.prepare(sql);
-
-        for (const QVariant &value : values) {
-            query.addBindValue(value);
-        }
-
-        if (!query.exec()) {
-            if (lastError != nullptr) {
-                *lastError = query.lastError().text();
-            }
-            return false;
-        }
-
-        return true;
-    }
-
-    bool tableHasRows(QSqlDatabase &database, const QString &tableName) {
-        QSqlQuery query(database);
-        if (!query.exec(QStringLiteral("SELECT 1 FROM %1 LIMIT 1").arg(tableName))) {
-            return false;
-        }
-
-        return query.next();
-    }
 }   // namespace
 
 DatabaseManager::DatabaseManager() : m_connectionName(QStringLiteral(
-    "train_ticket_connection"   // ! This is default
+    "train_ticket_connection"   // ! 默认连接名
 )) {
-    // We used a named connection instead of an anonymous default connection so
-    // this class stays predictable if the project later grows more windows or
-    // more test.
+    // 用命名连接而非匿名默认连接，将来多窗口/多测试并存时行为更可控。
 }
 
 DatabaseManager::~DatabaseManager() {
@@ -105,13 +67,6 @@ DatabaseManager::~DatabaseManager() {
 }
 
 bool DatabaseManager::initialize() {
-    // This is the complete implementation of initialize()
-    // ! What it does:
-    // 1. opens SQLite,
-    // 2. turns on foreign key checking,
-    // 3. creates all required tables,
-    // 4. returns true only if everything succeeded.
-
     m_lastError.clear();
 
     if (!openDatabase()) {
@@ -158,6 +113,7 @@ bool DatabaseManager::wasCreated() const {
 bool DatabaseManager::openDatabase() {
     m_databasePath = resolveDatabasePath();
 
+    // 记录文件是否已存在，用于区分本次是新建还是复用数据库。
     const bool databaseFileAlreadyExists = QFileInfo::exists(m_databasePath);
 
     QSqlDatabase database;
@@ -180,7 +136,7 @@ bool DatabaseManager::openDatabase() {
         m_wasCreated = true;
     }
 
-    // Handling foreign keys:
+    // SQLite 默认关闭外键约束，必须对每个连接显式打开。
     QSqlQuery pragmaQuery(database);
     if (!pragmaQuery.exec(QStringLiteral("PRAGMA foreign_keys = ON;"))) {
         m_lastError = pragmaQuery.lastError().text();
@@ -195,6 +151,7 @@ void DatabaseManager::closeDatabase() {
         return;
     }
 
+    // 先释放局部 QSqlDatabase，再 removeDatabase，避免"连接仍在使用"警告。
     {
         QSqlDatabase database = QSqlDatabase::database(m_connectionName);
         if (database.isOpen()) {
@@ -219,8 +176,7 @@ bool DatabaseManager::createTables() {
         return false;
     }
 
-    // ! If one CREATE TABLE fails, we roll back so
-    // ! initialization does not end in a half-finished state.
+    // 任一建表语句失败时整体回滚，避免初始化停在半完成状态。
     if (!database.transaction()) {
         m_lastError = database.lastError().text();
         return false;
@@ -268,166 +224,8 @@ bool DatabaseManager::createTables() {
     return true;
 }
 
-bool DatabaseManager::seedDemoData() {
-    if (!QSqlDatabase::contains(m_connectionName)) {
-        m_lastError = QStringLiteral("Database connection does not exist.");
-        return false;
-    }
-
-    QSqlDatabase database = QSqlDatabase::database(m_connectionName);
-    if (!database.isOpen()) {
-        m_lastError = QStringLiteral("Database connection is not open.");
-        return false;
-    }
-
-    // 已有完整演示数据时直接跳过，避免每次启动都重复跑整套种子写入。
-    if (tableHasRows(database, QStringLiteral("User"))
-        && tableHasRows(database, QStringLiteral("Station"))
-        && tableHasRows(database, QStringLiteral("Train"))
-        && tableHasRows(database, QStringLiteral("Trip"))) {
-        return true;
-    }
-
-    if (!database.transaction()) {
-        m_lastError = database.lastError().text();
-        return false;
-    }
-
-    const struct DemoUserSeed {
-        QString username;
-        QString password;
-        int role;
-        int enabled;
-    } demoUsers[] = {
-        {QStringLiteral("admin"), QStringLiteral("admin123"), 2, 1},
-        {QStringLiteral("seller"), QStringLiteral("seller123"), 1, 1},
-        {QStringLiteral("user01"), QStringLiteral("user123"), 3, 1},
-        {QStringLiteral("user02"), QStringLiteral("user456"), 3, 1}
-    };
-
-    for (const DemoUserSeed &user : demoUsers) {
-        if (!execPrepared(database,
-                          &m_lastError,
-                          QStringLiteral(
-                              "INSERT OR IGNORE INTO User "
-                              "(username, password, role, enabled) "
-                              "VALUES (?, ?, ?, ?)"
-                          ),
-                          {user.username, user.password, user.role, user.enabled})) {
-            database.rollback();
-            return false;
-        }
-    }
-
-    const QStringList demoStations = {
-        QStringLiteral("北京南"),
-        QStringLiteral("南京南"),
-        QStringLiteral("上海虹桥"),
-        QStringLiteral("杭州东")
-    };
-
-    for (const QString &stationName : demoStations) {
-        if (!execPrepared(database,
-                          &m_lastError,
-                          QStringLiteral(
-                              "INSERT OR IGNORE INTO Station (stationName) VALUES (?)"
-                          ),
-                          {stationName})) {
-            database.rollback();
-            return false;
-        }
-    }
-
-    const struct DemoTrainSeed {
-        QString trainNumber;
-        QString departureStationName;
-        QString arrivalStationName;
-        QString departureTime;
-        QString arrivalTime;
-        int totalSeats;
-        int enabled;
-    } demoTrains[] = {
-        {QStringLiteral("G1001"), QStringLiteral("北京南"), QStringLiteral("上海虹桥"),
-         QStringLiteral("08:00"), QStringLiteral("12:38"), 600, 1},
-        {QStringLiteral("G1002"), QStringLiteral("上海虹桥"), QStringLiteral("北京南"),
-         QStringLiteral("14:00"), QStringLiteral("18:40"), 600, 1},
-        {QStringLiteral("G2001"), QStringLiteral("南京南"), QStringLiteral("杭州东"),
-         QStringLiteral("09:15"), QStringLiteral("11:10"), 480, 1},
-        {QStringLiteral("G2002"), QStringLiteral("杭州东"), QStringLiteral("南京南"),
-         QStringLiteral("15:20"), QStringLiteral("17:18"), 480, 1}
-    };
-
-    for (const DemoTrainSeed &train : demoTrains) {
-        if (!execPrepared(
-                database,
-                &m_lastError,
-                QStringLiteral(
-                    "INSERT OR IGNORE INTO Train ("
-                    "trainNumber, departureStationId, arrivalStationId, "
-                    "departureTime, arrivalTime, totalSeats, enabled"
-                    ") "
-                    "SELECT ?, dep.stationId, arr.stationId, ?, ?, ?, ? "
-                    "FROM Station dep, Station arr "
-                    "WHERE dep.stationName = ? AND arr.stationName = ?"
-                ),
-                {
-                    train.trainNumber,
-                    train.departureTime,
-                    train.arrivalTime,
-                    train.totalSeats,
-                    train.enabled,
-                    train.departureStationName,
-                    train.arrivalStationName
-                })) {
-            database.rollback();
-            return false;
-        }
-    }
-
-    const QString today =
-        QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd"));
-    const QString tomorrow =
-        QDateTime::currentDateTime().addDays(1).toString(QStringLiteral("yyyy-MM-dd"));
-
-    for (const QString &travelDate : {today, tomorrow}) {
-        for (const DemoTrainSeed &train : demoTrains) {
-            if (!execPrepared(
-                    database,
-                    &m_lastError,
-                    QStringLiteral(
-                        "INSERT OR IGNORE INTO Trip ("
-                        "trainId, travelDate, departureTime, arrivalTime, "
-                        "totalSeats, remainingSeats, basePrice, enabled"
-                        ") "
-                        "SELECT trainId, ?, departureTime, arrivalTime, totalSeats, totalSeats, 0, 1 "
-                        "FROM Train WHERE trainNumber = ?"
-                    ),
-                    {travelDate, train.trainNumber})) {
-                database.rollback();
-                return false;
-            }
-        }
-    }
-
-    if (!database.commit()) {
-        m_lastError = database.lastError().text();
-        database.rollback();
-        return false;
-    }
-
-    return true;
-}
-
 QString DatabaseManager::resolveDatabasePath() const {
-    // * Trying to place the database file in a project-style "database" folder.
-    //
-    // We support three common run locations:
-    // 1. executable launched from the repository root
-    // 2. executable launched from the build folder
-    // 3. executable launched somewhere else
-    //
-    // ! In case (3), we still create a local "database" folder so
-    // ! initialization works instead of failing.
+    // 优先复用仓库或构建目录旁的 database 目录，必要时再在可执行文件旁创建。
 
     QDir baseDir(QCoreApplication::applicationDirPath());
 
@@ -440,7 +238,6 @@ QString DatabaseManager::resolveDatabasePath() const {
         return parentDir.filePath(QStringLiteral("database/train_ticket_v2.db"));
     }
 
-    // If neither directory exists, create one beside the executable.
     baseDir.mkpath(QStringLiteral("database"));
     return baseDir.filePath(QStringLiteral("database/train_ticket_v2.db"));
 }

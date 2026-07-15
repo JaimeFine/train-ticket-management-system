@@ -12,6 +12,7 @@
 #include <QDebug>
 #include <QRandomGenerator>
 
+// 生成带时间戳+随机数的唯一名称，避免多次运行测试时数据冲突
 static QString uniq(const QString &prefix) {
     return QStringLiteral("%1_%2_%3")
         .arg(prefix)
@@ -19,9 +20,11 @@ static QString uniq(const QString &prefix) {
         .arg(QRandomGenerator::global()->bounded(10000));
 }
 
+// 冒烟测试主流程：建数据→购票/退票→校验统计与座位，任一步失败即返回1
 int main(int argc, char *argv[]) {
     QCoreApplication app(argc, argv);
 
+    // 测试前置：数据库必须能正常初始化
     DatabaseManager db;
     if (!db.initialize()) { qCritical() << "FAIL: DB init:" << db.lastError(); return 1; }
 

@@ -5,6 +5,7 @@
 #include <QSqlQuery>
 
 namespace {
+// 统一把当前行读取成 TripRecord，避免多个查询函数重复抄字段顺序
 TripRecord readTripRecord(QSqlQuery &query)
 {
     TripRecord record;
@@ -27,6 +28,8 @@ std::optional<int> DatabaseManager::createTrip(int trainId,
 {
     m_lastError.clear();
 
+    // createTrip 基于 Train 模板生成当日班次：
+    // 继承默认发到时刻，总座位与余票初始相同，基础票价先置 0
     const auto train = findTrainById(trainId);
     if (!train.has_value()) {
         m_lastError = QStringLiteral("Train does not exist.");
@@ -101,6 +104,7 @@ std::optional<TripRecord> DatabaseManager::findOrCreateTrip(int trainId,
     }
 
     if (query.next()) {
+        // 已存在当天班次时直接返回，不重复创建
         return readTripRecord(query);
     }
 
@@ -117,6 +121,7 @@ bool DatabaseManager::adjustTripSeats(int tripId, int delta)
     m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
+    // 扣票时额外校验 remainingSeats >= 需要扣减的数量，防止并发/重复请求导致超卖
     if (delta < 0) {
         query.prepare(QStringLiteral(
             "UPDATE Trip "
@@ -170,4 +175,43 @@ QList<TripRecord> DatabaseManager::findTripsByTrain(int trainId) const
     }
 
     return results;
+}
+
+bool DatabaseManager::updateTrip(const TripRecord &trip)
+{
+    m_lastError.clear();
+    QSqlQuery query(QSqlDatabase::database(m_connectionName));
+
+    query.prepare(QStringLiteral(
+        "UPDATE Trip SET "
+        "travelDate = :travelDate, "
+        "departureTime = :departureTime, "
+        "arrivalTime = :arrivalTime, "
+        "totalSeats = :totalSeats, "
+        "remainingSeats = :remainingSeats, "
+        "basePrice = :basePrice, "
+        "enabled = :enabled "
+        "WHERE tripId = :tripId"
+        ));
+
+    query.bindValue(":tripId", trip.tripId);
+    query.bindValue(":travelDate", trip.travelDate);
+    query.bindValue(":departureTime", trip.departureTime);
+    query.bindValue(":arrivalTime", trip.arrivalTime);
+    query.bindValue(":totalSeats", trip.totalSeats);
+    query.bindValue(":remainingSeats", trip.remainingSeats);
+    query.bindValue(":basePrice", trip.basePrice);
+    query.bindValue(":enabled", trip.enabled ? 1 : 0);
+
+    if (!query.exec()) {
+        m_lastError = query.lastError().text();
+        return false;
+    }
+
+    if (query.numRowsAffected() == 0) {
+        m_lastError = QStringLiteral("No trip found for the given tripId.");
+        return false;
+    }
+
+    return true;
 }

@@ -4,6 +4,7 @@
 #include <QDialog>
 #include "train_manager.h"
 
+class QTabWidget;
 class QTableWidget;
 class QLineEdit;
 class QComboBox;
@@ -28,6 +29,13 @@ private slots:
     void deleteTrainPermanently();
     void updateSeats();
     void onTableRowClicked();
+    void loadTripsForTrain(int trainId);
+    void generateTrips();
+    void editTrip();
+    void disableTrip();
+    void toggleHistoryMode();
+    void onTrainTableDoubleClicked(const QModelIndex &index);
+    void goBackToTrainList();
 
 private:
     void setupUI();
@@ -35,7 +43,9 @@ private:
     void loadStations();
     void clearSelection();
     void showMessage(const QString &msg, bool success = false);
+    void selectTrainByNumber(const QString& trainNumber);
     int getSelectedTrainId();
+    bool m_showHistory = false;
 
     QTableWidget *m_table;
     QLineEdit *m_searchInput;
@@ -52,6 +62,14 @@ private:
     QLabel *m_messageLabel;
     QLabel *m_countLabel;
     QMap<int, QString> m_stationNameMap;
+    QTabWidget *m_tabWidget;
+    QTableWidget *m_tripTable;
+    QPushButton *m_generateTripBtn;
+    QPushButton *m_editTripBtn;
+    QPushButton *m_disableTripBtn;
+    QPushButton *m_historyToggleBtn;
+    QLabel* m_trainInfoLabel = nullptr;
+    QPushButton* m_backToTrainBtn = nullptr;
 
     TrainManager* m_manager;
 };

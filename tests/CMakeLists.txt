@@ -22,9 +22,14 @@ function(add_qt_smoke_test testTarget)
     endif()
 endfunction()
 
+set(DATABASE_MANAGER_CORE_SOURCES
+    ../src/database/database_manager.cpp
+    ../src/database/database_manager_seed.cpp
+)
+
 add_executable(database_init_smoke_test
     database_init_smoke_test.cpp
-    ../src/database/database_manager.cpp
+    ${DATABASE_MANAGER_CORE_SOURCES}
 )
 
 target_include_directories(database_init_smoke_test PRIVATE
@@ -48,7 +53,7 @@ add_custom_command(TARGET database_init_smoke_test POST_BUILD
 
 add_executable(user_api_smoke_test
     user_api_smoke_test.cpp
-    ../src/database/database_manager.cpp
+    ${DATABASE_MANAGER_CORE_SOURCES}
     ../src/database/database_manager_user.cpp
 )
 
@@ -74,7 +79,7 @@ add_custom_command(TARGET user_api_smoke_test POST_BUILD
 add_executable(login_role_permission_test
     login_role_permission_test.cpp
     ../src/login/login_manager.cpp
-    ../src/database/database_manager.cpp
+    ${DATABASE_MANAGER_CORE_SOURCES}
     ../src/database/database_manager_user.cpp
     ../src/database/database_manager_operation_log.cpp
 )
@@ -101,7 +106,7 @@ add_custom_command(TARGET login_role_permission_test POST_BUILD
 add_executable(login_account_management_test
     login_account_management_test.cpp
     ../src/login/login_manager.cpp
-    ../src/database/database_manager.cpp
+    ${DATABASE_MANAGER_CORE_SOURCES}
     ../src/database/database_manager_user.cpp
     ../src/database/database_manager_operation_log.cpp
 )
@@ -128,7 +133,7 @@ add_custom_command(TARGET login_account_management_test POST_BUILD
 add_executable(ticket_issue9_smoke_test
     ticket_issue9_smoke_test.cpp
     ../src/ticket/ticket_manager.cpp
-    ../src/database/database_manager.cpp
+    ${DATABASE_MANAGER_CORE_SOURCES}
     ../src/database/database_manager_user.cpp
     ../src/database/database_manager_station.cpp
     ../src/database/database_manager_train.cpp
@@ -161,7 +166,7 @@ add_custom_command(TARGET ticket_issue9_smoke_test POST_BUILD
 add_executable(dynamic_pricing_smoke_test
     dynamic_pricing_smoke_test.cpp
     ../src/ticket/ticket_manager.cpp
-    ../src/database/database_manager.cpp
+    ${DATABASE_MANAGER_CORE_SOURCES}
     ../src/database/database_manager_user.cpp
     ../src/database/database_manager_station.cpp
     ../src/database/database_manager_train.cpp
@@ -191,41 +196,9 @@ add_custom_command(TARGET dynamic_pricing_smoke_test POST_BUILD
         $<TARGET_FILE_DIR:dynamic_pricing_smoke_test>/database/schema_v2.sql
 )
 
-add_executable(dynamic_pricing_live_demo
-    dynamic_pricing_live_demo.cpp
-    ../src/ticket/ticket_manager.cpp
-    ../src/database/database_manager.cpp
-    ../src/database/database_manager_user.cpp
-    ../src/database/database_manager_station.cpp
-    ../src/database/database_manager_train.cpp
-    ../src/database/database_manager_trip.cpp
-    ../src/database/database_manager_order.cpp
-    ../src/database/database_manager_ticket.cpp
-    ../src/database/database_manager_statistics.cpp
-    ../src/database/database_manager_operation_log.cpp
-)
-
-target_include_directories(dynamic_pricing_live_demo PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../include
-)
-
-target_link_libraries(dynamic_pricing_live_demo PRIVATE
-    Qt${QT_VERSION_MAJOR}::Core
-    Qt${QT_VERSION_MAJOR}::Sql
-    Qt${QT_VERSION_MAJOR}::Widgets
-)
-
-add_custom_command(TARGET dynamic_pricing_live_demo POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory
-        $<TARGET_FILE_DIR:dynamic_pricing_live_demo>/database
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/../database/schema_v2.sql
-        $<TARGET_FILE_DIR:dynamic_pricing_live_demo>/database/schema_v2.sql
-)
-
 add_executable(station_api_smoke_test
     station_api_smoke_test.cpp
-    ../src/database/database_manager.cpp
+    ${DATABASE_MANAGER_CORE_SOURCES}
     ../src/database/database_manager_station.cpp
 )
 
@@ -250,7 +223,7 @@ add_custom_command(TARGET station_api_smoke_test POST_BUILD
 
 add_executable(train_api_smoke_test
     train_api_smoke_test.cpp
-    ../src/database/database_manager.cpp
+    ${DATABASE_MANAGER_CORE_SOURCES}
     ../src/database/database_manager_station.cpp
     ../src/database/database_manager_train.cpp
 )
@@ -276,7 +249,7 @@ add_custom_command(TARGET train_api_smoke_test POST_BUILD
 
 add_executable(order_api_smoke_test
     order_api_smoke_test.cpp
-    ../src/database/database_manager.cpp
+    ${DATABASE_MANAGER_CORE_SOURCES}
     ../src/database/database_manager_user.cpp
     ../src/database/database_manager_station.cpp
     ../src/database/database_manager_train.cpp
@@ -305,7 +278,7 @@ add_custom_command(TARGET order_api_smoke_test POST_BUILD
 
 add_executable(ticket_issue10_smoke_test
     ticket_issue10_smoke_test.cpp
-    ../src/database/database_manager.cpp
+    ${DATABASE_MANAGER_CORE_SOURCES}
     ../src/database/database_manager_user.cpp
     ../src/database/database_manager_station.cpp
     ../src/database/database_manager_train.cpp
@@ -338,7 +311,7 @@ add_custom_command(TARGET ticket_issue10_smoke_test POST_BUILD
 
 add_executable(statistics_smoke_test
     statistics_smoke_test.cpp
-    ../src/database/database_manager.cpp ../src/database/database_manager_user.cpp
+    ${DATABASE_MANAGER_CORE_SOURCES} ../src/database/database_manager_user.cpp
     ../src/database/database_manager_station.cpp ../src/database/database_manager_train.cpp
     ../src/database/database_manager_trip.cpp
     ../src/database/database_manager_order.cpp ../src/database/database_manager_ticket.cpp
