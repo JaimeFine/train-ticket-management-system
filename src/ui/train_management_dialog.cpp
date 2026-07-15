@@ -422,8 +422,8 @@ void TrainManagementDialog::addTrain()
         train.arrivalStationId = arriveCombo->currentData().toInt();
         train.departureTime = departTimeEdit->text().trimmed();
         train.arrivalTime = arriveTimeEdit->text().trimmed();
+        // Train 只保存车次模板和总座位数，具体日期的余票由对应的 Trip 记录维护。
         train.totalSeats = totalSeatsSpin->value();
-        // V2: seats are per Trip now;
         train.enabled = true;
 
         if (train.trainNumber.isEmpty()) {
@@ -516,8 +516,8 @@ void TrainManagementDialog::editTrain()
         train.arrivalStationId = arriveCombo->currentData().toInt();
         train.departureTime = departTimeEdit->text().trimmed();
         train.arrivalTime = arriveTimeEdit->text().trimmed();
+        // 修改车次模板时不直接改余票，已经生成的 Trip 仍保留各自的座位数据。
         train.totalSeats = totalSeatsSpin->value();
-        // V2: seats per Trip;
         train.enabled = current.enabled;
 
         if (train.trainNumber.isEmpty()) {
