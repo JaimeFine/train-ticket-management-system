@@ -258,6 +258,7 @@ bool TrainManager::deleteTrain(int trainId)
         return false;
     }
 
+    // 这里的“删除”其实是停运：保留历史数据，只把 enabled 置为 false。
     if (!m_dbManager->deleteTrain(trainId)) {
         setStatus("停运车次失败: " + m_dbManager->lastError());
         return false;
@@ -279,6 +280,7 @@ bool TrainManager::resumeTrain(int trainId)
         return false;
     }
 
+    // 恢复运营只需把 enabled 重新置回 true，不改动车次基础信息。
     if (!m_dbManager->setTrainEnabled(trainId, true)) {
         setStatus("恢复运营失败: " + m_dbManager->lastError());
         return false;

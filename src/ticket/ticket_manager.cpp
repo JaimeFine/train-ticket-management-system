@@ -256,6 +256,7 @@ int TicketManager::bookTicket(int userId, int tripId, const QString &passengerNa
         m_lastError = QStringLiteral("班次不存在");
         return -1;
     }
+    // 先检查 trip.enabled：班次停运后，直接禁止继续售票。
     if (!trip->enabled) {
         m_lastError = QStringLiteral("该班次已停运");
         return -1;
@@ -265,6 +266,7 @@ int TicketManager::bookTicket(int userId, int tripId, const QString &passengerNa
         return -1;
     }
 
+    // 购票前要同时确认班次和所属车次都处于启用状态。
     const auto train = m_db.findTrainById(trip->trainId);
     if (!train.has_value() || !train->enabled) {
         m_lastError = QStringLiteral("该车次已停运");

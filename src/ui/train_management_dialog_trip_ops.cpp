@@ -404,6 +404,7 @@ void TrainManagementDialog::disableTrip()
                              ? QString("确定要停运 %1 的班次吗？").arg(trip.travelDate)
                              : QString("确定要恢复 %1 的班次吗？").arg(trip.travelDate);
 
+    // 班次级启停控制：直接切换 trip.enabled，让当天班次可单独停运或恢复。
     QMessageBox::StandardButton reply = QMessageBox::question(
         this, "确认" + action,
         confirmMsg,

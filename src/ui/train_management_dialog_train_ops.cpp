@@ -271,6 +271,7 @@ void TrainManagementDialog::deleteTrain()
         }
     }
 
+    // 管理员在这里确认“停运”动作；点确认后会向管理层下发状态变更。
     QMessageBox::StandardButton reply = QMessageBox::question(
         this, "确认停运",
         "确定要停运车次 " + trainNumber + " 吗？",
@@ -301,6 +302,7 @@ void TrainManagementDialog::resumeTrain()
         }
     }
 
+    // “恢复运营”与“停运”对称处理，UI 只负责确认和刷新。
     QMessageBox::StandardButton reply = QMessageBox::question(
         this, "确认恢复运营",
         "确定要恢复车次 " + trainNumber + " 的运营吗？",

@@ -223,6 +223,7 @@ bool DatabaseManager::deleteTrain(int trainId) {
     m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
+    // 这一步对应管理端的“停运”：不删记录，只禁止该车次继续对外可用。
     query.prepare(QStringLiteral(
         "UPDATE Train "
         "SET enabled = 0 "
@@ -249,6 +250,7 @@ bool DatabaseManager::setTrainEnabled(int trainId, bool enabled) {
     m_lastError.clear();
     QSqlQuery query(QSqlDatabase::database(m_connectionName));
 
+    // “恢复运营”走同一字段：enabled=1；停运则是 enabled=0。
     query.prepare(QStringLiteral(
         "UPDATE Train SET enabled = :enabled WHERE trainId = :trainId"
     ));
